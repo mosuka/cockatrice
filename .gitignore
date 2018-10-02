@@ -1,0 +1,9 @@
+*.pyc
+*.pyo
+*.egg
+*.DS_store
+basilisk.egg-info
+docs/*/_build
+.idea/
+venv/
+.python-version

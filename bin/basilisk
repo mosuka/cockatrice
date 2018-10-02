@@ -1,0 +1,148 @@
+#!/usr/bin/env python
+
+# -*- coding: utf-8 -*-
+
+# Copyright (c) 2018 Minoru Osuka
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# 		http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import sys
+import signal
+
+sys.path.append(".")
+
+from argparse import ArgumentParser
+from logging import getLogger, StreamHandler, Formatter, CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET
+from logging.handlers import RotatingFileHandler
+
+from prometheus_client.core import CollectorRegistry
+
+from basilisk import APP_NAME, APP_VERSION
+from basilisk.kvs import KeyValueStore
+from basilisk.kvs_server import KVSServer
+
+
+def signal_handler(signal, frame):
+    sys.exit(0)
+
+
+signal.signal(signal.SIGINT, signal_handler)
+
+
+def server_handler(args):
+    # create logger and handler
+    logger = getLogger(APP_NAME)
+    log_handler = StreamHandler()
+
+    # determine log destination
+    if args.log_file != "":
+        log_handler = RotatingFileHandler(args.log_file, "a+", maxBytes=512000000, backupCount=5)
+
+    # determine log level
+    if args.log_level in ["CRITICAL", "FATAL"]:
+        logger.setLevel(CRITICAL)
+        log_handler.setLevel(CRITICAL)
+    elif args.log_level == "ERROR":
+        logger.setLevel(ERROR)
+        log_handler.setLevel(ERROR)
+    elif args.log_level in ["WARNING", "WARN"]:
+        logger.setLevel(WARNING)
+        log_handler.setLevel(WARNING)
+    elif args.log_level == "INFO":
+        logger.setLevel(INFO)
+        log_handler.setLevel(INFO)
+    elif args.log_level == "DEBUG":
+        logger.setLevel(DEBUG)
+        log_handler.setLevel(DEBUG)
+    elif args.log_level == "NOTSET":
+        logger.setLevel(NOTSET)
+        log_handler.setLevel(NOTSET)
+    else:
+        logger.setLevel(INFO)
+        log_handler.setLevel(INFO)
+
+    # set log format
+    handler_format = Formatter('%(asctime)s - %(levelname)s - %(pathname)s:%(lineno)d - %(message)s')
+    log_handler.setFormatter(handler_format)
+
+    # add log handler
+    logger.addHandler(log_handler)
+
+    # create http logger and handler
+    http_logger = getLogger(APP_NAME + "_http")
+    http_log_handler = StreamHandler()
+
+    # determine http log destination
+    if args.http_log_file != "":
+        http_log_handler = RotatingFileHandler(args.http_log_file, "a+", maxBytes=512000000, backupCount=5)
+
+    # determine http log level
+    http_logger.setLevel(INFO)
+    http_log_handler.setLevel(INFO)
+
+    # set http log format
+    http_handler_format = Formatter('%(message)s')
+    http_log_handler.setFormatter(http_handler_format)
+
+    # add http log handler
+    http_logger.addHandler(http_log_handler)
+
+    # metrics registry
+    metrics_registry = CollectorRegistry()
+
+    # kvs = KeyValueStore(args.bind_addr, args.peer_addr, logger, metrics_registry)
+    kvs = KeyValueStore(args.bind_addr, args.peer_addr, args.dump_file, logger)
+    server = KVSServer(APP_NAME, args.http_port, kvs, logger, http_logger, metrics_registry)
+    server.start()
+
+
+def client_handler(args):
+    print(__name__)
+
+
+def main():
+    parser = ArgumentParser(description="basilisk command")
+    parser.add_argument("-v", "--version", action="version", version="basilisk {}".format(APP_VERSION))
+
+    subparsers = parser.add_subparsers()
+
+    parser_server = subparsers.add_parser("server", help="see `server -h`")
+    parser_server.add_argument("--http-port", dest="http_port", default=8080, metavar="HTTP_PORT", type=int,
+                               help="http port")
+    parser_server.add_argument("--bind-addr", dest="bind_addr", default="127.0.0.1:10000", metavar="BIND_ADDR",
+                               help="host address")
+    parser_server.add_argument("--peer-addr", dest="peer_addr", default=[], action="append", metavar="PEER_ADDR",
+                               help="peer address")
+    parser_server.add_argument("--dump-file", dest="dump_file", default="/tmp/basilisk/node1/data.dump",
+                               metavar="DUMP_FILE", help="dump file")
+    parser_server.add_argument("--log-level", dest="log_level", default="DEBUG",
+                               metavar="LOG_LEVEL", help="log level")
+    parser_server.add_argument("--log-file", dest="log_file", default="",
+                               metavar="LOG_FILE", help="log file")
+    parser_server.add_argument("--http-log-file", dest="http_log_file", default="",
+                               metavar="HTTP_LOG_FILE", help="http log file")
+    parser_server.set_defaults(handler=server_handler)
+
+    parser_client = subparsers.add_parser("client", help="see `client -h`")
+    parser_client.add_argument("-H", metavar="HOST", help="host address")
+    parser_client.set_defaults(handler=client_handler)
+
+    args = parser.parse_args()
+    if hasattr(args, 'handler'):
+        args.handler(args)
+    else:
+        parser.print_help()
+
+
+if __name__ == '__main__':
+    main()
