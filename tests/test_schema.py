@@ -14,26 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from setuptools import setup
+import unittest
 
-from basilisk import APP_NAME, APP_VERSION
+import os
 
-setup(
-    name=APP_NAME,
-    version=APP_VERSION,
-    description="Test application.",
-    author="Minoru Osuka",
-    author_email="minoru.osuka@gmail.com",
-    license="AL2",
-    packages=[
-        "basilisk"
-    ],
-    install_requires=[
-        "pysyncobj==0.3.4",
-        "flask==1.0.2",
-        "prometheus_client==0.3.1",
-        "whoosh==2.7.4",
-        "pyyaml==3.13"
-    ],
-    test_suite="tests"
-)
+from basilisk.schema import Schema
+
+
+class TestSchema(unittest.TestCase):
+    def setUp(self):
+        self.conf_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "../conf"))
+
+        schema_file = self.conf_dir + "/schema.yaml"
+        self.schema = Schema(schema_file)
+
+    def test_get_unique_field(self):
+        expected = "id"
+        actual = self.schema.get_unique_field()
+
+        self.assertEqual(expected, actual)

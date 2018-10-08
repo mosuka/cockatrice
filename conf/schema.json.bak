@@ -1,0 +1,505 @@
+{
+  "schema": {
+    "id": {
+      "field_type": "id",
+      "args": {
+        "unique": true,
+        "stored": true
+      }
+    },
+    "keyword": {
+      "field_type": "keyword",
+      "args": {
+        "stored": true
+      }
+    },
+    "title": {
+      "field_type": "text_ja",
+      "args": {
+        "stored": true
+      }
+    },
+    "description": {
+      "field_type": "text_ja",
+      "args": {
+        "stored": true
+      }
+    },
+    "price": {
+      "field_type": "numeric",
+      "args": {
+        "stored": true
+      }
+    },
+    "published": {
+      "field_type": "datetime",
+      "args": {
+        "stored": true
+      }
+    }
+  },
+  "field_types": {
+    "id": {
+      "class": "whoosh.fields.ID",
+      "args": {
+        "stored": false,
+        "unique": false,
+        "field_boost": 1.0,
+        "sortable": false,
+        "analyzer": null
+      }
+    },
+    "idlist": {
+      "class": "whoosh.fields.IDLIST",
+      "args": {
+        "stored": false,
+        "unique": false,
+        "expression": null,
+        "field_boost": 1.0
+      }
+    },
+    "stored": {
+      "class": "whoosh.fields.STORED"
+    },
+    "keyword": {
+      "class": "whoosh.fields.KEYWORD",
+      "args": {
+        "stored": false,
+        "lowercase": false,
+        "commas": false,
+        "scorable": false,
+        "unique": false,
+        "field_boost": 1.0,
+        "sortable": false,
+        "vector": null,
+        "analyzer": null
+      }
+    },
+    "text": {
+      "class": "whoosh.fields.TEXT",
+      "args": {
+        "analyzer": null,
+        "phrase": true,
+        "chars": false,
+        "stored": false,
+        "field_boost": 1.0,
+        "multitoken_query": "default",
+        "spelling": false,
+        "sortable": false,
+        "lang": null,
+        "vector": null,
+        "spelling_prefix": "spell_"
+      }
+    },
+    "numeric": {
+      "class": "whoosh.fields.NUMERIC",
+      "args": {
+        "numtype": "int",
+        "bits": 32,
+        "stored": false,
+        "unique": false,
+        "field_boost": 1.0,
+        "decimal_places": 0,
+        "shift_step": 4,
+        "signed": true,
+        "sortable": false,
+        "default": null
+      }
+    },
+    "datetime": {
+      "class": "whoosh.fields.DATETIME",
+      "args": {
+        "stored": false,
+        "unique": false,
+        "sortable": false
+      }
+    },
+    "boolean": {
+      "class": "whoosh.fields.BOOLEAN",
+      "args": {
+        "stored": false,
+        "field_boost": 1.0
+      }
+    },
+    "ngram": {
+      "class": "whoosh.fields.NGRAM",
+      "args": {
+        "minsize": 2,
+        "maxsize": 4,
+        "stored": false,
+        "field_boost": 1.0,
+        "queryor": false,
+        "phrase": false,
+        "sortable": false
+      }
+    },
+    "ngramwords": {
+      "class": "whoosh.fields.NGRAMWORDS",
+      "args": {
+        "minsize": 2,
+        "maxsize": 4,
+        "stored": false,
+        "field_boost": 1.0,
+        "tokenizer": null,
+        "at": null,
+        "queryor": false,
+        "sortable": false
+      }
+    },
+    "text_ja": {
+      "class": "whoosh.fields.TEXT",
+      "args": {
+        "analyzer": "ja_mecab",
+        "phrase": true,
+        "chars": false,
+        "vector": null,
+        "stored": false,
+        "field_boost": 1.0,
+        "multitoken_query": "default",
+        "spelling": false,
+        "sortable": false,
+        "lang": null
+      }
+    }
+  },
+  "analyzers": {
+    "id": {
+      "class": "whoosh.analysis.IDAnalyzer",
+      "args": {
+        "lowercase": false
+      }
+    },
+    "keyword": {
+      "class": "whoosh.analysis.KeywordAnalyzer",
+      "args": {
+        "lowercase": false,
+        "commas": false
+      }
+    },
+    "regex": {
+      "class": "whoosh.analysis.RegexAnalyzer",
+      "args": {
+        "expression": "\\w+(\\.?\\w+)*",
+        "gaps": false
+      }
+    },
+    "simple": {
+      "class": "whoosh.analysis.SimpleAnalyzer",
+      "args": {
+        "expression": "\\w+(\\.?\\w+)*",
+        "gaps": false
+      }
+    },
+    "standard": {
+      "class": "whoosh.analysis.StandardAnalyzer",
+      "attributes": {
+        "expression": "\\w+(\\.?\\w+)*",
+        "stoplist": [
+          "and",
+          "is",
+          "it",
+          "an",
+          "as",
+          "at",
+          "have",
+          "in",
+          "yet",
+          "if",
+          "from",
+          "for",
+          "when",
+          "by",
+          "to",
+          "you",
+          "be",
+          "we",
+          "that",
+          "may",
+          "not",
+          "with",
+          "tbd",
+          "a",
+          "on",
+          "your",
+          "this",
+          "of",
+          "us",
+          "will",
+          "can",
+          "the",
+          "or",
+          "are"
+        ],
+        "minsize": 2,
+        "maxsize": null,
+        "gaps": false
+      }
+    },
+    "stemming": {
+      "class": "whoosh.analysis.StemmingAnalyzer",
+      "args": {
+        "expression": "\\w+(\\.?\\w+)*",
+        "stoplist": [
+          "and",
+          "is",
+          "it",
+          "an",
+          "as",
+          "at",
+          "have",
+          "in",
+          "yet",
+          "if",
+          "from",
+          "for",
+          "when",
+          "by",
+          "to",
+          "you",
+          "be",
+          "we",
+          "that",
+          "may",
+          "not",
+          "with",
+          "tbd",
+          "a",
+          "on",
+          "your",
+          "this",
+          "of",
+          "us",
+          "will",
+          "can",
+          "the",
+          "or",
+          "are"
+        ],
+        "minsize": 2,
+        "maxsize": null,
+        "gaps": false,
+        "ignore": null,
+        "cachesize": 50000
+      }
+    },
+    "fancy": {
+      "class": "whoosh.analysis.FancyAnalyzer",
+      "args": {
+        "expression": "\\s+",
+        "stoplist": [
+          "and",
+          "is",
+          "it",
+          "an",
+          "as",
+          "at",
+          "have",
+          "in",
+          "yet",
+          "if",
+          "from",
+          "for",
+          "when",
+          "by",
+          "to",
+          "you",
+          "be",
+          "we",
+          "that",
+          "may",
+          "not",
+          "with",
+          "tbd",
+          "a",
+          "on",
+          "your",
+          "this",
+          "of",
+          "us",
+          "will",
+          "can",
+          "the",
+          "or",
+          "are"
+        ],
+        "minsize": 2,
+        "maxsize": null,
+        "gaps": false,
+        "splitwords": true,
+        "splitnums": true,
+        "mergewords": false,
+        "mergenums": false
+      }
+    },
+    "language": {
+      "class": "whoosh.analysis.LanguageAnalyzer",
+      "args": {
+        "lang": "en",
+        "expression": "\\w+(\\.?\\w+)*",
+        "gaps": false,
+        "cachesize": 50000
+      }
+    },
+    "ngram": {
+      "tokenizer": "ngram",
+      "filters": [
+        "lowercase"
+      ]
+    },
+    "ngramword": {
+      "tokenizer": "regex",
+      "filters": [
+        "lowercase",
+        "ngram"
+      ]
+    },
+    "ja_mecab": {
+      "tokenizer": "mecab",
+      "filters": [
+        "lowercase"
+      ]
+    },
+    "ja_tiny_segmenter": {
+      "tokenizer": "tiny_segmenter",
+      "filters": [
+        "lowercase"
+      ]
+    },
+    "ja_mecab_ngram": {
+      "tokenizer": "mecab",
+      "filters": [
+        "lowercase",
+        "ngram"
+      ]
+    }
+  },
+  "tokenizers": {
+    "id": {
+      "class": "whoosh.analysis.IDTokenizer"
+    },
+    "regex": {
+      "class": "whoosh.analysis.RegexTokenizer",
+      "args": {
+        "expression": "\\w+(\\.?\\w+)*",
+        "gaps": false
+      }
+    },
+    "space": {
+      "class": "whoosh.analysis.SpaceSeparatedTokenizer"
+    },
+    "comma": {
+      "class": "whoosh.analysis.CommaSeparatedTokenizer"
+    },
+    "path": {
+      "class": "whoosh.analysis.PathTokenizer",
+      "args": {
+        "expression": "[^/]+"
+      }
+    },
+    "ngram": {
+      "class": "whoosh.analysis.NgramTokenizer",
+      "args": {
+        "minsize": 2,
+        "maxsize": null
+      }
+    },
+    "tiny_segmenter": {
+      "class": "basilisk.analysis.TinySegmenterTokenizer",
+      "args": {
+        "strip": 2
+      }
+    },
+    "mecab": {
+      "class": "basilisk.analysis.MeCabTokenizer"
+    }
+  },
+  "filters": {
+    "reversetext": {
+      "class": "whoosh.analysis.ReverseTextFilter"
+    },
+    "lowercase": {
+      "class": "whoosh.analysis.LowercaseFilter"
+    },
+    "strip": {
+      "class": "whoosh.analysis.StripFilter"
+    },
+    "stop": {
+      "class": "whoosh.analysis.StopFilter",
+      "args": {
+        "stoplist": [
+          "and",
+          "is",
+          "it",
+          "an",
+          "as",
+          "at",
+          "have",
+          "in",
+          "yet",
+          "if",
+          "from",
+          "for",
+          "when",
+          "by",
+          "to",
+          "you",
+          "be",
+          "we",
+          "that",
+          "may",
+          "not",
+          "with",
+          "tbd",
+          "a",
+          "on",
+          "your",
+          "this",
+          "of",
+          "us",
+          "will",
+          "can",
+          "the",
+          "or",
+          "are"
+        ],
+        "minsize": 2,
+        "maxsize": null,
+        "renumber": true,
+        "lang": null
+      }
+    },
+    "stem": {
+      "class": "whoosh.analysis.StemFilter",
+      "args": {
+        "lang": "en",
+        "ignore": null,
+        "cachesize": 50000
+      }
+    },
+    "ngram": {
+      "class": "whoosh.analysis.NgramFilter",
+      "args": {
+        "minsize": 2,
+        "maxsize": null,
+        "at": null
+      }
+    },
+    "intraword": {
+      "class": "whoosh.analysis.IntraWordFilter",
+      "args": {
+        "delims": "-_'\"()!@#$%^&*[]{}<>\\|;:, ./?`~=+'",
+        "splitwords": true,
+        "splitnums": true,
+        "mergewords": false,
+        "mergenums": false
+      }
+    },
+    "shingle": {
+      "class": "whoosh.analysis.ShingleFilter",
+      "args": {
+        "size": 2,
+        "sep": "-"
+      }
+    }
+  }
+}
