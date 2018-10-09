@@ -13,28 +13,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from setuptools import setup
-
-from basilisk import APP_NAME, APP_VERSION
-
-setup(
-    name=APP_NAME,
-    version=APP_VERSION,
-    description='Test application.',
-    author='Minoru Osuka',
-    author_email='minoru.osuka@gmail.com',
-    license='AL2',
-    packages=[
-        'basilisk'
-    ],
-    install_requires=[
-        'pysyncobj==0.3.4',
-        'flask==1.0.2',
-        'prometheus_client==0.3.1',
-        'whoosh==2.7.4',
-        'pyyaml==3.13',
-        'janome==0.3.6'
-    ],
-    test_suite='tests'
-)

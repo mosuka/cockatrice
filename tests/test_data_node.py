@@ -32,15 +32,15 @@ from basilisk.schema import Schema
 class TestDataNode(unittest.TestCase):
     def setUp(self):
         self.temp_dir = TemporaryDirectory()
-        self.conf_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "../conf"))
-        self.example_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "../example"))
+        self.conf_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '../conf'))
+        self.example_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '../example'))
 
-        bind_addr = "0.0.0.0:0"
+        bind_addr = '0.0.0.0:0'
         peer_addrs = []
-        dump_file = self.temp_dir.name + "/data.dump"
+        dump_file = self.temp_dir.name + '/data.dump'
 
-        index_dir = self.temp_dir.name + "/index"
-        schema_file = self.conf_dir + "/schema.yaml"
+        index_dir = self.temp_dir.name + '/index'
+        schema_file = self.conf_dir + '/schema.yaml'
 
         logger = getLogger(APP_NAME)
         log_handler = StreamHandler()
@@ -64,13 +64,13 @@ class TestDataNode(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_index(self):
-        example_file = self.example_dir + "/doc1.json"
+        example_file = self.example_dir + '/doc1.json'
 
         file_obj = open(example_file, 'r', encoding='utf-8')
         example_data = json.loads(file_obj.read(), encoding='utf-8')
         file_obj.close()
 
-        test_doc_id = "1"
+        test_doc_id = '1'
         test_fields = example_data
         sync = True
 
@@ -83,13 +83,13 @@ class TestDataNode(unittest.TestCase):
         self.assertEqual(expected_count, actual_count)
 
     def test_delete(self):
-        example_file = self.example_dir + "/doc1.json"
+        example_file = self.example_dir + '/doc1.json'
 
         file_obj = open(example_file, 'r', encoding='utf-8')
         example_data = json.loads(file_obj.read(), encoding='utf-8')
         file_obj.close()
 
-        test_doc_id = "1"
+        test_doc_id = '1'
         test_fields = example_data
         sync = True
 
@@ -110,7 +110,7 @@ class TestDataNode(unittest.TestCase):
         self.assertEqual(expected_count, actual_count)
 
     def test_bulk_index(self):
-        example_file = self.example_dir + "/bulk_index.json"
+        example_file = self.example_dir + '/bulk_index.json'
 
         file_obj = open(example_file, 'r', encoding='utf-8')
         example_data = json.loads(file_obj.read(), encoding='utf-8')
@@ -120,33 +120,33 @@ class TestDataNode(unittest.TestCase):
 
         self.data_node.bulk_index(example_data, sync=sync)
 
-        page = self.data_node.get("1")
+        page = self.data_node.get('1')
         expected_count = 1
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.get("2")
+        page = self.data_node.get('2')
         expected_count = 1
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.get("3")
+        page = self.data_node.get('3')
         expected_count = 1
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.get("4")
+        page = self.data_node.get('4')
         expected_count = 1
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.get("5")
+        page = self.data_node.get('5')
         expected_count = 1
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
     def test_bulk_delete(self):
-        example_file = self.example_dir + "/bulk_index.json"
+        example_file = self.example_dir + '/bulk_index.json'
 
         file_obj = open(example_file, 'r', encoding='utf-8')
         example_data = json.loads(file_obj.read(), encoding='utf-8')
@@ -156,7 +156,7 @@ class TestDataNode(unittest.TestCase):
 
         self.data_node.bulk_index(example_data, sync=sync)
 
-        example_file = self.example_dir + "/bulk_delete.json"
+        example_file = self.example_dir + '/bulk_delete.json'
 
         file_obj = open(example_file, 'r', encoding='utf-8')
         example_data = json.loads(file_obj.read(), encoding='utf-8')
@@ -166,39 +166,39 @@ class TestDataNode(unittest.TestCase):
 
         self.data_node.bulk_delete(example_data, sync=sync)
 
-        page = self.data_node.get("1")
+        page = self.data_node.get('1')
         expected_count = 0
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.get("2")
+        page = self.data_node.get('2')
         expected_count = 0
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.get("3")
+        page = self.data_node.get('3')
         expected_count = 0
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.get("4")
+        page = self.data_node.get('4')
         expected_count = 0
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.get("5")
+        page = self.data_node.get('5')
         expected_count = 0
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
     def test_get(self):
-        example_file = self.example_dir + "/doc1.json"
+        example_file = self.example_dir + '/doc1.json'
 
         file_obj = open(example_file, 'r', encoding='utf-8')
         example_data = json.loads(file_obj.read(), encoding='utf-8')
         file_obj.close()
 
-        test_doc_id = "1"
+        test_doc_id = '1'
         test_fields = example_data
         sync = True
 
@@ -211,7 +211,7 @@ class TestDataNode(unittest.TestCase):
         self.assertEqual(expected_count, actual_count)
 
     def test_search(self):
-        example_file = self.example_dir + "/bulk_index.json"
+        example_file = self.example_dir + '/bulk_index.json'
 
         file_obj = open(example_file, 'r', encoding='utf-8')
         example_data = json.loads(file_obj.read(), encoding='utf-8')
@@ -221,22 +221,22 @@ class TestDataNode(unittest.TestCase):
 
         self.data_node.bulk_index(example_data, sync=sync)
 
-        page = self.data_node.search("search", default_field="text", page_num=1, page_len=10)
+        page = self.data_node.search('search', search_field='text', page_num=1, page_len=10)
         expected_count = 5
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.search("search engine", default_field="text", page_num=1, page_len=10)
+        page = self.data_node.search('search engine', search_field='text', page_num=1, page_len=10)
         expected_count = 3
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.search("distributed search", default_field="text", page_num=1, page_len=10)
+        page = self.data_node.search('distributed search', search_field='text', page_num=1, page_len=10)
         expected_count = 2
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.search("web search", default_field="text", page_num=1, page_len=10)
+        page = self.data_node.search('web search', search_field='text', page_num=1, page_len=10)
         expected_count = 4
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)

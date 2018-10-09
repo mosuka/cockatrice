@@ -36,7 +36,6 @@ class DataNode(SyncObj):
         else:
             if index_dir is not None:
                 os.makedirs(index_dir, exist_ok=True)
-
             self.__index = create_in(index_dir, self.__schema)
 
     @replicated
@@ -103,13 +102,10 @@ class DataNode(SyncObj):
     def get(self, doc_id):
         return self.search(doc_id, self.__schema.get_unique_field(), 1, 1)
 
-    def search(self, query, default_field=None, page_num=1, page_len=10, **kwargs):
+    def search(self, query, search_field, page_num, page_len=10, **kwargs):
         searcher = self.__index.searcher()
 
-        if default_field is None:
-            query_parser = QueryParser(self.__schema.get_unique_field(), schema=self.__schema)
-        else:
-            query_parser = QueryParser(default_field, schema=self.__schema)
+        query_parser = QueryParser(search_field, self.__schema)
         query = query_parser.parse(query)
 
         results_page = searcher.search_page(query, page_num, pagelen=page_len, **kwargs)

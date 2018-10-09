@@ -19,7 +19,7 @@
 
 # -- Project information -----------------------------------------------------
 
-project = 'basilisk'
+project = 'Basilisk'
 copyright = '2018, Minoru Osuka'
 author = 'Minoru Osuka'
 

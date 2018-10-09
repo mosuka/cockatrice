@@ -21,7 +21,7 @@ from basilisk import APP_VERSION
 
 class TestVersion(unittest.TestCase):
     def test_version(self):
-        expected = "0.1.0"
+        expected = '0.1.0'
         actual = APP_VERSION
 
         self.assertEqual(expected, actual)

@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import importlib
 import os
 from copy import deepcopy
@@ -24,9 +23,9 @@ from whoosh.fields import Schema as WhooshSchema
 
 
 def get_instance(class_name, **class_args):
-    class_data = class_name.split(".")
+    class_data = class_name.split('.')
 
-    module_path = ".".join(class_data[:-1])
+    module_path = '.'.join(class_data[:-1])
     class_name = class_data[-1]
 
     module = importlib.import_module(module_path)
@@ -50,12 +49,13 @@ class Schema(WhooshSchema):
 
             name, ext = os.path.splitext(schema_file)
 
-            if ext in [".json"]:
-                self.__dict = json.loads(file_obj.read(), encoding='utf-8')
-            elif ext in [".yaml", ".yml"]:
+            if ext in ['.yaml', '.yml']:
                 self.__dict = yaml.safe_load(file_obj.read())
             else:
-                raise Exception("Unsupported extension")
+                raise Exception('Unsupported extension')
+
+            if self.__dict is None:
+                raise ValueError('failed to load YAML file.')
 
             for field_name in self.__dict['schema'].keys():
                 field_type = self.__get_field_type(self.__dict['schema'][field_name]['field_type'])
@@ -127,3 +127,6 @@ class Schema(WhooshSchema):
                 return name
 
         return None
+
+    def get_default_search_field(self):
+        return  self.__dict['default_search_field']

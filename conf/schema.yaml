@@ -26,6 +26,11 @@ schema:
       stored: true
 
 #
+# define default search field
+#
+default_search_field: text
+
+#
 # define field types
 #
 field_types:
@@ -117,6 +122,20 @@ field_types:
       at: null
       queryor: false
       sortable: false
+  text_janome:
+    class: whoosh.fields.TEXT
+    args:
+      analyzer: janome
+      phrase: true
+      chars: false
+      stored: false
+      field_boost: 1.0
+      multitoken_query: default
+      spelling: false
+      sortable: false
+      lang: null
+      vector: null
+      spelling_prefix: spell_
 
 #
 # define analyzers
@@ -289,6 +308,10 @@ analyzers:
     filters:
       - lowercase
       - ngram
+  janome:
+    tokenizer: janome
+    filters:
+      - lowercase
 
 #
 # define tokenizers
@@ -314,6 +337,15 @@ tokenizers:
     args:
       minsize: 2
       maxsize: null
+  janome:
+    class: basilisk.analysis.JanomeTokenizer
+    args:
+      udic: ""
+      udic_enc: "utf-8"
+      udic_type: "ipadic"
+      max_unknown_length: 1024
+      wakati: false
+      mmap: true
 
 #
 # define filters

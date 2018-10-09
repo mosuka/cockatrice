@@ -20,7 +20,7 @@ import os
 import sys
 import signal
 
-sys.path.append(".")
+sys.path.append('.')
 
 from argparse import ArgumentParser
 from logging import getLogger, StreamHandler, Formatter, CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET
@@ -48,26 +48,26 @@ def server_handler(args):
     log_handler = StreamHandler()
 
     # determine log destination
-    if args.log_file != "":
-        log_handler = RotatingFileHandler(args.log_file, "a+", maxBytes=512000000, backupCount=5)
+    if args.log_file != '':
+        log_handler = RotatingFileHandler(args.log_file, 'a+', maxBytes=512000000, backupCount=5)
 
     # determine log level
-    if args.log_level in ["CRITICAL", "FATAL"]:
+    if args.log_level in ['CRITICAL', 'FATAL']:
         logger.setLevel(CRITICAL)
         log_handler.setLevel(CRITICAL)
-    elif args.log_level == "ERROR":
+    elif args.log_level == 'ERROR':
         logger.setLevel(ERROR)
         log_handler.setLevel(ERROR)
-    elif args.log_level in ["WARNING", "WARN"]:
+    elif args.log_level in ['WARNING', 'WARN']:
         logger.setLevel(WARNING)
         log_handler.setLevel(WARNING)
-    elif args.log_level == "INFO":
+    elif args.log_level == 'INFO':
         logger.setLevel(INFO)
         log_handler.setLevel(INFO)
-    elif args.log_level == "DEBUG":
+    elif args.log_level == 'DEBUG':
         logger.setLevel(DEBUG)
         log_handler.setLevel(DEBUG)
-    elif args.log_level == "NOTSET":
+    elif args.log_level == 'NOTSET':
         logger.setLevel(NOTSET)
         log_handler.setLevel(NOTSET)
     else:
@@ -82,12 +82,12 @@ def server_handler(args):
     logger.addHandler(log_handler)
 
     # create http logger and handler
-    http_logger = getLogger(APP_NAME + "_http")
+    http_logger = getLogger(APP_NAME + '_http')
     http_log_handler = StreamHandler()
 
     # determine http log destination
-    if args.http_log_file != "":
-        http_log_handler = RotatingFileHandler(args.http_log_file, "a+", maxBytes=512000000, backupCount=5)
+    if args.http_log_file != '':
+        http_log_handler = RotatingFileHandler(args.http_log_file, 'a+', maxBytes=512000000, backupCount=5)
 
     # determine http log level
     http_logger.setLevel(INFO)
@@ -124,34 +124,34 @@ def client_handler(args):
 
 
 def main():
-    parser = ArgumentParser(description="basilisk command")
-    parser.add_argument("-v", "--version", action="version", version="basilisk {}".format(APP_VERSION))
+    parser = ArgumentParser(description='basilisk command')
+    parser.add_argument('-v', '--version', action='version', version='basilisk {}'.format(APP_VERSION))
 
     subparsers = parser.add_subparsers()
 
-    parser_server = subparsers.add_parser("server", help="see `server -h`")
-    parser_server.add_argument("--http-port", dest="http_port", default=8080, metavar="HTTP_PORT", type=int,
-                               help="http port")
-    parser_server.add_argument("--bind-addr", dest="bind_addr", default="127.0.0.1:7070", metavar="BIND_ADDR",
-                               type=str, help="host address")
-    parser_server.add_argument("--peer-addr", dest="peer_addr", default=[], action="append", metavar="PEER_ADDR",
-                               type=str, help="peer address")
-    parser_server.add_argument("--index-dir", dest="index_dir", default=None,
-                               metavar="INDEX_DIR", type=str, help="index dir")
-    parser_server.add_argument("--schema-file", dest="schema_file", default=None,
-                               metavar="SCHEMA_FILE", type=str, help="schema file")
-    parser_server.add_argument("--dump-file", dest="dump_file", default=None,
-                               metavar="DUMP_FILE", type=str, help="dump file")
-    parser_server.add_argument("--log-level", dest="log_level", default="DEBUG",
-                               metavar="LOG_LEVEL", type=str, help="log level")
-    parser_server.add_argument("--log-file", dest="log_file", default="",
-                               metavar="LOG_FILE", type=str, help="log file")
-    parser_server.add_argument("--http-log-file", dest="http_log_file", default="",
-                               metavar="HTTP_LOG_FILE", type=str, help="http log file")
+    parser_server = subparsers.add_parser('server', help='see `server -h`')
+    parser_server.add_argument('--http-port', dest='http_port', default=8080, metavar='HTTP_PORT', type=int,
+                               help='http port')
+    parser_server.add_argument('--bind-addr', dest='bind_addr', default='127.0.0.1:7070', metavar='BIND_ADDR',
+                               type=str, help='host address')
+    parser_server.add_argument('--peer-addr', dest='peer_addr', default=[], action='append', metavar='PEER_ADDR',
+                               type=str, help='peer address')
+    parser_server.add_argument('--index-dir', dest='index_dir', default=None,
+                               metavar='INDEX_DIR', type=str, help='index dir')
+    parser_server.add_argument('--schema-file', dest='schema_file', default=None,
+                               metavar='SCHEMA_FILE', type=str, help='schema file')
+    parser_server.add_argument('--dump-file', dest='dump_file', default=None,
+                               metavar='DUMP_FILE', type=str, help='dump file')
+    parser_server.add_argument('--log-level', dest='log_level', default='DEBUG',
+                               metavar='LOG_LEVEL', type=str, help='log level')
+    parser_server.add_argument('--log-file', dest='log_file', default='',
+                               metavar='LOG_FILE', type=str, help='log file')
+    parser_server.add_argument('--http-log-file', dest='http_log_file', default='',
+                               metavar='HTTP_LOG_FILE', type=str, help='http log file')
     parser_server.set_defaults(handler=server_handler)
 
-    parser_client = subparsers.add_parser("client", help="see `client -h`")
-    parser_client.add_argument("-H", metavar="HOST", help="host address")
+    parser_client = subparsers.add_parser('client', help='see `client -h`')
+    parser_client.add_argument('-H', metavar='HOST', help='host address')
     parser_client.set_defaults(handler=client_handler)
 
     args = parser.parse_args()

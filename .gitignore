@@ -1,6 +1,7 @@
 *.pyc
 *.pyo
 *.egg
+*.eggs
 *.DS_store
 basilisk.egg-info
 docs/*/_build
