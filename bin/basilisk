@@ -29,7 +29,7 @@ from logging.handlers import RotatingFileHandler
 from prometheus_client.core import CollectorRegistry
 from pysyncobj import SyncObjConf
 
-from basilisk import APP_NAME, APP_VERSION
+from basilisk import NAME, VERSION
 from basilisk.data_node import DataNode
 from basilisk.http_server import HTTPServer
 from basilisk.schema import Schema
@@ -44,7 +44,7 @@ signal.signal(signal.SIGINT, signal_handler)
 
 def server_handler(args):
     # create logger and handler
-    logger = getLogger(APP_NAME)
+    logger = getLogger(NAME)
     log_handler = StreamHandler()
 
     # determine log destination
@@ -82,7 +82,7 @@ def server_handler(args):
     logger.addHandler(log_handler)
 
     # create http logger and handler
-    http_logger = getLogger(APP_NAME + '_http')
+    http_logger = getLogger(NAME + '_http')
     http_log_handler = StreamHandler()
 
     # determine http log destination
@@ -115,7 +115,7 @@ def server_handler(args):
         )
 
     data_node = DataNode(args.bind_addr, args.peer_addr, conf, args.index_dir, schema, logger)
-    http_server = HTTPServer(APP_NAME, args.http_port, data_node, schema, logger, http_logger, metrics_registry)
+    http_server = HTTPServer(NAME, args.http_port, data_node, schema, logger, http_logger, metrics_registry)
     http_server.start()
 
 
@@ -125,7 +125,7 @@ def client_handler(args):
 
 def main():
     parser = ArgumentParser(description='basilisk command')
-    parser.add_argument('-v', '--version', action='version', version='basilisk {}'.format(APP_VERSION))
+    parser.add_argument('-v', '--version', action='version', version='basilisk {}'.format(VERSION))
 
     subparsers = parser.add_subparsers()
 

@@ -3,7 +3,9 @@
 *.egg
 *.eggs
 *.DS_store
-basilisk.egg-info
+*.egg-info/
+build/
+dist/
 docs/*/_build
 .idea/
 venv/

@@ -16,12 +16,12 @@
 
 import unittest
 
-from basilisk import APP_VERSION
+from basilisk import VERSION
 
 
 class TestVersion(unittest.TestCase):
     def test_version(self):
         expected = '0.1.0'
-        actual = APP_VERSION
+        actual = VERSION
 
         self.assertEqual(expected, actual)

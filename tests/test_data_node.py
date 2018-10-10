@@ -24,7 +24,7 @@ from tempfile import TemporaryDirectory
 
 from pysyncobj import SyncObjConf
 
-from basilisk import APP_NAME
+from basilisk import NAME
 from basilisk.data_node import DataNode
 from basilisk.schema import Schema
 
@@ -42,7 +42,7 @@ class TestDataNode(unittest.TestCase):
         index_dir = self.temp_dir.name + '/index'
         schema_file = self.conf_dir + '/schema.yaml'
 
-        logger = getLogger(APP_NAME)
+        logger = getLogger(NAME)
         log_handler = StreamHandler()
         logger.setLevel(DEBUG)
         log_handler.setLevel(INFO)

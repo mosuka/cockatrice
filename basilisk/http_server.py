@@ -24,14 +24,14 @@ from flask import Flask, jsonify, request, after_this_request, Response
 from prometheus_client.core import CollectorRegistry, Counter, Histogram, Gauge
 from prometheus_client.exposition import CONTENT_TYPE_LATEST, generate_latest
 
-from basilisk import APP_NAME
+from basilisk import NAME
 
 TRUE_STRINGS = ['true', 'yes', 'on', 't', 'y', '1']
 
 
 class HTTPServer:
-    def __init__(self, name, port, data_node, schema, logger=getLogger(APP_NAME),
-                 http_logger=getLogger(APP_NAME + '_http'), metrics_registry=CollectorRegistry()):
+    def __init__(self, name, port, data_node, schema, logger=getLogger(NAME),
+                 http_logger=getLogger(NAME + '_http'), metrics_registry=CollectorRegistry()):
         self.__logger = logger
         self.__http_logger = http_logger
         self.__metrics_registry = metrics_registry

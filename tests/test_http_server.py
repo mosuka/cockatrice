@@ -26,7 +26,7 @@ from http import HTTPStatus
 from prometheus_client.core import CollectorRegistry
 from pysyncobj import SyncObjConf
 
-from basilisk import APP_NAME
+from basilisk import NAME
 from basilisk.data_node import DataNode
 from basilisk.http_server import HTTPServer
 from basilisk.schema import Schema
@@ -46,7 +46,7 @@ class TestKVSServer(unittest.TestCase):
         index_dir = self.temp_dir.name + '/index'
         schema_file = self.conf_dir + '/schema.yaml'
 
-        logger = getLogger(APP_NAME)
+        logger = getLogger(NAME)
         log_handler = StreamHandler()
         logger.setLevel(DEBUG)
         log_handler.setLevel(INFO)
@@ -54,7 +54,7 @@ class TestKVSServer(unittest.TestCase):
         log_handler.setFormatter(log_format)
         logger.addHandler(log_handler)
 
-        http_logger = getLogger(APP_NAME + '_http')
+        http_logger = getLogger(NAME + '_http')
         http_log_handler = StreamHandler()
         http_logger.setLevel(INFO)
         http_log_handler.setLevel(INFO)
@@ -74,7 +74,7 @@ class TestKVSServer(unittest.TestCase):
 
         data_node = DataNode(bind_addr, peer_addrs, conf, index_dir, schema, logger=logger)
 
-        self.server = HTTPServer(APP_NAME, http_port, data_node, schema,
+        self.server = HTTPServer(NAME, http_port, data_node, schema,
                                  logger=logger, http_logger=http_logger, metrics_registry=metrics_registry)
 
         self.client = self.server.get_test_client()
