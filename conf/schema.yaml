@@ -338,7 +338,7 @@ tokenizers:
       minsize: 2
       maxsize: null
   janome:
-    class: basilisk.analysis.JanomeTokenizer
+    class: cockatrice.analysis.JanomeTokenizer
     args:
       udic: ""
       udic_enc: "utf-8"

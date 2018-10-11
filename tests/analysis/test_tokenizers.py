@@ -16,7 +16,7 @@
 
 import unittest
 
-from basilisk.analysis import JanomeTokenizer
+from cockatrice.analysis import JanomeTokenizer
 
 
 class TestJanomeTokenizer(unittest.TestCase):

@@ -18,13 +18,13 @@ from setuptools import setup
 
 import os
 
-from basilisk import NAME, VERSION
+from cockatrice import NAME, VERSION
 
 with open(os.path.join(os.path.abspath(os.path.dirname(__file__)),  'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
-    name=NAME + '-search',
+    name=NAME,
     version=VERSION,
     description='Full text search and indexing server.',
     long_description=long_description,
@@ -61,9 +61,9 @@ setup(
         'Topic :: Text Processing',
         'Topic :: Text Processing :: Indexing'
     ],
-    url='https://github.com/mosuka/basilisk',
+    url='https://github.com/mosuka/cockatrice',
     packages=[
-        'basilisk'
+        'cockatrice'
     ],
     platforms='any',
     install_requires=[
@@ -75,7 +75,7 @@ setup(
         'janome==0.3.6'
     ],
     scripts=[
-        'bin/basilisk'
+        'bin/cockatrice'
     ],
     test_suite='tests'
 )

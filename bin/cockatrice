@@ -20,8 +20,6 @@ import os
 import sys
 import signal
 
-sys.path.append('.')
-
 from argparse import ArgumentParser
 from logging import getLogger, StreamHandler, Formatter, CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET
 from logging.handlers import RotatingFileHandler
@@ -29,10 +27,10 @@ from logging.handlers import RotatingFileHandler
 from prometheus_client.core import CollectorRegistry
 from pysyncobj import SyncObjConf
 
-from basilisk import NAME, VERSION
-from basilisk.data_node import DataNode
-from basilisk.http_server import HTTPServer
-from basilisk.schema import Schema
+from cockatrice import NAME, VERSION
+from cockatrice.data_node import DataNode
+from cockatrice.http_server import HTTPServer
+from cockatrice.schema import Schema
 
 
 def signal_handler(signal, frame):
@@ -109,10 +107,10 @@ def server_handler(args):
         os.makedirs(os.path.dirname(args.dump_file), exist_ok=True)
 
     conf = SyncObjConf(
-            fullDumpFile=args.dump_file,
-            logCompactionMinTime=300,
-            dynamicMembershipChange=True
-        )
+        fullDumpFile=args.dump_file,
+        logCompactionMinTime=300,
+        dynamicMembershipChange=True
+    )
 
     data_node = DataNode(args.bind_addr, args.peer_addr, conf, args.index_dir, schema, logger)
     http_server = HTTPServer(NAME, args.http_port, data_node, schema, logger, http_logger, metrics_registry)
@@ -124,8 +122,8 @@ def client_handler(args):
 
 
 def main():
-    parser = ArgumentParser(description='basilisk command')
-    parser.add_argument('-v', '--version', action='version', version='basilisk {}'.format(VERSION))
+    parser = ArgumentParser(description='cockatrice command')
+    parser.add_argument('-v', '--version', action='version', version='cockatrice {}'.format(VERSION))
 
     subparsers = parser.add_subparsers()
 

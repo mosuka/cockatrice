@@ -2,14 +2,14 @@ Usage
 ==================
 
 
-Running Basilisk in standalone mode
------------------------------------
+Running Cockatrice in standalone mode
+-------------------------------------
 
-Running a Basilisk node is easy. Starting Basilisk in standalone mode by the following command:
+Running a Cockatrice node is easy. Starting Cockatrice in standalone mode by the following command:
 
 .. code-block:: bash
 
-    $ ./bin/basilisk server --http-port=8080 --index-dir=/tmp/basilisk/index --schema-file=./conf/schema.yaml
+    $ ./bin/cockatrice server --http-port=8080 --index-dir=/tmp/cockatrice/index --schema-file=./conf/schema.yaml
 
 You can now index, get, search and delete the document(s) via HTTP.
 

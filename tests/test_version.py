@@ -16,7 +16,7 @@
 
 import unittest
 
-from basilisk import VERSION
+from cockatrice import VERSION
 
 
 class TestVersion(unittest.TestCase):

@@ -24,9 +24,9 @@ from tempfile import TemporaryDirectory
 
 from pysyncobj import SyncObjConf
 
-from basilisk import NAME
-from basilisk.data_node import DataNode
-from basilisk.schema import Schema
+from cockatrice import NAME
+from cockatrice.data_node import DataNode
+from cockatrice.schema import Schema
 
 
 class TestDataNode(unittest.TestCase):

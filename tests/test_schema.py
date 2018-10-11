@@ -22,7 +22,7 @@ from tempfile import TemporaryDirectory
 
 from whoosh.index import create_in
 
-from basilisk.schema import Schema
+from cockatrice.schema import Schema
 
 
 class TestSchema(unittest.TestCase):

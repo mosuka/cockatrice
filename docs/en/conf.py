@@ -19,7 +19,7 @@
 
 # -- Project information -----------------------------------------------------
 
-project = 'Basilisk'
+project = 'Cockatrice'
 copyright = '2018, Minoru Osuka'
 author = 'Minoru Osuka'
 
@@ -101,7 +101,7 @@ html_static_path = ['_static']
 # -- Options for HTMLHelp output ---------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'basiliskdoc'
+htmlhelp_basename = 'cockatricedoc'
 
 
 # -- Options for LaTeX output ------------------------------------------------
@@ -128,7 +128,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'basilisk.tex', 'basilisk Documentation',
+    (master_doc, 'cockatrice.tex', 'Cockatrice Documentation',
      'Minoru Osuka', 'manual'),
 ]
 
@@ -138,7 +138,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'basilisk', 'basilisk Documentation',
+    (master_doc, 'cockatrice', 'Cockatrice Documentation',
      [author], 1)
 ]
 
@@ -149,8 +149,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'basilisk', 'basilisk Documentation',
-     author, 'basilisk', 'One line description of project.',
+    (master_doc, 'cockatrice', 'Cockatrice Documentation',
+     author, 'cockatrice', 'One line description of project.',
      'Miscellaneous'),
 ]
 

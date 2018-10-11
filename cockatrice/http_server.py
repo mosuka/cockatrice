@@ -24,7 +24,7 @@ from flask import Flask, jsonify, request, after_this_request, Response
 from prometheus_client.core import CollectorRegistry, Counter, Histogram, Gauge
 from prometheus_client.exposition import CONTENT_TYPE_LATEST, generate_latest
 
-from basilisk import NAME
+from cockatrice import NAME
 
 TRUE_STRINGS = ['true', 'yes', 'on', 't', 'y', '1']
 
