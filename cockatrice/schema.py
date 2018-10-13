@@ -38,24 +38,13 @@ def get_instance(class_name, **class_args):
 
 
 class Schema(WhooshSchema):
-    def __init__(self, schema_file):
+    def __init__(self, scheme_yaml):
         super().__init__()
 
-        self.__dict = None
+        self.__dict = {}
 
-        file_obj = None
         try:
-            file_obj = open(schema_file, 'r', encoding='utf-8')
-
-            name, ext = os.path.splitext(schema_file)
-
-            if ext in ['.yaml', '.yml']:
-                self.__dict = yaml.safe_load(file_obj.read())
-            else:
-                raise Exception('Unsupported extension')
-
-            if self.__dict is None:
-                raise ValueError('failed to load YAML file.')
+            self.__dict = yaml.safe_load(scheme_yaml)
 
             for field_name in self.__dict['schema'].keys():
                 field_type = self.__get_field_type(self.__dict['schema'][field_name]['field_type'])
@@ -64,9 +53,6 @@ class Schema(WhooshSchema):
                 self.add(field_name, field_type, glob=False)
         except Exception as ex:
             raise ex
-        finally:
-            if file_obj is not None:
-                file_obj.close()
 
     def __get_filter(self, name):
         class_name = self.__dict['filters'][name]['class']
@@ -129,4 +115,4 @@ class Schema(WhooshSchema):
         return None
 
     def get_default_search_field(self):
-        return  self.__dict['default_search_field']
+        return self.__dict['default_search_field']

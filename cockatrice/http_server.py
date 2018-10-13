@@ -24,13 +24,14 @@ from flask import Flask, jsonify, request, after_this_request, Response
 from prometheus_client.core import CollectorRegistry, Counter, Histogram, Gauge
 from prometheus_client.exposition import CONTENT_TYPE_LATEST, generate_latest
 
-from cockatrice import NAME
+from cockatrice import NAME, VERSION
+from cockatrice.schema import Schema
 
 TRUE_STRINGS = ['true', 'yes', 'on', 't', 'y', '1']
 
 
 class HTTPServer:
-    def __init__(self, name, port, data_node, schema, logger=getLogger(NAME),
+    def __init__(self, name, port, data_node, logger=getLogger(NAME),
                  http_logger=getLogger(NAME + '_http'), metrics_registry=CollectorRegistry()):
         self.__logger = logger
         self.__http_logger = http_logger
@@ -38,16 +39,30 @@ class HTTPServer:
 
         self.__port = port
         self.__data_node = data_node
-        self.__schema = schema
 
         self.__app = Flask(name)
-        self.__app.add_url_rule('/rest/doc/<doc_id>', 'get', self.__get, methods=['GET'])
-        self.__app.add_url_rule('/rest/doc/<doc_id>', 'index', self.__index, methods=['PUT'])
-        self.__app.add_url_rule('/rest/doc/<doc_id>', 'delete', self.__delete, methods=['DELETE'])
-        self.__app.add_url_rule('/rest/bulk', 'bulk_index', self.__bulk_index, methods=['PUT'])
-        self.__app.add_url_rule('/rest/bulk', 'bulk_delete', self.__bulk_delete, methods=['DELETE'])
-        self.__app.add_url_rule('/rest/search', 'search', self.__search, methods=['GET'])
-        self.__app.add_url_rule('/metrics', 'metrics', self.__metrics, methods=['GET'])
+        self.__app.add_url_rule('/', 'root', self.__root,
+                                methods=['GET'])
+        self.__app.add_url_rule('/rest/<index_name>', 'get_index', self.__get_index,
+                                methods=['GET'])
+        self.__app.add_url_rule('/rest/<index_name>', 'create_index', self.__create_index,
+                                methods=['PUT'])
+        self.__app.add_url_rule('/rest/<index_name>', 'delete_index', self.__delete_index,
+                                methods=['DELETE'])
+        self.__app.add_url_rule('/rest/<index_name>/_doc/<doc_id>', 'get_document', self.__get_document,
+                                methods=['GET'])
+        self.__app.add_url_rule('/rest/<index_name>/_doc/<doc_id>', 'index_document', self.__index_document,
+                                methods=['PUT'])
+        self.__app.add_url_rule('/rest/<index_name>/_doc/<doc_id>', 'delete_document', self.__delete_document,
+                                methods=['DELETE'])
+        self.__app.add_url_rule('/rest/<index_name>/_docs', 'index_documents', self.__index_documents,
+                                methods=['PUT'])
+        self.__app.add_url_rule('/rest/<index_name>/_docs', 'delete_documents', self.__delete_documents,
+                                methods=['DELETE'])
+        self.__app.add_url_rule('/rest/<index_name>/_search', 'search_documents', self.__search_documents,
+                                methods=['GET', 'POST'])
+        self.__app.add_url_rule('/metrics', 'metrics', self.__metrics,
+                                methods=['GET'])
 
         # disable Flask default logger
         self.__app.logger.disabled = True
@@ -154,7 +169,21 @@ class HTTPServer:
 
         return resp
 
-    def __get(self, doc_id):
+    def __root(self):
+        start_time = time.time()
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            return self.__post_process(start_time, request, response)
+
+        resp = Response()
+        resp.data = NAME + ' ' + VERSION + ' is running.'
+        resp.status_code = HTTPStatus.OK
+        resp.content_type = 'text/plain; charset="UTF-8"'
+
+        return resp
+
+    def __get_index(self, index_name):
         start_time = time.time()
 
         data = {}
@@ -165,10 +194,137 @@ class HTTPServer:
             return self.__post_process(start_time, request, response)
 
         try:
-            results_page = self.__data_node.get(doc_id)
+            index_data = {'name': index_name}
+
+            index = self.__data_node.get_index(index_name)
+            index_data['doc_count'] = index.doc_count()
+            index_data['doc_count_all'] = index.doc_count_all()
+            index_data['last_modified'] = index.last_modified()
+            index_data['latest_generation'] = index.latest_generation()
+            index_data['version'] = index.version
+            index_data['storage'] = {
+                'folder': index.storage.folder,
+                'supports_mmap': index.storage.supports_mmap,
+                'readonly': index.storage.readonly,
+                'files': index.storage.list()
+            }
+
+            data['index'] = index_data
+
+            status_code = HTTPStatus.OK
+        except KeyError as ex:
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.NOT_FOUND
+            self.__logger.error(ex)
+        except Exception as ex:
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            self.__logger.error(ex)
+        finally:
+            data['time'] = time.time() - start_time
+            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+                              'description': status_code.description}
+
+        resp = jsonify(data)
+        resp.status_code = status_code
+
+        return resp
+
+    def __create_index(self, index_name):
+        start_time = time.time()
+
+        data = {}
+        status_code = None
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            return self.__post_process(start_time, request, response)
+
+        try:
+            sync = False
+            if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
+                sync = True
+
+            use_ram_storage = False
+            if request.args.get('use_ram_storage', default='', type=str).lower() in TRUE_STRINGS:
+                use_ram_storage = True
+
+            schema = Schema(request.data)
+
+            self.__data_node.create_index(index_name, schema, use_ram_storage=use_ram_storage, sync=sync)
+
+            if sync:
+                status_code = HTTPStatus.CREATED
+            else:
+                status_code = HTTPStatus.ACCEPTED
+        except json.decoder.JSONDecodeError as ex:
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.BAD_REQUEST
+            self.__logger.error(ex)
+        except Exception as ex:
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            self.__logger.error(ex)
+        finally:
+            data['time'] = time.time() - start_time
+            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+                              'description': status_code.description}
+
+        resp = jsonify(data)
+        resp.status_code = status_code
+
+        return resp
+
+    def __delete_index(self, index_name):
+        start_time = time.time()
+
+        data = {}
+        status_code = None
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            return self.__post_process(start_time, request, response)
+
+        try:
+            sync = False
+            if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
+                sync = True
+
+            self.__data_node.delete_index(index_name, sync=sync)
+
+            if sync:
+                status_code = HTTPStatus.OK
+            else:
+                status_code = HTTPStatus.ACCEPTED
+        except Exception as ex:
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            self.__logger.error(ex)
+        finally:
+            data['time'] = time.time() - start_time
+            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+                              'description': status_code.description}
+
+        resp = jsonify(data)
+        resp.status_code = status_code
+
+        return resp
+
+    def __get_document(self, index_name, doc_id):
+        start_time = time.time()
+
+        data = {}
+        status_code = None
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            return self.__post_process(start_time, request, response)
+
+        try:
+            results_page = self.__data_node.get_document(index_name, doc_id)
 
             if results_page.total <= 0:
-                raise KeyError('{0} does not exist'.format(doc_id))
+                raise KeyError('{0} does not exist in {1}'.format(doc_id, index_name))
 
             fields = {}
 
@@ -198,7 +354,7 @@ class HTTPServer:
 
         return resp
 
-    def __index(self, doc_id):
+    def __index_document(self, index_name, doc_id):
         start_time = time.time()
 
         data = {}
@@ -213,7 +369,7 @@ class HTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            self.__data_node.index(doc_id, json.loads(request.data), sync=sync)
+            self.__data_node.index_document(index_name, doc_id, json.loads(request.data, encoding='utf-8'), sync=sync)
 
             if sync:
                 status_code = HTTPStatus.CREATED
@@ -237,7 +393,7 @@ class HTTPServer:
 
         return resp
 
-    def __delete(self, doc_id):
+    def __delete_document(self, index_name, doc_id):
         start_time = time.time()
 
         data = {}
@@ -252,7 +408,7 @@ class HTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            self.__data_node.delete(doc_id, sync=sync)
+            self.__data_node.delete_document(index_name, doc_id, sync=sync)
 
             if sync:
                 status_code = HTTPStatus.OK
@@ -276,7 +432,7 @@ class HTTPServer:
 
         return resp
 
-    def __bulk_index(self):
+    def __index_documents(self, index_name):
         start_time = time.time()
 
         data = {}
@@ -291,7 +447,7 @@ class HTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            cnt = self.__data_node.bulk_index(json.loads(request.data), sync=sync)
+            cnt = self.__data_node.index_documents(index_name, json.loads(request.data), sync=sync)
             if cnt is not None:
                 data['count'] = cnt
 
@@ -317,7 +473,7 @@ class HTTPServer:
 
         return resp
 
-    def __bulk_delete(self):
+    def __delete_documents(self, index_name):
         start_time = time.time()
 
         data = {}
@@ -332,7 +488,7 @@ class HTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            cnt = self.__data_node.bulk_delete(json.loads(request.data), sync=sync)
+            cnt = self.__data_node.delete_documents(index_name, json.loads(request.data), sync=sync)
             if cnt is not None:
                 data['count'] = cnt
 
@@ -358,7 +514,7 @@ class HTTPServer:
 
         return resp
 
-    def __search(self):
+    def __search_documents(self, index_name):
         start_time = time.time()
 
         data = {}
@@ -375,7 +531,8 @@ class HTTPServer:
             page_num = request.args.get('page_num', default=1, type=int)
             page_len = request.args.get('page_len', default=10, type=int)
 
-            results_page = self.__data_node.search(query, search_field, page_num, page_len=page_len)
+            results_page = self.__data_node.search_documents(index_name, query, search_field, page_num,
+                                                             page_len=page_len)
 
             results['is_last_page'] = results_page.is_last_page()
             results['page_count'] = results_page.pagecount

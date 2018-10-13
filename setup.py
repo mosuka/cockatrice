@@ -74,8 +74,10 @@ setup(
         'pyyaml==3.13',
         'janome==0.3.6'
     ],
-    scripts=[
-        'bin/cockatrice'
-    ],
+    entry_points={
+        'console_scripts': [
+            'cockatrice = cockatrice.__main__:main'
+        ]
+    },
     test_suite='tests'
 )

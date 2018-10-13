@@ -44,7 +44,6 @@ class TestKVSServer(unittest.TestCase):
         dump_file = self.temp_dir.name + '/data.dump'
 
         index_dir = self.temp_dir.name + '/index'
-        schema_file = self.conf_dir + '/schema.yaml'
 
         logger = getLogger(NAME)
         log_handler = StreamHandler()
@@ -70,11 +69,9 @@ class TestKVSServer(unittest.TestCase):
             dynamicMembershipChange=True
         )
 
-        schema = Schema(schema_file)
+        data_node = DataNode(bind_addr, peer_addrs, conf, index_dir, logger=logger)
 
-        data_node = DataNode(bind_addr, peer_addrs, conf, index_dir, schema, logger=logger)
-
-        self.server = HTTPServer(NAME, http_port, data_node, schema,
+        self.server = HTTPServer(NAME, http_port, data_node,
                                  logger=logger, http_logger=http_logger, metrics_registry=metrics_registry)
 
         self.client = self.server.get_test_client()
@@ -90,64 +87,87 @@ class TestKVSServer(unittest.TestCase):
 
         self.assertEqual(expected_status_code, actual_status_code)
 
-    def test_index(self):
-        example_file = self.example_dir + '/doc1.json'
-
-        file_obj = open(example_file, 'r', encoding='utf-8')
-        example_data = json.loads(file_obj.read(), encoding='utf-8')
-        file_obj.close()
-
-        doc_id = '1'
-        sync = True
-
-        response = self.client.put('/rest/doc/' + doc_id, data=json.dumps(example_data),
-                                   query_string='sync=' + str(sync))
-
-        expected_status_code = HTTPStatus.CREATED
-        actual_status_code = response.status_code
-        self.assertEqual(expected_status_code, actual_status_code)
-
-        data = json.loads(response.data)
-
-        expected_status_code = HTTPStatus.CREATED
-        actual_status_code = data['status']['code']
-        self.assertEqual(expected_status_code, actual_status_code)
-
-    def test_delete(self):
-        example_file = self.example_dir + '/doc1.json'
-
-        file_obj = open(example_file, 'r', encoding='utf-8')
-        example_data = json.loads(file_obj.read(), encoding='utf-8')
-        file_obj.close()
-
-        doc_id = '1'
-        sync = True
-
-        self.client.put('/rest/doc/' + doc_id, data=json.dumps(example_data),
-                        query_string='sync=' + str(sync))
-
-        response = self.client.delete('/rest/doc/' + doc_id, query_string='sync=' + str(sync))
-
+    def test_root(self):
+        response = self.client.get('/')
         expected_status_code = HTTPStatus.OK
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
 
-        response = self.client.get('/rest/doc/' + doc_id)
+    def test_create_index(self):
+        index_name = 'test_index'
+        with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
+            schema_yaml = file_obj.read()
 
+        # create index
+        response = self.client.put('/rest/' + index_name, data=schema_yaml, query_string='sync=True')
+        expected_status_code = HTTPStatus.CREATED
+        actual_status_code = response.status_code
+        self.assertEqual(expected_status_code, actual_status_code)
+
+    def test_get_index(self):
+        index_name = 'test_index'
+        with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
+            schema_yaml = file_obj.read()
+
+        # create index
+        response = self.client.put('/rest/' + index_name, data=schema_yaml, query_string='sync=True')
+        expected_status_code = HTTPStatus.CREATED
+        actual_status_code = response.status_code
+        self.assertEqual(expected_status_code, actual_status_code)
+
+        # get index
+        response = self.client.get('/rest/' + index_name)
+        expected_status_code = HTTPStatus.OK
+        actual_status_code = response.status_code
+        self.assertEqual(expected_status_code, actual_status_code)
+
+    def test_delete_index(self):
+        index_name = 'test_index'
+        with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
+            schema_yaml = file_obj.read()
+
+        # create index
+        response = self.client.put('/rest/' + index_name, data=schema_yaml, query_string='sync=True')
+        expected_status_code = HTTPStatus.CREATED
+        actual_status_code = response.status_code
+        self.assertEqual(expected_status_code, actual_status_code)
+
+        # get index
+        response = self.client.get('/rest/' + index_name)
+        expected_status_code = HTTPStatus.OK
+        actual_status_code = response.status_code
+        self.assertEqual(expected_status_code, actual_status_code)
+
+        # delete index
+        response = self.client.delete('/rest/' + index_name, query_string='sync=True')
+        expected_status_code = HTTPStatus.OK
+        actual_status_code = response.status_code
+        self.assertEqual(expected_status_code, actual_status_code)
+
+        # get index
+        response = self.client.get('/rest/' + index_name)
         expected_status_code = HTTPStatus.NOT_FOUND
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
 
-    def test_bulk_index(self):
-        example_file = self.example_dir + '/bulk_index.json'
+    def test_index_document(self):
+        index_name = 'test_index'
+        with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
+            schema_yaml = file_obj.read()
 
-        file_obj = open(example_file, 'r', encoding='utf-8')
-        example_data = json.loads(file_obj.read(), encoding='utf-8')
-        file_obj.close()
+        # create index
+        response = self.client.put('/rest/' + index_name, data=schema_yaml, query_string='sync=True')
+        expected_status_code = HTTPStatus.CREATED
+        actual_status_code = response.status_code
+        self.assertEqual(expected_status_code, actual_status_code)
 
-        sync = True
+        with open(self.example_dir + '/doc1.json', 'r', encoding='utf-8') as file_obj:
+            doc_json = file_obj.read()
 
-        response = self.client.put('/rest/bulk', data=json.dumps(example_data), query_string='sync=' + str(sync))
+        doc_id = '1'
+
+        response = self.client.put('/rest/' + index_name + '/_doc/' + doc_id, data=json.dumps(doc_json),
+                                   query_string='sync=True')
 
         expected_status_code = HTTPStatus.CREATED
         actual_status_code = response.status_code
@@ -159,65 +179,31 @@ class TestKVSServer(unittest.TestCase):
         actual_status_code = data['status']['code']
         self.assertEqual(expected_status_code, actual_status_code)
 
-        expected_count = 5
-        actual_count = data['count']
-        self.assertEqual(expected_count, actual_count)
+    def test_get_document(self):
+        index_name = 'test_index'
+        with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
+            schema_yaml = file_obj.read()
 
-    def test_bulk_delete(self):
-        example_bulk_index = self.example_dir + '/bulk_index.json'
-
-        file_obj = open(example_bulk_index, 'r', encoding='utf-8')
-        example_data = json.loads(file_obj.read(), encoding='utf-8')
-        file_obj.close()
-
-        sync = True
-
-        response = self.client.put('/rest/bulk', data=json.dumps(example_data), query_string='sync=' + str(sync))
-
+        # create index
+        response = self.client.put('/rest/' + index_name, data=schema_yaml, query_string='sync=True')
         expected_status_code = HTTPStatus.CREATED
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
 
-        example_bulk_delete = self.example_dir + '/bulk_delete.json'
+        with open(self.example_dir + '/doc1.json', 'r', encoding='utf-8') as file_obj:
+            doc_json = file_obj.read()
 
-        file_obj = open(example_bulk_delete, 'r', encoding='utf-8')
-        example_data = json.loads(file_obj.read(), encoding='utf-8')
-        file_obj.close()
+        doc_id = '1'
 
-        sync = True
-
-        response = self.client.delete('/rest/bulk', data=json.dumps(example_data), query_string='sync=' + str(sync))
-
-        expected_status_code = HTTPStatus.OK
+        # index document
+        response = self.client.put('/rest/' + index_name + '/_doc/' + doc_id, data=doc_json,
+                                   query_string='sync=True')
+        expected_status_code = HTTPStatus.CREATED
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
 
-        data = json.loads(response.data)
-
-        expected_status_code = HTTPStatus.OK
-        actual_status_code = data['status']['code']
-        self.assertEqual(expected_status_code, actual_status_code)
-
-        expected_count = 5
-        actual_count = data['count']
-        self.assertEqual(expected_count, actual_count)
-
-    def test_get(self):
-        example_file = self.example_dir + '/doc1.json'
-
-        file_obj = open(example_file, 'r', encoding='utf-8')
-        example_data = json.loads(file_obj.read(), encoding='utf-8')
-        file_obj.close()
-
-        test_doc_id = '1'
-        test_fields = example_data
-        sync = True
-
-        self.client.put('/rest/doc/' + test_doc_id, data=json.dumps(test_fields),
-                        query_string='sync=' + str(sync))
-
-        response = self.client.get('/rest/doc/' + test_doc_id)
-
+        # get document
+        response = self.client.get('/rest/' + index_name + '/_doc/' + doc_id)
         expected_status_code = HTTPStatus.OK
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
@@ -232,5 +218,95 @@ class TestKVSServer(unittest.TestCase):
         actual_doc_id = data['doc']['fields']['id']
         self.assertEqual(expected_doc_id, actual_doc_id)
 
-    def test_search(self):
-        pass
+
+    # def test_delete(self):
+    #     example_file = self.example_dir + '/doc1.json'
+    #
+    #     file_obj = open(example_file, 'r', encoding='utf-8')
+    #     example_data = json.loads(file_obj.read(), encoding='utf-8')
+    #     file_obj.close()
+    #
+    #     doc_id = '1'
+    #     sync = True
+    #
+    #     self.client.put('/rest/doc/' + doc_id, data=json.dumps(example_data),
+    #                     query_string='sync=' + str(sync))
+    #
+    #     response = self.client.delete_document('/rest/doc/' + doc_id, query_string='sync=' + str(sync))
+    #
+    #     expected_status_code = HTTPStatus.OK
+    #     actual_status_code = response.status_code
+    #     self.assertEqual(expected_status_code, actual_status_code)
+    #
+    #     response = self.client.get('/rest/doc/' + doc_id)
+    #
+    #     expected_status_code = HTTPStatus.NOT_FOUND
+    #     actual_status_code = response.status_code
+    #     self.assertEqual(expected_status_code, actual_status_code)
+    #
+    # def test_bulk_index(self):
+    #     example_file = self.example_dir + '/bulk_index.json'
+    #
+    #     file_obj = open(example_file, 'r', encoding='utf-8')
+    #     example_data = json.loads(file_obj.read(), encoding='utf-8')
+    #     file_obj.close()
+    #
+    #     sync = True
+    #
+    #     response = self.client.put('/rest/bulk', data=json.dumps(example_data), query_string='sync=' + str(sync))
+    #
+    #     expected_status_code = HTTPStatus.CREATED
+    #     actual_status_code = response.status_code
+    #     self.assertEqual(expected_status_code, actual_status_code)
+    #
+    #     data = json.loads(response.data)
+    #
+    #     expected_status_code = HTTPStatus.CREATED
+    #     actual_status_code = data['status']['code']
+    #     self.assertEqual(expected_status_code, actual_status_code)
+    #
+    #     expected_count = 5
+    #     actual_count = data['count']
+    #     self.assertEqual(expected_count, actual_count)
+    #
+    # def test_bulk_delete(self):
+    #     example_bulk_index = self.example_dir + '/bulk_index.json'
+    #
+    #     file_obj = open(example_bulk_index, 'r', encoding='utf-8')
+    #     example_data = json.loads(file_obj.read(), encoding='utf-8')
+    #     file_obj.close()
+    #
+    #     sync = True
+    #
+    #     response = self.client.put('/rest/bulk', data=json.dumps(example_data), query_string='sync=' + str(sync))
+    #
+    #     expected_status_code = HTTPStatus.CREATED
+    #     actual_status_code = response.status_code
+    #     self.assertEqual(expected_status_code, actual_status_code)
+    #
+    #     example_bulk_delete = self.example_dir + '/bulk_delete.json'
+    #
+    #     file_obj = open(example_bulk_delete, 'r', encoding='utf-8')
+    #     example_data = json.loads(file_obj.read(), encoding='utf-8')
+    #     file_obj.close()
+    #
+    #     sync = True
+    #
+    #     response = self.client.delete_document('/rest/bulk', data=json.dumps(example_data), query_string='sync=' + str(sync))
+    #
+    #     expected_status_code = HTTPStatus.OK
+    #     actual_status_code = response.status_code
+    #     self.assertEqual(expected_status_code, actual_status_code)
+    #
+    #     data = json.loads(response.data)
+    #
+    #     expected_status_code = HTTPStatus.OK
+    #     actual_status_code = data['status']['code']
+    #     self.assertEqual(expected_status_code, actual_status_code)
+    #
+    #     expected_count = 5
+    #     actual_count = data['count']
+    #     self.assertEqual(expected_count, actual_count)
+    #
+    # def test_search(self):
+    #     pass

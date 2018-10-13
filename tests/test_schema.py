@@ -33,7 +33,10 @@ class TestSchema(unittest.TestCase):
         self.index_dir = self.temp_dir.name + '/index'
         schema_file = self.conf_dir + '/schema.yaml'
 
-        self.schema = Schema(schema_file)
+        with open(schema_file, 'r', encoding='utf-8') as file_obj:
+            schema_yaml = file_obj.read()
+
+        self.schema = Schema(schema_yaml)
 
     def tearDown(self):
         self.temp_dir.cleanup()
