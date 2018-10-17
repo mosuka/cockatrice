@@ -15,7 +15,6 @@
 # limitations under the License.
 
 import importlib
-import os
 from copy import deepcopy
 
 import yaml

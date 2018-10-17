@@ -30,7 +30,6 @@ from pysyncobj import SyncObjConf
 from cockatrice import NAME, VERSION
 from cockatrice.data_node import DataNode
 from cockatrice.http_server import HTTPServer
-from cockatrice.schema import Schema
 
 
 def signal_handler(signal, frame):

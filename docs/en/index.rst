@@ -1,10 +1,10 @@
 .. cockatrice documentation master file, created by
-sphinx-quickstart on Tue Oct  2 13:26:53 2018.
-You can adapt this file completely to your liking, but it should at least
-contain the root `toctree` directive.
+   sphinx-quickstart on Tue Oct  2 13:26:53 2018.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
 
-Welcome to Cockatrice's documentation!
-======================================
+Cockatrice |release| documentation
+==================================
 
 Cockatrice is the open source search and indexing server written in `Python <https://www.python.org>`_ that provides scalable indexing and search, faceting, hit highlighting and advanced analysis/tokenization capabilities.
 
@@ -42,10 +42,10 @@ Contents
    :maxdepth: 2
 
    getting_started/index
+   schema_management/index
    index_management/index
    document_management/index
    search_documents/index
-   schema/index
    rest_api_reference/index
 
 

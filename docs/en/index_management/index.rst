@@ -1,8 +1,8 @@
 Index management
 ================
 
-| First of all, you need to create an index after starting Cockatrice.
-| You can delete indexes that are no longer needed.
+You need to create an index after starting Cockatrice. Also you can delete indexes that are no longer needed.
+
 
 Create an index
 ---------------
@@ -23,7 +23,46 @@ You can see the result in JSON format. The result of the above command is:
         "description": "Request accepted, processing continues off-line",
         "phrase": "Accepted"
       },
-      "time": 21.88803505897522
+      "time": 0.08018112182617188
+    }
+
+
+Get an index
+------------
+
+If you created an index, you can retrieve index information by the following command:
+
+.. code-block:: bash
+
+    $ curl -s -X GET http://localhost:8080/rest/myindex | jq .
+
+The result of the above command is:
+
+.. code-block:: json
+
+    {
+      "index": {
+        "doc_count": 0,
+        "doc_count_all": 0,
+        "last_modified": 1539674088.2373083,
+        "latest_generation": 0,
+        "name": "myindex",
+        "storage": {
+          "files": [
+            "_myindex_0.toc"
+          ],
+          "folder": "/tmp/cockatrice/index",
+          "readonly": false,
+          "supports_mmap": true
+        },
+        "version": -111
+      },
+      "status": {
+        "code": 200,
+        "description": "Request fulfilled, document follows",
+        "phrase": "OK"
+      },
+      "time": 0.0008370876312255859
     }
 
 
