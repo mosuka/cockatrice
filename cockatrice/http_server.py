@@ -527,7 +527,9 @@ class HTTPServer:
 
         try:
             query = request.args.get('query', default='', type=str)
-            search_field = request.args.get('search_field', default=self.__schema.get_default_search_field(), type=str)
+
+            search_field = request.args.get('search_field', default=self.__data_node.get_index(
+                index_name).schema.get_default_search_field(), type=str)
             page_num = request.args.get('page_num', default=1, type=int)
             page_len = request.args.get('page_len', default=10, type=int)
 
