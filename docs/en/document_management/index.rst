@@ -3,7 +3,6 @@ Document management
 
 Once indices are created, you can update indices.
 
-
 Index a document
 ----------------
 
