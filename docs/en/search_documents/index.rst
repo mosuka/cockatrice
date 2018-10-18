@@ -1,15 +1,17 @@
 Search documents
 ================
 
+Once created an index and added documents to it, you can search for those documents.
 
-Search documents by keyword
----------------------------
+
+Searching documents
+-------------------
 
 Searching documents by the following command:
 
 .. code-block:: bash
 
-    $ curl -s -X GET http://localhost:8080/rest/search?query=search | jq .
+    $ curl -s -X GET http://localhost:8080/rest/myindex/_search?query=search | jq .
 
 You can see the result in JSON format. The result of the above command is:
 
@@ -102,6 +104,3 @@ You can see the result in JSON format. The result of the above command is:
       },
       "time": 0.010915756225585938
     }
-
-
-

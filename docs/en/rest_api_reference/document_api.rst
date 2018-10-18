@@ -1,6 +1,7 @@
 Document APIs
 =============
 
+
 Get Document API
 ----------------
 
@@ -8,12 +9,12 @@ Get Document API
 
     GET /rest/<INDEX_NAME>/_doc/<DOC_ID>
 
-* INDEX_NAME: Specify the target index name.
-* DOC_ID: Specify the document ID to retrieve.
+* ``<INDEX_NAME>``: The index name.
+* ``<DOC_ID>``: The document ID to retrieve.
 
 
-Put Document API
-----------------
+Index Document API
+------------------
 
 .. code-block:: text
 
@@ -23,9 +24,9 @@ Put Document API
       ...
     }
 
-* INDEX_NAME: Specify the target index name.
-* DOC_ID: Specify the document ID to put document.
-* SYNC: The sync parameter specifies whether to execute the command synchronously or asynchronously. If 'True' is specified, command will execute synchronously. Default is 'False', command will execute asynchronously.
+* ``<INDEX_NAME>``: The index name.
+* ``<DOC_ID>``: The document ID to index.
+* ``<SYNC>``: Specifies whether to execute the command synchronously or asynchronously. If ``True`` is specified, command will execute synchronously. Default is ``False``, command will execute asynchronously.
 * Request Body: JSON formatted fields definition.
 
 
@@ -36,12 +37,12 @@ Delete Document API
 
     DELETE /rest/<INDEX_NAME>/_doc/<DOC_ID>?sync=<SYNC>
 
-* INDEX_NAME: Specify the target index name.
-* DOC_ID: Specify the document ID to put document.
-* SYNC: The sync parameter specifies whether to execute the command synchronously or asynchronously. If 'True' is specified, command will execute synchronously. Default is 'False', command will execute asynchronously.
+* ``<INDEX_NAME>``: The index name.
+* ``<DOC_ID>``: The document ID to delete.
+* ``<SYNC>``: Specifies whether to execute the command synchronously or asynchronously. If ``True`` is specified, command will execute synchronously. Default is ``False``, command will execute asynchronously.
 
 
-Put Documents API
+Index Documents API
 -----------------
 
 .. code-block:: text
@@ -57,8 +58,8 @@ Put Documents API
       ...
     ]
 
-* INDEX_NAME: Specify the target index name.
-* SYNC: The sync parameter specifies whether to execute the command synchronously or asynchronously. If 'True' is specified, command will execute synchronously. Default is 'False', command will execute asynchronously.
+* ``<INDEX_NAME>``: The index name.
+* ``<SYNC>``: Specifies whether to execute the command synchronously or asynchronously. If ``True`` is specified, command will execute synchronously. Default is ``False``, command will execute asynchronously.
 * Request Body: JSON formatted documents definition.
 
 
@@ -74,8 +75,7 @@ Delete Documents API
       ...
     ]
 
-* INDEX_NAME: Specify the target index name.
-* DOC_ID: Specify the document ID to put document.
-* SYNC: The sync parameter specifies whether to execute the command synchronously or asynchronously. If 'True' is specified, command will execute synchronously. Default is 'False', command will execute asynchronously.
+* ``<INDEX_NAME>``: The index name.
+* ``<SYNC>``: Specifies whether to execute the command synchronously or asynchronously. If ``True`` is specified, command will execute synchronously. Default is ``False``, command will execute asynchronously.
 * Request Body: JSON formatted document ids definition.
 
