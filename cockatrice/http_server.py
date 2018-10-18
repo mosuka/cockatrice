@@ -41,14 +41,10 @@ class HTTPServer:
         self.__data_node = data_node
 
         self.__app = Flask(name)
-        self.__app.add_url_rule('/', 'root', self.__root,
-                                methods=['GET'])
-        self.__app.add_url_rule('/rest/<index_name>', 'get_index', self.__get_index,
-                                methods=['GET'])
-        self.__app.add_url_rule('/rest/<index_name>', 'create_index', self.__create_index,
-                                methods=['PUT'])
-        self.__app.add_url_rule('/rest/<index_name>', 'delete_index', self.__delete_index,
-                                methods=['DELETE'])
+        self.__app.add_url_rule('/', 'root', self.__root, methods=['GET'])
+        self.__app.add_url_rule('/rest/<index_name>', 'get_index', self.__get_index, methods=['GET'])
+        self.__app.add_url_rule('/rest/<index_name>', 'create_index', self.__create_index, methods=['PUT'])
+        self.__app.add_url_rule('/rest/<index_name>', 'delete_index', self.__delete_index, methods=['DELETE'])
         self.__app.add_url_rule('/rest/<index_name>/_doc/<doc_id>', 'get_document', self.__get_document,
                                 methods=['GET'])
         self.__app.add_url_rule('/rest/<index_name>/_doc/<doc_id>', 'index_document', self.__index_document,
@@ -61,8 +57,8 @@ class HTTPServer:
                                 methods=['DELETE'])
         self.__app.add_url_rule('/rest/<index_name>/_search', 'search_documents', self.__search_documents,
                                 methods=['GET', 'POST'])
-        self.__app.add_url_rule('/metrics', 'metrics', self.__metrics,
-                                methods=['GET'])
+        self.__app.add_url_rule('/rest/_cluster', 'cluster', self.__cluster, methods=['GET'])
+        self.__app.add_url_rule('/metrics', 'metrics', self.__metrics, methods=['GET'])
 
         # disable Flask default logger
         self.__app.logger.disabled = True
@@ -568,6 +564,34 @@ class HTTPServer:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.MISDIRECTED_REQUEST
             self.__logger.error(ex)
+        except Exception as ex:
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            self.__logger.error(ex)
+        finally:
+            data['time'] = time.time() - start_time
+            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+                              'description': status_code.description}
+
+        resp = jsonify(data)
+        resp.status_code = status_code
+
+        return resp
+
+    def __cluster(self):
+        start_time = time.time()
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            return self.__post_process(start_time, request, response)
+
+        data = {}
+        status_code = None
+
+        try:
+            data['cluster_status'] = self.__data_node.getStatus()
+
+            status_code = HTTPStatus.OK
         except Exception as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.INTERNAL_SERVER_ERROR
