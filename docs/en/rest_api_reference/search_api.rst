@@ -8,5 +8,8 @@ Search API
 
     GET /rest/<INDEX_NAME>?query=<QUERY>&search_field=<SEARCH_FIELD>&page_num=<PAGE_NUM>&page_len=<PAGE_LEN>
 
-* INDEX_NAME: Specify the index name to retrieve.
-
+* ``<INDEX_NAME>``: The index name to search.
+* ``<QUERY>``: The unicode string to search index.
+* ``<SEARCH_FIELD>``: Uses this as the field for any terms without an explicit field.
+* ``<PAGE_NUM>``: The page number to retrieve, starting at ``1`` for the first page.
+* ``<PAGE_LEN>``: The number of results per page.

@@ -1,6 +1,8 @@
 Search documents
 ================
 
+Once created an index and added documents to it, you can search for those documents.
+
 
 Searching documents
 -------------------

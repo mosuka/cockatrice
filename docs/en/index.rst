@@ -46,6 +46,7 @@ Contents
    index_management/index
    document_management/index
    search_documents/index
+   cluster_management/index
    rest_api_reference/index
 
 
