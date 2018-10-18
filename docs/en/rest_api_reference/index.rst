@@ -7,3 +7,4 @@ RESTful API Reference
    indices_api
    document_api
    search_api
+   cluster_api
