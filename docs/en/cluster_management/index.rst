@@ -93,3 +93,33 @@ If the above command succeeds, same document will be indexed on all the nodes in
     $ curl -s -X GET http://localhost:8080/rest/myindex/_doc/1 | jq .
     $ curl -s -X GET http://localhost:8081/rest/myindex/_doc/1 | jq .
     $ curl -s -X GET http://localhost:8082/rest/myindex/_doc/1 | jq .
+
+
+Dynamic Membership change
+-------------------------
+
+Dynamic membership change allows you to add or remove nodes from your cluster without cluster restart.
+This section describes how to scale the cluster. Let's start first node by the following command:
+
+.. code-block:: bash
+
+    $ cockatrice server --http-port=8080 --bind-addr=127.0.0.1:7070 --index-dir=/tmp/cockatrice/node1/index --dump-file=/tmp/cockatrice/node1/raft/data.dump
+
+Then, call Node API with new node name on one of the existing nodes.
+
+.. code-block:: bash
+
+    $ curl -s -X PUT http://localhost:8080/rest/_node?node=127.0.0.1:7071 | jq .
+
+If the above command succeeds, you can launch new node with correct initial peers:
+
+.. code-block:: bash
+
+    $ cockatrice server --http-port=8081 --bind-addr=127.0.0.1:7071 --index-dir=/tmp/cockatrice/node2/index --dump-file=/tmp/cockatrice/node2/raft/data.dump --peer-addr=127.0.0.1:7070
+
+Recommend 3 or more odd number of nodes in the cluster due to avoid split brain. You should launch one more new node with correct initial peers:
+
+.. code-block:: bash
+
+    $ curl -s -X PUT http://localhost:8080/rest/_node?node=127.0.0.1:7072 | jq .
+    $ cockatrice server --http-port=8082 --bind-addr=127.0.0.1:7072 --index-dir=/tmp/cockatrice/node3/index --dump-file=/tmp/cockatrice/node3/raft/data.dump --peer-addr=127.0.0.1:7070 --peer-addr=127.0.0.1:7071

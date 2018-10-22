@@ -58,6 +58,8 @@ class HTTPServer:
         self.__app.add_url_rule('/rest/<index_name>/_search', 'search_documents', self.__search_documents,
                                 methods=['GET', 'POST'])
         self.__app.add_url_rule('/rest/_cluster', 'cluster', self.__cluster, methods=['GET'])
+        self.__app.add_url_rule('/rest/_node', 'join', self.__join, methods=['PUT'])
+        self.__app.add_url_rule('/rest/_node', 'leave', self.__leave, methods=['DELETE'])
         self.__app.add_url_rule('/metrics', 'metrics', self.__metrics, methods=['GET'])
 
         # disable Flask default logger
@@ -589,6 +591,68 @@ class HTTPServer:
         status_code = None
 
         try:
+            data['cluster_status'] = self.__data_node.getStatus()
+
+            status_code = HTTPStatus.OK
+        except Exception as ex:
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            self.__logger.error(ex)
+        finally:
+            data['time'] = time.time() - start_time
+            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+                              'description': status_code.description}
+
+        resp = jsonify(data)
+        resp.status_code = status_code
+
+        return resp
+
+    def __join(self):
+        start_time = time.time()
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            return self.__post_process(start_time, request, response)
+
+        data = {}
+        status_code = None
+
+        try:
+            node = request.args.get('node', default='', type=str)
+
+            self.__data_node.addNodeToCluster(node)
+
+            status_code = HTTPStatus.OK
+        except Exception as ex:
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            self.__logger.error(ex)
+        finally:
+            data['time'] = time.time() - start_time
+            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+                              'description': status_code.description}
+
+        resp = jsonify(data)
+        resp.status_code = status_code
+
+        return resp
+
+    def __leave(self):
+        start_time = time.time()
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            return self.__post_process(start_time, request, response)
+
+        data = {}
+        status_code = None
+
+        try:
+            node = request.args.get('node', default='', type=str)
+
+            self.__data_node.removeNodeFromCluster(node)
+
             data['cluster_status'] = self.__data_node.getStatus()
 
             status_code = HTTPStatus.OK
