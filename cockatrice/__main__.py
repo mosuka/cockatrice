@@ -19,7 +19,9 @@
 import os
 import sys
 import signal
+import json
 
+from threading import Thread
 from argparse import ArgumentParser
 from logging import getLogger, StreamHandler, Formatter, CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET
 from logging.handlers import RotatingFileHandler
@@ -28,15 +30,12 @@ from prometheus_client.core import CollectorRegistry
 from pysyncobj import SyncObjConf
 
 from cockatrice import NAME, VERSION
-from cockatrice.data_node import DataNode
-from cockatrice.http_server import HTTPServer
+from cockatrice.index_node import IndexNode
+from cockatrice.command import execute
 
 
 def signal_handler(signal, frame):
     sys.exit(0)
-
-
-signal.signal(signal.SIGINT, signal_handler)
 
 
 def server_handler(args):
@@ -109,16 +108,63 @@ def server_handler(args):
         dynamicMembershipChange=True
     )
 
-    data_node = DataNode(args.bind_addr, args.peer_addr, conf, args.index_dir, logger)
-    http_server = HTTPServer(NAME, args.http_port, data_node, logger, http_logger, metrics_registry)
-    http_server.start()
+    index_node = None
+    try:
+        if args.seed_addr is not None:
+            # clear the peer addresses due to update peer addresses from the cluster.
+            args.peer_addrs.clear()
+
+            # execute a command to get status from the cluster
+            status_result = execute('status', bind_addr=args.seed_addr, timeout=0.5)
+            if status_result is None:
+                raise ValueError('command execution failed to {0}'.format(args.seed_addr))
+
+            # get peer addresses from above command result
+            self_addr = status_result['data']['self']
+            if self_addr not in args.peer_addrs:
+                args.peer_addrs.append(self_addr)
+            for k in status_result['data'].keys():
+                if k.startswith('partner_node_status_server_'):
+                    partner_addr = k[len('partner_node_status_server_'):]
+                    if partner_addr not in args.peer_addrs:
+                        args.peer_addrs.append(partner_addr)
+
+            if args.bind_addr not in args.peer_addrs:
+                Thread(target=execute, kwargs={'cmd': 'add', 'args': [args.bind_addr], 'bind_addr': args.seed_addr,
+                                               'timeout': 0.5, 'logger': logger}).start()
+
+            # remove this node's address from peer addresses.
+            if args.bind_addr in args.peer_addrs:
+                args.peer_addrs.remove(args.bind_addr)
+
+        index_node = IndexNode(args.bind_addr, args.peer_addrs, conf=conf, index_dir=args.index_dir,
+                               http_port=args.http_port, logger=logger, http_logger=http_logger,
+                               metrics_registry=metrics_registry)
+        index_node.start()
+    except ValueError as ex:
+        print(ex)
+    finally:
+        if index_node is not None:
+            index_node.stop()
 
 
-def client_handler(args):
-    print(__name__)
+def status_handler(args):
+    print(json.dumps(execute('status', bind_addr=args.bind_addr, timeout=0.5)))
+
+
+def join_handler(args):
+    print(json.dumps(execute('add', args=[args.join_addr], bind_addr=args.bind_addr, timeout=0.5)))
+
+
+def leave_handler(args):
+    print(json.dumps(execute('remove', args=[args.leave_addr], bind_addr=args.bind_addr, timeout=0.5)))
 
 
 def main():
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGQUIT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
     parser = ArgumentParser(description='cockatrice command')
     parser.add_argument('-v', '--version', action='version', version='cockatrice {}'.format(VERSION))
 
@@ -128,13 +174,13 @@ def main():
     parser_server.add_argument('--http-port', dest='http_port', default=8080, metavar='HTTP_PORT', type=int,
                                help='http port')
     parser_server.add_argument('--bind-addr', dest='bind_addr', default='127.0.0.1:7070', metavar='BIND_ADDR',
-                               type=str, help='host address')
-    parser_server.add_argument('--peer-addr', dest='peer_addr', default=[], action='append', metavar='PEER_ADDR',
-                               type=str, help='peer address')
+                               type=str, help='the address to listen on for peer traffic')
+    parser_server.add_argument('--seed-addr', dest='seed_addr', default=None, metavar='SEED_ADDR',
+                               type=str, help='the address of the node in the existing cluster')
+    parser_server.add_argument('--peer-addr', dest='peer_addrs', default=[], action='append', metavar='PEER_ADDR',
+                               type=str, help='the address of the peer node in the cluster')
     parser_server.add_argument('--index-dir', dest='index_dir', default='/tmp/cockatrice/index', metavar='INDEX_DIR',
                                type=str, help='index dir')
-    # parser_server.add_argument('--schema-file', dest='schema_file', default=None, metavar='SCHEMA_FILE', type=str,
-    #                            help='schema file')
     parser_server.add_argument('--dump-file', dest='dump_file', default='/tmp/cockatrice/raft/data.dump',
                                metavar='DUMP_FILE', type=str, help='dump file')
     parser_server.add_argument('--log-level', dest='log_level', default='DEBUG', metavar='LOG_LEVEL', type=str,
@@ -145,9 +191,24 @@ def main():
                                help='http log file')
     parser_server.set_defaults(handler=server_handler)
 
-    parser_client = subparsers.add_parser('client', help='see `client --help`')
-    parser_client.add_argument('-H', metavar='HOST', help='host address')
-    parser_client.set_defaults(handler=client_handler)
+    parser_status = subparsers.add_parser('status', help='see `status --help`')
+    parser_status.add_argument('--bind-addr', dest='bind_addr', default='127.0.0.1:7070', metavar='BIND_ADDR',
+                               type=str, help='the address to listen on for peer traffic')
+    parser_status.set_defaults(handler=status_handler)
+
+    parser_join = subparsers.add_parser('join', help='see `join --help`')
+    parser_join.add_argument('--bind-addr', dest='bind_addr', default='127.0.0.1:7070', metavar='BIND_ADDR',
+                             type=str, help='the address to listen on for peer traffic')
+    parser_join.add_argument('--join-addr', dest='join_addr', default=None, metavar='JOIN_ADDR', type=str,
+                             help='the address of node to join to the cluster')
+    parser_join.set_defaults(handler=join_handler)
+
+    parser_join = subparsers.add_parser('leave', help='see `leave --help`')
+    parser_join.add_argument('--bind-addr', dest='bind_addr', default='127.0.0.1:7070', metavar='BIND_ADDR',
+                             type=str, help='the address to listen on for peer traffic')
+    parser_join.add_argument('--leave-addr', dest='leave_addr', default=None, metavar='LEAVE_ADDR', type=str,
+                             help='the address of node to leave from the cluster')
+    parser_join.set_defaults(handler=leave_handler)
 
     args = parser.parse_args()
     if hasattr(args, 'handler'):

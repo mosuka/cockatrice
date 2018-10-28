@@ -30,17 +30,17 @@ from cockatrice.schema import Schema
 TRUE_STRINGS = ['true', 'yes', 'on', 't', 'y', '1']
 
 
-class HTTPServer:
-    def __init__(self, name, port, data_node, logger=getLogger(NAME),
+class IndexHTTPServer:
+    def __init__(self, index_server, port=8080, logger=getLogger(NAME),
                  http_logger=getLogger(NAME + '_http'), metrics_registry=CollectorRegistry()):
         self.__logger = logger
         self.__http_logger = http_logger
         self.__metrics_registry = metrics_registry
 
         self.__port = port
-        self.__data_node = data_node
+        self.__index_server = index_server
 
-        self.__app = Flask(name)
+        self.__app = Flask('index_http_server')
         self.__app.add_url_rule('/', 'root', self.__root, methods=['GET'])
         self.__app.add_url_rule('/rest/<index_name>', 'get_index', self.__get_index, methods=['GET'])
         self.__app.add_url_rule('/rest/<index_name>', 'create_index', self.__create_index, methods=['PUT'])
@@ -58,8 +58,8 @@ class HTTPServer:
         self.__app.add_url_rule('/rest/<index_name>/_search', 'search_documents', self.__search_documents,
                                 methods=['GET', 'POST'])
         self.__app.add_url_rule('/rest/_cluster', 'cluster', self.__cluster, methods=['GET'])
-        self.__app.add_url_rule('/rest/_node', 'join', self.__join, methods=['PUT'])
-        self.__app.add_url_rule('/rest/_node', 'leave', self.__leave, methods=['DELETE'])
+        # self.__app.add_url_rule('/rest/_node', 'join', self.__join, methods=['PUT'])
+        # self.__app.add_url_rule('/rest/_node', 'leave', self.__leave, methods=['DELETE'])
         self.__app.add_url_rule('/metrics', 'metrics', self.__metrics, methods=['GET'])
 
         # disable Flask default logger
@@ -112,11 +112,15 @@ class HTTPServer:
 
     def start(self):
         try:
+            # run server
             self.__app.run(host='0.0.0.0', port=self.__port)
         except OSError as ex:
             self.__logger.critical(ex)
         except Exception as ex:
             self.__logger.critical(ex)
+
+    def stop(self):
+        pass
 
     def __record_http_log(self, req, resp):
         log_message = '{0} - {1} [{2}] "{3} {4} {5}" {6} {7} "{8}" "{9}"'.format(
@@ -194,7 +198,7 @@ class HTTPServer:
         try:
             index_data = {'name': index_name}
 
-            index = self.__data_node.get_index(index_name)
+            index = self.__index_server.get_index(index_name)
             index_data['doc_count'] = index.doc_count()
             index_data['doc_count_all'] = index.doc_count_all()
             index_data['last_modified'] = index.last_modified()
@@ -249,7 +253,7 @@ class HTTPServer:
 
             schema = Schema(request.data)
 
-            self.__data_node.create_index(index_name, schema, use_ram_storage=use_ram_storage, sync=sync)
+            self.__index_server.create_index(index_name, schema, use_ram_storage=use_ram_storage, sync=sync)
 
             if sync:
                 status_code = HTTPStatus.CREATED
@@ -288,7 +292,7 @@ class HTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            self.__data_node.delete_index(index_name, sync=sync)
+            self.__index_server.delete_index(index_name, sync=sync)
 
             if sync:
                 status_code = HTTPStatus.OK
@@ -319,7 +323,7 @@ class HTTPServer:
             return self.__post_process(start_time, request, response)
 
         try:
-            results_page = self.__data_node.get_document(index_name, doc_id)
+            results_page = self.__index_server.get_document(index_name, doc_id)
 
             if results_page.total <= 0:
                 raise KeyError('{0} does not exist in {1}'.format(doc_id, index_name))
@@ -367,7 +371,7 @@ class HTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            self.__data_node.index_document(index_name, doc_id, json.loads(request.data, encoding='utf-8'), sync=sync)
+            self.__index_server.index_document(index_name, doc_id, json.loads(request.data, encoding='utf-8'), sync=sync)
 
             if sync:
                 status_code = HTTPStatus.CREATED
@@ -406,7 +410,7 @@ class HTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            self.__data_node.delete_document(index_name, doc_id, sync=sync)
+            self.__index_server.delete_document(index_name, doc_id, sync=sync)
 
             if sync:
                 status_code = HTTPStatus.OK
@@ -445,7 +449,7 @@ class HTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            cnt = self.__data_node.index_documents(index_name, json.loads(request.data), sync=sync)
+            cnt = self.__index_server.index_documents(index_name, json.loads(request.data), sync=sync)
             if cnt is not None:
                 data['count'] = cnt
 
@@ -486,7 +490,7 @@ class HTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            cnt = self.__data_node.delete_documents(index_name, json.loads(request.data), sync=sync)
+            cnt = self.__index_server.delete_documents(index_name, json.loads(request.data), sync=sync)
             if cnt is not None:
                 data['count'] = cnt
 
@@ -526,13 +530,13 @@ class HTTPServer:
         try:
             query = request.args.get('query', default='', type=str)
 
-            search_field = request.args.get('search_field', default=self.__data_node.get_index(
+            search_field = request.args.get('search_field', default=self.__index_server.get_index(
                 index_name).schema.get_default_search_field(), type=str)
             page_num = request.args.get('page_num', default=1, type=int)
             page_len = request.args.get('page_len', default=10, type=int)
 
-            results_page = self.__data_node.search_documents(index_name, query, search_field, page_num,
-                                                             page_len=page_len)
+            results_page = self.__index_server.search_documents(index_name, query, search_field, page_num,
+                                                                page_len=page_len)
 
             results['is_last_page'] = results_page.is_last_page()
             results['page_count'] = results_page.pagecount
@@ -591,7 +595,7 @@ class HTTPServer:
         status_code = None
 
         try:
-            data['cluster_status'] = self.__data_node.getStatus()
+            data['cluster_status'] = self.__index_server.getStatus()
 
             status_code = HTTPStatus.OK
         except Exception as ex:
@@ -608,67 +612,67 @@ class HTTPServer:
 
         return resp
 
-    def __join(self):
-        start_time = time.time()
+    # def __join(self):
+    #     start_time = time.time()
+    #
+    #     @after_this_request
+    #     def to_do_after_this_request(response):
+    #         return self.__post_process(start_time, request, response)
+    #
+    #     data = {}
+    #     status_code = None
+    #
+    #     try:
+    #         node = request.args.get('node', default='', type=str)
+    #
+    #         self.__index_server.addNodeToCluster(node)
+    #
+    #         status_code = HTTPStatus.OK
+    #     except Exception as ex:
+    #         data['error'] = '{0}'.format(ex.args[0])
+    #         status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+    #         self.__logger.error(ex)
+    #     finally:
+    #         data['time'] = time.time() - start_time
+    #         data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+    #                           'description': status_code.description}
+    #
+    #     resp = jsonify(data)
+    #     resp.status_code = status_code
+    #
+    #     return resp
 
-        @after_this_request
-        def to_do_after_this_request(response):
-            return self.__post_process(start_time, request, response)
-
-        data = {}
-        status_code = None
-
-        try:
-            node = request.args.get('node', default='', type=str)
-
-            self.__data_node.addNodeToCluster(node)
-
-            status_code = HTTPStatus.OK
-        except Exception as ex:
-            data['error'] = '{0}'.format(ex.args[0])
-            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
-            self.__logger.error(ex)
-        finally:
-            data['time'] = time.time() - start_time
-            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
-                              'description': status_code.description}
-
-        resp = jsonify(data)
-        resp.status_code = status_code
-
-        return resp
-
-    def __leave(self):
-        start_time = time.time()
-
-        @after_this_request
-        def to_do_after_this_request(response):
-            return self.__post_process(start_time, request, response)
-
-        data = {}
-        status_code = None
-
-        try:
-            node = request.args.get('node', default='', type=str)
-
-            self.__data_node.removeNodeFromCluster(node)
-
-            data['cluster_status'] = self.__data_node.getStatus()
-
-            status_code = HTTPStatus.OK
-        except Exception as ex:
-            data['error'] = '{0}'.format(ex.args[0])
-            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
-            self.__logger.error(ex)
-        finally:
-            data['time'] = time.time() - start_time
-            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
-                              'description': status_code.description}
-
-        resp = jsonify(data)
-        resp.status_code = status_code
-
-        return resp
+    # def __leave(self):
+    #     start_time = time.time()
+    #
+    #     @after_this_request
+    #     def to_do_after_this_request(response):
+    #         return self.__post_process(start_time, request, response)
+    #
+    #     data = {}
+    #     status_code = None
+    #
+    #     try:
+    #         node = request.args.get('node', default='', type=str)
+    #
+    #         self.__index_server.removeNodeFromCluster(node)
+    #
+    #         data['cluster_status'] = self.__index_server.getStatus()
+    #
+    #         status_code = HTTPStatus.OK
+    #     except Exception as ex:
+    #         data['error'] = '{0}'.format(ex.args[0])
+    #         status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+    #         self.__logger.error(ex)
+    #     finally:
+    #         data['time'] = time.time() - start_time
+    #         data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+    #                           'description': status_code.description}
+    #
+    #     resp = jsonify(data)
+    #     resp.status_code = status_code
+    #
+    #     return resp
 
     def __metrics(self):
         start_time = time.time()

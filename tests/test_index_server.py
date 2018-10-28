@@ -26,11 +26,11 @@ from pysyncobj import SyncObjConf
 from whoosh.filedb.filestore import RamStorage, FileStorage
 
 from cockatrice import NAME
-from cockatrice.data_node import DataNode
+from cockatrice.index_server import IndexServer
 from cockatrice.schema import Schema
 
 
-class TestDataNode(unittest.TestCase):
+class TestIndexServer(unittest.TestCase):
     def setUp(self):
         self.temp_dir = TemporaryDirectory()
         self.conf_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '../conf'))
@@ -56,7 +56,7 @@ class TestDataNode(unittest.TestCase):
             dynamicMembershipChange=True
         )
 
-        self.data_node = DataNode(bind_addr, peer_addrs, conf, index_dir, logger=logger)
+        self.data_node = IndexServer(bind_addr, peer_addrs, conf, index_dir, logger=logger)
 
     def tearDown(self):
         self.data_node.destroy()
@@ -82,7 +82,7 @@ class TestDataNode(unittest.TestCase):
 
         # check the number of ram indices
         expected_file_count = 2
-        actual_file_count = len(self.data_node.ram_storage.list())
+        actual_file_count = len(self.data_node.get_ram_storage().list())
         self.assertEqual(expected_file_count, actual_file_count)
 
         # create file index
@@ -101,7 +101,7 @@ class TestDataNode(unittest.TestCase):
 
         # check the number of file file indices
         expected_file_count = 2
-        actual_file_count = len(self.data_node.file_storage.list())
+        actual_file_count = len(self.data_node.get_file_storage().list())
         self.assertEqual(expected_file_count, actual_file_count)
 
     def test_delete_index(self):
@@ -124,13 +124,13 @@ class TestDataNode(unittest.TestCase):
 
         # check the number of ram indices
         expected_file_count = 2
-        actual_file_count = len(self.data_node.ram_storage.list())
+        actual_file_count = len(self.data_node.get_ram_storage().list())
         self.assertEqual(expected_file_count, actual_file_count)
 
         # delete ram index
         self.data_node.delete_index(index_name, sync=True)
         expected_file_count = 1
-        actual_file_count = len(self.data_node.ram_storage.list())
+        actual_file_count = len(self.data_node.get_ram_storage().list())
         self.assertEqual(expected_file_count, actual_file_count)
 
         # create file index
@@ -148,12 +148,12 @@ class TestDataNode(unittest.TestCase):
         self.assertTrue(isinstance(index.storage, FileStorage))
 
         expected_file_count = 2
-        actual_file_count = len(self.data_node.file_storage.list())
+        actual_file_count = len(self.data_node.get_file_storage().list())
         self.assertEqual(expected_file_count, actual_file_count)
 
         self.data_node.delete_index(index_name, sync=True)
         expected_file_count = 1
-        actual_file_count = len(self.data_node.file_storage.list())
+        actual_file_count = len(self.data_node.get_file_storage().list())
         self.assertEqual(expected_file_count, actual_file_count)
 
     def test_index_exists(self):

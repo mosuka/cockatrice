@@ -27,12 +27,11 @@ from prometheus_client.core import CollectorRegistry
 from pysyncobj import SyncObjConf
 
 from cockatrice import NAME
-from cockatrice.data_node import DataNode
-from cockatrice.http_server import HTTPServer
-from cockatrice.schema import Schema
+from cockatrice.index_server import IndexServer
+from cockatrice.index_http_server import IndexHTTPServer
 
 
-class TestKVSServer(unittest.TestCase):
+class TestIndexHTTPServer(unittest.TestCase):
     def setUp(self):
         self.temp_dir = TemporaryDirectory()
         self.conf_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '../conf'))
@@ -69,18 +68,19 @@ class TestKVSServer(unittest.TestCase):
             dynamicMembershipChange=True
         )
 
-        data_node = DataNode(bind_addr, peer_addrs, conf, index_dir, logger=logger)
+        index_server = IndexServer(bind_addr, peer_addrs, conf, index_dir, logger=logger)
 
-        self.server = HTTPServer(NAME, http_port, data_node,
-                                 logger=logger, http_logger=http_logger, metrics_registry=metrics_registry)
+        self.index_http_server = IndexHTTPServer(index_server, port=http_port,
+                                                 logger=logger, http_logger=http_logger,
+                                                 metrics_registry=metrics_registry)
 
-        self.client = self.server.get_test_client()
+        self.test_client = self.index_http_server.get_test_client()
 
     def tearDown(self):
         self.temp_dir.cleanup()
 
     def test_metrics(self):
-        response = self.client.get('/metrics')
+        response = self.test_client.get('/metrics')
 
         expected_status_code = HTTPStatus.OK
         actual_status_code = response.status_code
@@ -88,7 +88,7 @@ class TestKVSServer(unittest.TestCase):
         self.assertEqual(expected_status_code, actual_status_code)
 
     def test_root(self):
-        response = self.client.get('/')
+        response = self.test_client.get('/')
         expected_status_code = HTTPStatus.OK
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
@@ -99,7 +99,7 @@ class TestKVSServer(unittest.TestCase):
             schema_yaml = file_obj.read()
 
         # create index
-        response = self.client.put('/rest/' + index_name, data=schema_yaml, query_string='sync=True')
+        response = self.test_client.put('/rest/' + index_name, data=schema_yaml, query_string='sync=True')
         expected_status_code = HTTPStatus.CREATED
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
@@ -110,13 +110,13 @@ class TestKVSServer(unittest.TestCase):
             schema_yaml = file_obj.read()
 
         # create index
-        response = self.client.put('/rest/' + index_name, data=schema_yaml, query_string='sync=True')
+        response = self.test_client.put('/rest/' + index_name, data=schema_yaml, query_string='sync=True')
         expected_status_code = HTTPStatus.CREATED
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
 
         # get index
-        response = self.client.get('/rest/' + index_name)
+        response = self.test_client.get('/rest/' + index_name)
         expected_status_code = HTTPStatus.OK
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
@@ -127,25 +127,25 @@ class TestKVSServer(unittest.TestCase):
             schema_yaml = file_obj.read()
 
         # create index
-        response = self.client.put('/rest/' + index_name, data=schema_yaml, query_string='sync=True')
+        response = self.test_client.put('/rest/' + index_name, data=schema_yaml, query_string='sync=True')
         expected_status_code = HTTPStatus.CREATED
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
 
         # get index
-        response = self.client.get('/rest/' + index_name)
+        response = self.test_client.get('/rest/' + index_name)
         expected_status_code = HTTPStatus.OK
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
 
         # delete index
-        response = self.client.delete('/rest/' + index_name, query_string='sync=True')
+        response = self.test_client.delete('/rest/' + index_name, query_string='sync=True')
         expected_status_code = HTTPStatus.OK
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
 
         # get index
-        response = self.client.get('/rest/' + index_name)
+        response = self.test_client.get('/rest/' + index_name)
         expected_status_code = HTTPStatus.NOT_FOUND
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
@@ -156,7 +156,7 @@ class TestKVSServer(unittest.TestCase):
             schema_yaml = file_obj.read()
 
         # create index
-        response = self.client.put('/rest/' + index_name, data=schema_yaml, query_string='sync=True')
+        response = self.test_client.put('/rest/' + index_name, data=schema_yaml, query_string='sync=True')
         expected_status_code = HTTPStatus.CREATED
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
@@ -166,8 +166,8 @@ class TestKVSServer(unittest.TestCase):
 
         doc_id = '1'
 
-        response = self.client.put('/rest/' + index_name + '/_doc/' + doc_id, data=json.dumps(doc_json),
-                                   query_string='sync=True')
+        response = self.test_client.put('/rest/' + index_name + '/_doc/' + doc_id, data=json.dumps(doc_json),
+                                        query_string='sync=True')
 
         expected_status_code = HTTPStatus.CREATED
         actual_status_code = response.status_code
@@ -185,7 +185,7 @@ class TestKVSServer(unittest.TestCase):
             schema_yaml = file_obj.read()
 
         # create index
-        response = self.client.put('/rest/' + index_name, data=schema_yaml, query_string='sync=True')
+        response = self.test_client.put('/rest/' + index_name, data=schema_yaml, query_string='sync=True')
         expected_status_code = HTTPStatus.CREATED
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
@@ -196,14 +196,14 @@ class TestKVSServer(unittest.TestCase):
         doc_id = '1'
 
         # index document
-        response = self.client.put('/rest/' + index_name + '/_doc/' + doc_id, data=doc_json,
-                                   query_string='sync=True')
+        response = self.test_client.put('/rest/' + index_name + '/_doc/' + doc_id, data=doc_json,
+                                        query_string='sync=True')
         expected_status_code = HTTPStatus.CREATED
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
 
         # get document
-        response = self.client.get('/rest/' + index_name + '/_doc/' + doc_id)
+        response = self.test_client.get('/rest/' + index_name + '/_doc/' + doc_id)
         expected_status_code = HTTPStatus.OK
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
@@ -217,7 +217,6 @@ class TestKVSServer(unittest.TestCase):
         expected_doc_id = '1'
         actual_doc_id = data['doc']['fields']['id']
         self.assertEqual(expected_doc_id, actual_doc_id)
-
 
     # def test_delete(self):
     #     example_file = self.example_dir + '/doc1.json'
