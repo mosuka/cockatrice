@@ -67,8 +67,9 @@ class IndexHTTPServer:
         getLogger('werkzeug').disabled = True
 
         # metrics
+        component_name = self.__class__.__name__.lower()
         self.__metrics_http_requests_total = Counter(
-            'http_requests_total',
+            '{0}_{1}_requests_total'.format(NAME, component_name),
             'The number of requests.',
             [
                 'method',
@@ -78,7 +79,7 @@ class IndexHTTPServer:
             registry=self.__metrics_registry
         )
         self.__metrics_http_requests_bytes_total = Counter(
-            'http_requests_bytes_total',
+            '{0}_{1}_requests_bytes_total'.format(NAME, component_name),
             'A summary of the invocation requests bytes.',
             [
                 'method',
@@ -87,7 +88,7 @@ class IndexHTTPServer:
             registry=self.__metrics_registry
         )
         self.__metrics_http_responses_bytes_total = Counter(
-            'http_responses_bytes_total',
+            '{0}_{1}_responses_bytes_total'.format(NAME, component_name),
             'A summary of the invocation responses bytes.',
             [
                 'method',
@@ -96,7 +97,7 @@ class IndexHTTPServer:
             registry=self.__metrics_registry
         )
         self.__metrics_http_requests_duration_seconds = Histogram(
-            'http_requests_duration_seconds',
+            '{0}_{1}_requests_duration_seconds'.format(NAME, component_name),
             'The invocation duration in seconds.',
             [
                 'method',
@@ -104,11 +105,6 @@ class IndexHTTPServer:
             ],
             registry=self.__metrics_registry
         )
-        # self.__metrics_kvs_records_count = Gauge(
-        #     'kvs_records_count',
-        #     'The number of kvs records.',
-        #     registry=self.__metrics_registry
-        # )
 
     def start(self):
         try:
@@ -371,7 +367,8 @@ class IndexHTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            self.__index_server.index_document(index_name, doc_id, json.loads(request.data, encoding='utf-8'), sync=sync)
+            self.__index_server.index_document(index_name, doc_id, json.loads(request.data, encoding='utf-8'),
+                                               sync=sync)
 
             if sync:
                 status_code = HTTPStatus.CREATED

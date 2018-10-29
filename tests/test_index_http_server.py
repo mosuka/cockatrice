@@ -68,7 +68,8 @@ class TestIndexHTTPServer(unittest.TestCase):
             dynamicMembershipChange=True
         )
 
-        index_server = IndexServer(bind_addr, peer_addrs, conf, index_dir, logger=logger)
+        index_server = IndexServer(bind_addr, peer_addrs, conf, index_dir, logger=logger,
+                                   metrics_registry=metrics_registry)
 
         self.index_http_server = IndexHTTPServer(index_server, port=http_port,
                                                  logger=logger, http_logger=http_logger,

@@ -24,6 +24,7 @@ from tempfile import TemporaryDirectory
 
 from pysyncobj import SyncObjConf
 from whoosh.filedb.filestore import RamStorage, FileStorage
+from prometheus_client.core import CollectorRegistry
 
 from cockatrice import NAME
 from cockatrice.index_server import IndexServer
@@ -56,7 +57,10 @@ class TestIndexServer(unittest.TestCase):
             dynamicMembershipChange=True
         )
 
-        self.data_node = IndexServer(bind_addr, peer_addrs, conf, index_dir, logger=logger)
+        metrics_registry = CollectorRegistry()
+
+        self.data_node = IndexServer(bind_addr, peer_addrs, conf, index_dir, logger=logger,
+                                     metrics_registry=metrics_registry)
 
     def tearDown(self):
         self.data_node.destroy()

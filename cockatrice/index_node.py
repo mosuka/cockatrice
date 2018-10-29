@@ -27,9 +27,10 @@ class IndexNode:
     def __init__(self, bind_addr, peer_addrs, conf=None, index_dir='/tmp/cockatrice/index', http_port=8080,
                  logger=getLogger(NAME), http_logger=getLogger(NAME + '_http'), metrics_registry=CollectorRegistry()):
         self.__logger = logger
-        self.__index_server = IndexServer(bind_addr, peer_addrs, conf, index_dir, logger)
-        self.__index_http_server = IndexHTTPServer(self.__index_server, http_port, logger, http_logger,
-                                                   metrics_registry)
+        self.__index_server = IndexServer(bind_addr, peer_addrs, conf=conf, index_dir=index_dir, logger=logger,
+                                          metrics_registry=metrics_registry)
+        self.__index_http_server = IndexHTTPServer(self.__index_server, port=http_port, logger=logger,
+                                                   http_logger=http_logger, metrics_registry=metrics_registry)
 
     def start(self):
         self.__index_http_server.start()

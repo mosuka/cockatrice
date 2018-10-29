@@ -15,10 +15,12 @@
 # limitations under the License.
 
 import os
+import time
 
 from logging import getLogger
 
 from pysyncobj import SyncObj, replicated
+from prometheus_client.core import CollectorRegistry, Gauge, Histogram
 from whoosh.filedb.filestore import FileStorage, RamStorage
 from whoosh.qparser import QueryParser
 
@@ -26,10 +28,12 @@ from cockatrice import NAME
 
 
 class IndexServer(SyncObj):
-    def __init__(self, bind_addr, peer_addrs, conf=None, index_dir='/tmp/cockatrice/index', logger=getLogger(NAME)):
+    def __init__(self, bind_addr, peer_addrs, conf=None, index_dir='/tmp/cockatrice/index', logger=getLogger(NAME),
+                 metrics_registry=CollectorRegistry()):
         super(IndexServer, self).__init__(bind_addr, peer_addrs, conf=conf)
 
         self.__logger = logger
+        self.__metrics_registry = metrics_registry
 
         self.__bind_addr = bind_addr
 
@@ -41,6 +45,25 @@ class IndexServer(SyncObj):
         self.__file_storage = FileStorage(self.__index_dir, supports_mmap=True, readonly=False, debug=False)
 
         # self.__metadata = {}
+
+        # metrics
+        component_name = self.__class__.__name__.lower()
+        self.__metrics_documents = Gauge(
+            '{0}_{1}_documents'.format(NAME, component_name),
+            'The number of documents.',
+            [
+                'index_name',
+            ],
+            registry=self.__metrics_registry
+        )
+        self.__metrics_duration_seconds = Histogram(
+            '{0}_{1}_duration_seconds'.format(NAME, component_name),
+            'The invocation duration in seconds.',
+            [
+                'func'
+            ],
+            registry=self.__metrics_registry
+        )
 
     def destroy(self):
         for index in self.__indices.values():
@@ -90,16 +113,17 @@ class IndexServer(SyncObj):
             else:
                 self.__indices[index_name] = self.__file_storage.create_index(schema, indexname=index_name)
                 self.__logger.info('create {0} on {1}'.format(index_name, self.__index_dir))
+
+        self.__metrics_documents.labels(
+            index_name=index_name,
+        ).set(self.__indices[index_name].doc_count())
+
         return self.__indices[index_name]
 
     @replicated
     def delete_index(self, index_name):
         __index = self.__indices.pop(index_name, None)
         if __index is not None:
-            # # clear index
-            # __index.writer().commit(mergetype=CLEAR)
-            # self.__logger.info('delete {0} on {1}'.format(index_name, self.index_dir))
-
             # close index
             __index.close()
             self.__logger.info('close {0} on {1}'.format(index_name, self.__index_dir))
@@ -110,6 +134,10 @@ class IndexServer(SyncObj):
                 if filename.startswith(prefix):
                     __index.storage.delete_file(filename)
                     self.__logger.info('delete {0} on {1}'.format(index_name, os.path.join(self.__index_dir, filename)))
+
+            self.__metrics_documents.labels(
+                index_name=index_name,
+            ).set(0)
 
     def index_exists(self, index_name):
         if index_name in self.__indices:
@@ -122,6 +150,8 @@ class IndexServer(SyncObj):
 
     @replicated
     def index_document(self, index_name, doc_id, fields):
+        start_time = time.time()
+
         writer = self.__indices[index_name].writer()
 
         try:
@@ -133,6 +163,13 @@ class IndexServer(SyncObj):
         except Exception as ex:
             self.__logger.error(ex)
             writer.cancel()
+        finally:
+            self.__metrics_documents.labels(
+                index_name=index_name,
+            ).set(self.__indices[index_name].doc_count())
+            self.__metrics_duration_seconds.labels(
+                func='index_document'
+            ).observe(time.time() - start_time)
 
     @replicated
     def delete_document(self, index_name, doc_id):
@@ -144,6 +181,10 @@ class IndexServer(SyncObj):
         except Exception as ex:
             self.__logger.error(ex)
             writer.cancel()
+        finally:
+            self.__metrics_documents.labels(
+                index_name=index_name,
+            ).set(self.__indices[index_name].doc_count())
 
     @replicated
     def index_documents(self, index_name, docs):
@@ -160,6 +201,10 @@ class IndexServer(SyncObj):
             self.__logger.error(ex)
             writer.cancel()
             cnt = 0
+        finally:
+            self.__metrics_documents.labels(
+                index_name=index_name,
+            ).set(self.__indices[index_name].doc_count())
 
         return cnt
 
@@ -178,6 +223,10 @@ class IndexServer(SyncObj):
             self.__logger.error(ex)
             writer.cancel()
             cnt = 0
+        finally:
+            self.__metrics_documents.labels(
+                index_name=index_name,
+            ).set(self.__indices[index_name].doc_count())
 
         return cnt
 
