@@ -43,7 +43,7 @@ Delete Document API
 
 
 Index Documents API
------------------
+-------------------
 
 .. code-block:: text
 

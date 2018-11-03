@@ -6,7 +6,7 @@ Once indices are created, you can update indices.
 Index a document
 ----------------
 
-If you already created an index named ``myindex``, you can indexing a document by the following command:
+If you already created an index named ``myindex``, indexing a document by the following command:
 
 .. code-block:: bash
 
@@ -29,7 +29,7 @@ You can see the result in JSON format. The result of the above command is:
 Get a document
 --------------
 
-Getting a document from ``myindex`` by the following command:
+If you already indexed a document ID ``1`` in ``myindex``, getting a document that specifying ID from ``myindex`` by the following command:
 
 .. code-block:: bash
 

@@ -47,6 +47,7 @@ Contents
    document_management/index
    search_documents/index
    cluster_management/index
+   monitoring_cockatrice/index
    rest_api_reference/index
 
 
