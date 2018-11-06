@@ -57,10 +57,9 @@ class TestIndexServer(unittest.TestCase):
             dynamicMembershipChange=True
         )
 
-        metrics_registry = CollectorRegistry()
+        # metrics_registry = CollectorRegistry()
 
-        self.data_node = IndexServer(bind_addr, peer_addrs, conf, index_dir, logger=logger,
-                                     metrics_registry=metrics_registry)
+        self.data_node = IndexServer(bind_addr, peer_addrs, conf, index_dir, logger=logger)
 
     def tearDown(self):
         self.data_node.destroy()

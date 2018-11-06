@@ -99,14 +99,17 @@ def server_handler(args):
     # metrics registry
     metrics_registry = CollectorRegistry()
 
-    if args.dump_file is not None:
-        os.makedirs(os.path.dirname(args.dump_file), exist_ok=True)
+    if args.full_dump_file is not None:
+        os.makedirs(os.path.dirname(args.full_dump_file), exist_ok=True)
 
-    conf = SyncObjConf(
-        fullDumpFile=args.dump_file,
-        logCompactionMinTime=300,
-        dynamicMembershipChange=True
-    )
+    conf = SyncObjConf()
+
+    conf.fullDumpFile = args.full_dump_file
+    conf.logCompactionMinEntries = args.log_compaction_min_entries
+    conf.logCompactionMinTime = args.log_compaction_min_time
+    conf.dynamicMembershipChange = True
+
+    conf.validate()
 
     index_node = None
     try:
@@ -172,17 +175,23 @@ def main():
 
     parser_server = subparsers.add_parser('server', help='see `server --help`')
     parser_server.add_argument('--http-port', dest='http_port', default=8080, metavar='HTTP_PORT', type=int,
-                               help='http port')
+                               help='the port to listen on for HTTP traffic')
     parser_server.add_argument('--bind-addr', dest='bind_addr', default='127.0.0.1:7070', metavar='BIND_ADDR',
                                type=str, help='the address to listen on for peer traffic')
     parser_server.add_argument('--seed-addr', dest='seed_addr', default=None, metavar='SEED_ADDR',
                                type=str, help='the address of the node in the existing cluster')
     parser_server.add_argument('--peer-addr', dest='peer_addrs', default=[], action='append', metavar='PEER_ADDR',
                                type=str, help='the address of the peer node in the cluster')
+    parser_server.add_argument('--full-dump-file', dest='full_dump_file', default=None, metavar='FULL_DUMP_FILE',
+                               type=str, help='file to store full serialized object')
+    parser_server.add_argument('--log-compaction-min-entries', dest='log_compaction_min_entries', default=5000,
+                               metavar='LOG_COMPACTION_MIN_ENTRIES', type=int,
+                               help='log-compaction interval min entries')
+    parser_server.add_argument('--log-compaction-min-time', dest='log_compaction_min_time', default=300,
+                               metavar='LOG_COMPACTION_MIN_TIME', type=int,
+                               help='log-compaction interval min time in seconds')
     parser_server.add_argument('--index-dir', dest='index_dir', default='/tmp/cockatrice/index', metavar='INDEX_DIR',
                                type=str, help='index dir')
-    parser_server.add_argument('--dump-file', dest='dump_file', default='/tmp/cockatrice/raft/data.dump',
-                               metavar='DUMP_FILE', type=str, help='dump file')
     parser_server.add_argument('--log-level', dest='log_level', default='DEBUG', metavar='LOG_LEVEL', type=str,
                                help='log level')
     parser_server.add_argument('--log-file', dest='log_file', default=None, metavar='LOG_FILE', type=str,

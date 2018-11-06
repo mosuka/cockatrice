@@ -67,9 +67,8 @@ class IndexHTTPServer:
         getLogger('werkzeug').disabled = True
 
         # metrics
-        component_name = self.__class__.__name__.lower()
         self.__metrics_http_requests_total = Counter(
-            '{0}_{1}_requests_total'.format(NAME, component_name),
+            '{0}_http_requests_total'.format(NAME),
             'The number of requests.',
             [
                 'method',
@@ -79,7 +78,7 @@ class IndexHTTPServer:
             registry=self.__metrics_registry
         )
         self.__metrics_http_requests_bytes_total = Counter(
-            '{0}_{1}_requests_bytes_total'.format(NAME, component_name),
+            '{0}_http_requests_bytes_total'.format(NAME),
             'A summary of the invocation requests bytes.',
             [
                 'method',
@@ -88,7 +87,7 @@ class IndexHTTPServer:
             registry=self.__metrics_registry
         )
         self.__metrics_http_responses_bytes_total = Counter(
-            '{0}_{1}_responses_bytes_total'.format(NAME, component_name),
+            '{0}_http_responses_bytes_total'.format(NAME),
             'A summary of the invocation responses bytes.',
             [
                 'method',
@@ -97,11 +96,19 @@ class IndexHTTPServer:
             registry=self.__metrics_registry
         )
         self.__metrics_http_requests_duration_seconds = Histogram(
-            '{0}_{1}_requests_duration_seconds'.format(NAME, component_name),
+            '{0}_http_requests_duration_seconds'.format(NAME),
             'The invocation duration in seconds.',
             [
                 'method',
                 'endpoint'
+            ],
+            registry=self.__metrics_registry
+        )
+        self.__metrics_index_documents = Gauge(
+            '{0}_index_documents'.format(NAME),
+            'The number of documents.',
+            [
+                'index_name',
             ],
             registry=self.__metrics_registry
         )
@@ -135,7 +142,7 @@ class IndexHTTPServer:
 
         return
 
-    def __record_metrics(self, start_time, req, resp):
+    def __record_http_metrics(self, start_time, req, resp):
         self.__metrics_http_requests_total.labels(
             method=req.method,
             endpoint=req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else ''),
@@ -157,13 +164,24 @@ class IndexHTTPServer:
             endpoint=req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else '')
         ).observe(time.time() - start_time)
 
-        # self.metrics_kvs_records_count.set(self.data_node.len())
+        return
+
+    def __record_index_metrics(self, index_name):
+        doc_count = self.__index_server.get_doc_count(index_name)
+        if doc_count is not None:
+            self.__metrics_index_documents.labels(
+                index_name=index_name,
+            ).set(doc_count)
+        else:
+            self.__metrics_index_documents.labels(
+                index_name=index_name,
+            ).set(0)
 
         return
 
     def __post_process(self, start_time, req, resp):
         self.__record_http_log(req, resp)
-        self.__record_metrics(start_time, req, resp)
+        self.__record_http_metrics(start_time, req, resp)
 
         return resp
 
@@ -195,6 +213,9 @@ class IndexHTTPServer:
             index_data = {'name': index_name}
 
             index = self.__index_server.get_index(index_name)
+            if index is None:
+                raise KeyError('index does not exist')
+
             index_data['doc_count'] = index.doc_count()
             index_data['doc_count_all'] = index.doc_count_all()
             index_data['last_modified'] = index.last_modified()
@@ -267,6 +288,7 @@ class IndexHTTPServer:
             data['time'] = time.time() - start_time
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
+            self.__record_index_metrics(index_name)
 
         resp = jsonify(data)
         resp.status_code = status_code
@@ -302,6 +324,7 @@ class IndexHTTPServer:
             data['time'] = time.time() - start_time
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
+            self.__record_index_metrics(index_name)
 
         resp = jsonify(data)
         resp.status_code = status_code
@@ -386,6 +409,7 @@ class IndexHTTPServer:
             data['time'] = time.time() - start_time
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
+            self.__record_index_metrics(index_name)
 
         resp = jsonify(data)
         resp.status_code = status_code
@@ -425,6 +449,7 @@ class IndexHTTPServer:
             data['time'] = time.time() - start_time
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
+            self.__record_index_metrics(index_name)
 
         resp = jsonify(data)
         resp.status_code = status_code
@@ -466,6 +491,8 @@ class IndexHTTPServer:
             data['time'] = time.time() - start_time
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
+            self.__record_index_metrics(index_name)
+
 
         resp = jsonify(data)
         resp.status_code = status_code
@@ -507,6 +534,8 @@ class IndexHTTPServer:
             data['time'] = time.time() - start_time
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
+            self.__record_index_metrics(index_name)
+
 
         resp = jsonify(data)
         resp.status_code = status_code
