@@ -179,57 +179,57 @@ class IndexHTTPServer:
 
         return
 
-    def __post_process(self, start_time, req, resp):
-        self.__record_http_log(req, resp)
-        self.__record_http_metrics(start_time, req, resp)
-
-        return resp
-
     def __root(self):
         start_time = time.time()
 
         @after_this_request
         def to_do_after_this_request(response):
-            return self.__post_process(start_time, request, response)
+            self.__record_http_log(request, response)
+            self.__record_http_metrics(start_time, request, response)
+            return response
 
         resp = Response()
-        resp.data = NAME + ' ' + VERSION + ' is running.'
-        resp.status_code = HTTPStatus.OK
-        resp.content_type = 'text/plain; charset="UTF-8"'
+        try:
+            resp.status_code = HTTPStatus.OK
+            resp.content_type = 'text/plain; charset="UTF-8"'
+            resp.data = NAME + ' ' + VERSION + ' is running.'
+        except Exception as ex:
+            resp.status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            resp.content_type = 'text/plain; charset="UTF-8"'
+            resp.data = '{0}\n{1}'.format(resp.status_code.phrase, resp.status_code.description)
+            self.__logger.error(ex)
 
         return resp
 
     def __get_index(self, index_name):
         start_time = time.time()
 
-        data = {}
-        status_code = None
-
         @after_this_request
         def to_do_after_this_request(response):
-            return self.__post_process(start_time, request, response)
+            self.__record_http_log(request, response)
+            self.__record_http_metrics(start_time, request, response)
+            return response
 
+        data = {}
+        status_code = None
         try:
-            index_data = {'name': index_name}
-
             index = self.__index_server.get_index(index_name)
             if index is None:
                 raise KeyError('index does not exist')
 
-            index_data['doc_count'] = index.doc_count()
-            index_data['doc_count_all'] = index.doc_count_all()
-            index_data['last_modified'] = index.last_modified()
-            index_data['latest_generation'] = index.latest_generation()
-            index_data['version'] = index.version
-            index_data['storage'] = {
+            data['index'] = {}
+            data['index']['name'] = index_name
+            data['index']['doc_count'] = index.doc_count()
+            data['index']['doc_count_all'] = index.doc_count_all()
+            data['index']['last_modified'] = index.last_modified()
+            data['index']['latest_generation'] = index.latest_generation()
+            data['index']['version'] = index.version
+            data['index']['storage'] = {
                 'folder': index.storage.folder,
                 'supports_mmap': index.storage.supports_mmap,
                 'readonly': index.storage.readonly,
                 'files': index.storage.list()
             }
-
-            data['index'] = index_data
-
             status_code = HTTPStatus.OK
         except KeyError as ex:
             data['error'] = '{0}'.format(ex.args[0])
@@ -244,6 +244,7 @@ class IndexHTTPServer:
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
 
+        # make response
         resp = jsonify(data)
         resp.status_code = status_code
 
@@ -257,7 +258,9 @@ class IndexHTTPServer:
 
         @after_this_request
         def to_do_after_this_request(response):
-            return self.__post_process(start_time, request, response)
+            self.__record_http_log(request, response)
+            self.__record_http_metrics(start_time, request, response)
+            return response
 
         try:
             sync = False
@@ -298,13 +301,14 @@ class IndexHTTPServer:
     def __delete_index(self, index_name):
         start_time = time.time()
 
-        data = {}
-        status_code = None
-
         @after_this_request
         def to_do_after_this_request(response):
-            return self.__post_process(start_time, request, response)
+            self.__record_http_log(request, response)
+            self.__record_http_metrics(start_time, request, response)
+            return response
 
+        data = {}
+        status_code = None
         try:
             sync = False
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
@@ -326,6 +330,7 @@ class IndexHTTPServer:
                               'description': status_code.description}
             self.__record_index_metrics(index_name)
 
+        # make response
         resp = jsonify(data)
         resp.status_code = status_code
 
@@ -334,13 +339,14 @@ class IndexHTTPServer:
     def __get_document(self, index_name, doc_id):
         start_time = time.time()
 
-        data = {}
-        status_code = None
-
         @after_this_request
         def to_do_after_this_request(response):
-            return self.__post_process(start_time, request, response)
+            self.__record_http_log(request, response)
+            self.__record_http_metrics(start_time, request, response)
+            return response
 
+        data = {}
+        status_code = None
         try:
             results_page = self.__index_server.get_document(index_name, doc_id)
 
@@ -370,6 +376,7 @@ class IndexHTTPServer:
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
 
+        # make response
         resp = jsonify(data)
         resp.status_code = status_code
 
@@ -378,13 +385,14 @@ class IndexHTTPServer:
     def __index_document(self, index_name, doc_id):
         start_time = time.time()
 
-        data = {}
-        status_code = None
-
         @after_this_request
         def to_do_after_this_request(response):
-            return self.__post_process(start_time, request, response)
+            self.__record_http_log(request, response)
+            self.__record_http_metrics(start_time, request, response)
+            return response
 
+        data = {}
+        status_code = None
         try:
             sync = False
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
@@ -411,6 +419,7 @@ class IndexHTTPServer:
                               'description': status_code.description}
             self.__record_index_metrics(index_name)
 
+        # make response
         resp = jsonify(data)
         resp.status_code = status_code
 
@@ -419,13 +428,14 @@ class IndexHTTPServer:
     def __delete_document(self, index_name, doc_id):
         start_time = time.time()
 
-        data = {}
-        status_code = None
-
         @after_this_request
         def to_do_after_this_request(response):
-            return self.__post_process(start_time, request, response)
+            self.__record_http_log(request, response)
+            self.__record_http_metrics(start_time, request, response)
+            return response
 
+        data = {}
+        status_code = None
         try:
             sync = False
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
@@ -451,6 +461,7 @@ class IndexHTTPServer:
                               'description': status_code.description}
             self.__record_index_metrics(index_name)
 
+        # make response
         resp = jsonify(data)
         resp.status_code = status_code
 
@@ -459,13 +470,14 @@ class IndexHTTPServer:
     def __index_documents(self, index_name):
         start_time = time.time()
 
-        data = {}
-        status_code = None
-
         @after_this_request
         def to_do_after_this_request(response):
-            return self.__post_process(start_time, request, response)
+            self.__record_http_log(request, response)
+            self.__record_http_metrics(start_time, request, response)
+            return response
 
+        data = {}
+        status_code = None
         try:
             sync = False
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
@@ -493,7 +505,7 @@ class IndexHTTPServer:
                               'description': status_code.description}
             self.__record_index_metrics(index_name)
 
-
+        # make response
         resp = jsonify(data)
         resp.status_code = status_code
 
@@ -502,13 +514,14 @@ class IndexHTTPServer:
     def __delete_documents(self, index_name):
         start_time = time.time()
 
-        data = {}
-        status_code = None
-
         @after_this_request
         def to_do_after_this_request(response):
-            return self.__post_process(start_time, request, response)
+            self.__record_http_log(request, response)
+            self.__record_http_metrics(start_time, request, response)
+            return response
 
+        data = {}
+        status_code = None
         try:
             sync = False
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
@@ -536,7 +549,7 @@ class IndexHTTPServer:
                               'description': status_code.description}
             self.__record_index_metrics(index_name)
 
-
+        # make response
         resp = jsonify(data)
         resp.status_code = status_code
 
@@ -545,14 +558,14 @@ class IndexHTTPServer:
     def __search_documents(self, index_name):
         start_time = time.time()
 
-        data = {}
-        results = {}
-        status_code = None
-
         @after_this_request
         def to_do_after_this_request(response):
-            return self.__post_process(start_time, request, response)
+            self.__record_http_log(request, resp)
+            self.__record_http_metrics(start_time, request, resp)
+            return response
 
+        data = {}
+        status_code = None
         try:
             query = request.args.get('query', default='', type=str)
 
@@ -564,32 +577,29 @@ class IndexHTTPServer:
             results_page = self.__index_server.search_documents(index_name, query, search_field, page_num,
                                                                 page_len=page_len)
 
-            results['is_last_page'] = results_page.is_last_page()
-            results['page_count'] = results_page.pagecount
-            results['page_len'] = results_page.pagelen
-            results['page_num'] = results_page.pagenum
-            results['total'] = results_page.total
-
+            data['results'] = {
+                'is_last_page': results_page.is_last_page(),
+                'page_count': results_page.pagecount,
+                'page_len': results_page.pagelen,
+                'page_num': results_page.pagenum,
+                'total': results_page.total
+            }
             if results_page.pagecount >= page_num or results_page.total <= 0:
                 hits = []
-                for hit in results_page.results[results_page.offset:]:
+                for result in results_page.results[results_page.offset:]:
                     doc = {'fields': {}}
-                    for item in hit.iteritems():
+                    for item in result.iteritems():
                         doc['fields'][item[0]] = item[1]
-
-                    h = {
+                    hit = {
                         'doc': doc,
-                        'score': hit.score,
-                        'rank': hit.rank,
-                        'pos': hit.pos
+                        'score': result.score,
+                        'rank': result.rank,
+                        'pos': result.pos
                     }
-
-                    hits.append(h)
-                results['hits'] = hits
+                    hits.append(hit)
+                data['results']['hits'] = hits
             else:
                 raise ValueError('page_num must be <= {0}'.format(results_page.pagecount))
-
-            data['results'] = results
 
             status_code = HTTPStatus.OK
         except ValueError as ex:
@@ -605,6 +615,7 @@ class IndexHTTPServer:
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
 
+        # make response
         resp = jsonify(data)
         resp.status_code = status_code
 
@@ -615,14 +626,14 @@ class IndexHTTPServer:
 
         @after_this_request
         def to_do_after_this_request(response):
-            return self.__post_process(start_time, request, response)
+            self.__record_http_log(request, resp)
+            self.__record_http_metrics(start_time, request, resp)
+            return response
 
         data = {}
         status_code = None
-
         try:
             data['cluster_status'] = self.__index_server.getStatus()
-
             status_code = HTTPStatus.OK
         except Exception as ex:
             data['error'] = '{0}'.format(ex.args[0])
@@ -633,6 +644,7 @@ class IndexHTTPServer:
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
 
+        # make response
         resp = jsonify(data)
         resp.status_code = status_code
 
@@ -705,21 +717,20 @@ class IndexHTTPServer:
 
         @after_this_request
         def to_do_after_this_request(response):
-            return self.__post_process(start_time, request, response)
+            self.__record_http_log(request, response)
+            self.__record_http_metrics(start_time, request, response)
+            return response
 
         resp = Response()
-        status_code = None
-
         try:
+            resp.status_code = HTTPStatus.OK
+            resp.content_type = CONTENT_TYPE_LATEST
             resp.data = generate_latest(self.__metrics_registry)
-            status_code = HTTPStatus.OK
         except Exception as ex:
-            resp.data = '{0}\n{1}'.format(status_code.phrase, status_code.description)
-            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            resp.status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            resp.content_type = 'text/plain; charset="UTF-8"'
+            resp.data = '{0}\n{1}'.format(resp.status_code.phrase, resp.status_code.description)
             self.__logger.error(ex)
-
-        resp.status_code = status_code
-        resp.content_type = CONTENT_TYPE_LATEST
 
         return resp
 
