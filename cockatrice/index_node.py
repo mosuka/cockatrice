@@ -24,14 +24,29 @@ from cockatrice.index_http_server import IndexHTTPServer
 
 
 class IndexNode:
-    def __init__(self, bind_addr, peer_addrs, conf=None, index_dir='/tmp/cockatrice/index', http_port=8080,
+    def __init__(self, bind_addr, peer_addrs, conf=None, index_dir=None, http_port=8080,
                  logger=getLogger(NAME), http_logger=getLogger(NAME + '_http'), metrics_registry=CollectorRegistry()):
+        self.__bind_addr = bind_addr
+        self.__peer_addrs = peer_addrs
+        self.__conf = conf
+        self.__index_dir = index_dir
+        self.__http_port = http_port
         self.__logger = logger
-        self.__index_server = IndexServer(bind_addr, peer_addrs, conf=conf, index_dir=index_dir, logger=logger)
-        self.__index_http_server = IndexHTTPServer(self.__index_server, port=http_port, logger=logger,
-                                                   http_logger=http_logger, metrics_registry=metrics_registry)
+        self.__http_logger = http_logger
+        self.__metrics_registry = metrics_registry
+
+        self.__index_server = None
+        self.__index_http_server = None
 
     def start(self):
+        self.__logger.info('starting index node')
+
+        self.__index_server = IndexServer(self.__bind_addr, self.__peer_addrs, conf=self.__conf,
+                                          index_dir=self.__index_dir, logger=self.__logger)
+        self.__index_http_server = IndexHTTPServer(self.__index_server, port=self.__http_port, logger=self.__logger,
+                                                   http_logger=self.__http_logger,
+                                                   metrics_registry=self.__metrics_registry)
+
         self.__index_http_server.start()
 
     def stop(self):

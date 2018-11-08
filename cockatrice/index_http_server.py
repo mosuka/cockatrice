@@ -116,6 +116,7 @@ class IndexHTTPServer:
     def start(self):
         try:
             # run server
+            self.__logger.info('starting index http server')
             self.__app.run(host='0.0.0.0', port=self.__port)
         except OSError as ex:
             self.__logger.critical(ex)
@@ -123,7 +124,7 @@ class IndexHTTPServer:
             self.__logger.critical(ex)
 
     def stop(self):
-        pass
+        self.__logger.info('stopping index http server')
 
     def __record_http_log(self, req, resp):
         log_message = '{0} - {1} [{2}] "{3} {4} {5}" {6} {7} "{8}" "{9}"'.format(
@@ -271,12 +272,14 @@ class IndexHTTPServer:
             if request.args.get('use_ram_storage', default='', type=str).lower() in TRUE_STRINGS:
                 use_ram_storage = True
 
-            schema = Schema(request.data)
-
-            self.__index_server.create_index(index_name, schema, use_ram_storage=use_ram_storage, sync=sync)
+            index = self.__index_server.create_index(index_name, Schema(request.data), use_ram_storage=use_ram_storage,
+                                                     sync=sync)
 
             if sync:
-                status_code = HTTPStatus.CREATED
+                if index is None:
+                    raise ValueError('failed to create index')
+                else:
+                    status_code = HTTPStatus.CREATED
             else:
                 status_code = HTTPStatus.ACCEPTED
         except json.decoder.JSONDecodeError as ex:
@@ -291,8 +294,8 @@ class IndexHTTPServer:
             data['time'] = time.time() - start_time
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
-            self.__record_index_metrics(index_name)
 
+        # make response
         resp = jsonify(data)
         resp.status_code = status_code
 
@@ -328,7 +331,6 @@ class IndexHTTPServer:
             data['time'] = time.time() - start_time
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
-            self.__record_index_metrics(index_name)
 
         # make response
         resp = jsonify(data)
@@ -417,7 +419,6 @@ class IndexHTTPServer:
             data['time'] = time.time() - start_time
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
-            self.__record_index_metrics(index_name)
 
         # make response
         resp = jsonify(data)
@@ -459,7 +460,6 @@ class IndexHTTPServer:
             data['time'] = time.time() - start_time
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
-            self.__record_index_metrics(index_name)
 
         # make response
         resp = jsonify(data)
@@ -503,7 +503,6 @@ class IndexHTTPServer:
             data['time'] = time.time() - start_time
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
-            self.__record_index_metrics(index_name)
 
         # make response
         resp = jsonify(data)
@@ -547,7 +546,6 @@ class IndexHTTPServer:
             data['time'] = time.time() - start_time
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
-            self.__record_index_metrics(index_name)
 
         # make response
         resp = jsonify(data)
@@ -720,6 +718,10 @@ class IndexHTTPServer:
             self.__record_http_log(request, response)
             self.__record_http_metrics(start_time, request, response)
             return response
+
+        # index metrics
+        for index_name in self.__index_server.get_indices().keys():
+            self.__record_index_metrics(index_name)
 
         resp = Response()
         try:

@@ -159,34 +159,6 @@ class TestIndexServer(unittest.TestCase):
         actual_file_count = len(self.data_node.get_file_storage().list())
         self.assertEqual(expected_file_count, actual_file_count)
 
-    def test_index_exists(self):
-        with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            schema_yaml = file_obj.read()
-
-        # create ram index
-        index_name = 'test_ram_index'
-        schema = Schema(schema_yaml)
-
-        self.assertFalse(self.data_node.index_exists(index_name))
-
-        index = self.data_node.create_index(index_name, schema, use_ram_storage=True, sync=True)
-        self.assertTrue(isinstance(index.storage, RamStorage))
-        self.assertFalse(isinstance(index.storage, FileStorage))
-
-        self.assertTrue(self.data_node.index_exists(index_name))
-
-        # create file index
-        index_name = 'test_file_index'
-        schema = Schema(schema_yaml)
-
-        self.assertFalse(self.data_node.index_exists(index_name))
-
-        index = self.data_node.create_index(index_name, schema, use_ram_storage=False, sync=True)
-        self.assertFalse(isinstance(index.storage, RamStorage))
-        self.assertTrue(isinstance(index.storage, FileStorage))
-
-        self.assertTrue(self.data_node.index_exists(index_name))
-
     def test_get_index(self):
         with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
             schema_yaml = file_obj.read()

@@ -174,8 +174,6 @@ def main():
     subparsers = parser.add_subparsers()
 
     parser_server = subparsers.add_parser('server', help='see `server --help`')
-    parser_server.add_argument('--http-port', dest='http_port', default=8080, metavar='HTTP_PORT', type=int,
-                               help='the port to listen on for HTTP traffic')
     parser_server.add_argument('--bind-addr', dest='bind_addr', default='127.0.0.1:7070', metavar='BIND_ADDR',
                                type=str, help='the address to listen on for peer traffic')
     parser_server.add_argument('--seed-addr', dest='seed_addr', default=None, metavar='SEED_ADDR',
@@ -190,8 +188,10 @@ def main():
     parser_server.add_argument('--log-compaction-min-time', dest='log_compaction_min_time', default=300,
                                metavar='LOG_COMPACTION_MIN_TIME', type=int,
                                help='log-compaction interval min time in seconds')
-    parser_server.add_argument('--index-dir', dest='index_dir', default='/tmp/cockatrice/index', metavar='INDEX_DIR',
-                               type=str, help='index dir')
+    parser_server.add_argument('--index-dir', dest='index_dir', default=None, metavar='INDEX_DIR', type=str,
+                               help='index dir')
+    parser_server.add_argument('--http-port', dest='http_port', default=8080, metavar='HTTP_PORT',
+                               type=int, help='the port to listen on for HTTP traffic')
     parser_server.add_argument('--log-level', dest='log_level', default='DEBUG', metavar='LOG_LEVEL', type=str,
                                help='log level')
     parser_server.add_argument('--log-file', dest='log_file', default=None, metavar='LOG_FILE', type=str,
@@ -201,20 +201,20 @@ def main():
     parser_server.set_defaults(handler=server_handler)
 
     parser_status = subparsers.add_parser('status', help='see `status --help`')
-    parser_status.add_argument('--bind-addr', dest='bind_addr', default='127.0.0.1:7070', metavar='BIND_ADDR',
-                               type=str, help='the address to listen on for peer traffic')
+    parser_status.add_argument('--bind-addr', dest='bind_addr', default='127.0.0.1:7070', metavar='BIND_ADDR', type=str,
+                               help='the address to listen on for peer traffic')
     parser_status.set_defaults(handler=status_handler)
 
     parser_join = subparsers.add_parser('join', help='see `join --help`')
-    parser_join.add_argument('--bind-addr', dest='bind_addr', default='127.0.0.1:7070', metavar='BIND_ADDR',
-                             type=str, help='the address to listen on for peer traffic')
+    parser_join.add_argument('--bind-addr', dest='bind_addr', default='127.0.0.1:7070', metavar='BIND_ADDR', type=str,
+                             help='the address to listen on for peer traffic')
     parser_join.add_argument('--join-addr', dest='join_addr', default=None, metavar='JOIN_ADDR', type=str,
                              help='the address of node to join to the cluster')
     parser_join.set_defaults(handler=join_handler)
 
     parser_join = subparsers.add_parser('leave', help='see `leave --help`')
-    parser_join.add_argument('--bind-addr', dest='bind_addr', default='127.0.0.1:7070', metavar='BIND_ADDR',
-                             type=str, help='the address to listen on for peer traffic')
+    parser_join.add_argument('--bind-addr', dest='bind_addr', default='127.0.0.1:7070', metavar='BIND_ADDR', type=str,
+                             help='the address to listen on for peer traffic')
     parser_join.add_argument('--leave-addr', dest='leave_addr', default=None, metavar='LEAVE_ADDR', type=str,
                              help='the address of node to leave from the cluster')
     parser_join.set_defaults(handler=leave_handler)

@@ -27,23 +27,29 @@ from cockatrice import NAME
 
 
 class IndexServer(SyncObj):
-    def __init__(self, bind_addr, peer_addrs, conf=None, index_dir='/tmp/cockatrice/index', logger=getLogger(NAME)):
-        super(IndexServer, self).__init__(bind_addr, peer_addrs, conf=conf)
-
+    def __init__(self, bind_addr, peer_addrs, conf=None, index_dir=None, logger=getLogger(NAME)):
         self.__logger = logger
+        self.__logger.info('starting index server')
+
+        super(IndexServer, self).__init__(bind_addr, peer_addrs, conf=conf)
 
         self.__bind_addr = bind_addr
 
-        self.__index_dir = index_dir
-        os.makedirs(self.__index_dir, exist_ok=True)
+        if index_dir is not None:
+            os.makedirs(index_dir, exist_ok=True)
 
         self.__indices = {}
         self.__ram_storage = RamStorage()
-        self.__file_storage = FileStorage(self.__index_dir, supports_mmap=True, readonly=False, debug=False)
+        self.__file_storage = FileStorage(index_dir, supports_mmap=True, readonly=False,
+                                          debug=False) if index_dir is not None else None
+
+        self.open_existing_index()
 
     def destroy(self):
-        for index in self.__indices.values():
-            index.close()
+        self.__logger.info('stopping index server')
+
+        for index_name in self.__indices.keys():
+            self.close_index(index_name)
 
         super().destroy()
 
@@ -56,28 +62,26 @@ class IndexServer(SyncObj):
     def get_file_storage(self):
         return self.__file_storage
 
-    def get_bind_addr(self):
-        return self.__bind_addr
+    # def get_bind_addr(self):
+    #     return self.__bind_addr
 
     @replicated
     def create_index(self, index_name, schema, use_ram_storage=False):
         index = None
 
         try:
+            if index_name in self.__indices:
+                raise KeyError('index already exists')
+
             if use_ram_storage:
-                if self.__ram_storage.index_exists(indexname=index_name):
-                    self.__indices[index_name] = self.__ram_storage.open_index(indexname=index_name, schema=schema)
-                    self.__logger.info('open {0} on memory'.format(index_name))
-                else:
-                    self.__indices[index_name] = self.__ram_storage.create_index(schema, indexname=index_name)
-                    self.__logger.info('create {0} on memory'.format(index_name))
+                self.__indices[index_name] = self.__ram_storage.create_index(schema, indexname=index_name)
+                self.__logger.info('create {0} on memory'.format(index_name))
             else:
-                if self.__file_storage.index_exists(indexname=index_name):
-                    self.__indices[index_name] = self.__file_storage.open_index(indexname=index_name, schema=schema)
-                    self.__logger.info('open {0} on {1}'.format(index_name, self.__index_dir))
-                else:
+                if self.__file_storage is not None:
                     self.__indices[index_name] = self.__file_storage.create_index(schema, indexname=index_name)
-                    self.__logger.info('create {0} on {1}'.format(index_name, self.__index_dir))
+                    self.__logger.info('create {0} on {1}'.format(index_name, self.__file_storage.folder))
+                else:
+                    raise ValueError('file storage has not been created')
 
             index = self.__indices[index_name]
         except Exception as ex:
@@ -85,48 +89,77 @@ class IndexServer(SyncObj):
 
         return index
 
-    @replicated
-    def delete_index(self, index_name):
-        try:
-            index = self.__indices.pop(index_name, None)
-            if index is not None:
-                # close index
-                index.close()
-                self.__logger.info('close {0} on {1}'.format(index_name, self.__index_dir))
+    def open_existing_index(self):
+        pattern_toc = re.compile('^_(.+)_\\d+\\.toc$')
+        for filename in self.__ram_storage:
+            match = pattern_toc.search(filename)
+            if match:
+                self.open_index(match.group(1), schema=None)
+        if self.__file_storage is not None:
+            for filename in self.__file_storage:
+                match = pattern_toc.search(filename)
+                if match:
+                    self.open_index(match.group(1), schema=None)
 
-                # delete files
-                pattern_toc = re.compile('^_{0}_(\\d+)\\.toc$'.format(index_name))
-                for filename in index.storage:
-                    if re.match(pattern_toc, filename):
-                        index.storage.delete_file(filename)
-                        self.__logger.info(
-                            'delete {0} on {1}'.format(index_name, os.path.join(self.__index_dir, filename)))
-                pattern_seg = re.compile('^{0}_([a-z0-9]+)\\.seg$'.format(index_name))
-                for filename in index.storage:
-                    if re.match(pattern_seg, filename):
-                        index.storage.delete_file(filename)
-                        self.__logger.info(
-                            'delete {0} on {1}'.format(index_name, os.path.join(self.__index_dir, filename)))
-                pattern_lock = re.compile('^{0}_WRITELOCK$'.format(index_name))
-                for filename in index.storage:
-                    if re.match(pattern_lock, filename):
-                        index.storage.delete_file(filename)
-                        self.__logger.info(
-                            'delete {0} on {1}'.format(index_name, os.path.join(self.__index_dir, filename)))
+    def open_index(self, index_name, schema=None):
+        index = None
+
+        try:
+            if self.__ram_storage.index_exists(indexname=index_name):
+                self.__indices[index_name] = self.__ram_storage.open_index(indexname=index_name, schema=schema)
+                self.__logger.info('open {0} on memory'.format(index_name))
+            elif self.__file_storage is not None and self.__file_storage.index_exists(indexname=index_name):
+                self.__indices[index_name] = self.__file_storage.open_index(indexname=index_name, schema=schema)
+                self.__logger.info('open {0} on {1}'.format(index_name, self.__file_storage.folder))
+            else:
+                raise KeyError('index does not exist')
+
+            index = self.__indices[index_name]
         except Exception as ex:
             self.__logger.error(ex)
 
-    def index_exists(self, index_name):
-        if index_name in self.__indices:
-            return True
-        else:
-            return False
+        return index
 
     def get_index(self, index_name):
-        if self.index_exists(index_name):
+        if index_name in self.__indices:
             return self.__indices[index_name]
         else:
             return None
+
+    def close_index(self, index_name):
+        index = self.get_index(index_name)
+        if index is not None:
+            index.close()
+            self.__logger.info('close {0} on {1}'.format(index_name, index.storage.folder))
+        else:
+            self.__logger.error('index does not exist')
+
+    @replicated
+    def delete_index(self, index_name):
+        # close index
+        self.close_index(index_name)
+
+        # delete index files
+        index = self.__indices.pop(index_name)
+        if index is not None:
+            pattern_toc = re.compile('^_{0}_(\\d+)\\.toc$'.format(index_name))
+            for filename in index.storage:
+                if re.match(pattern_toc, filename):
+                    index.storage.delete_file(filename)
+                    self.__logger.info(
+                        'delete {0} on {1}'.format(index_name, os.path.join(index.storage.folder, filename)))
+            pattern_seg = re.compile('^{0}_([a-z0-9]+)\\.seg$'.format(index_name))
+            for filename in index.storage:
+                if re.match(pattern_seg, filename):
+                    index.storage.delete_file(filename)
+                    self.__logger.info(
+                        'delete {0} on {1}'.format(index_name, os.path.join(index.storage.folder, filename)))
+            pattern_lock = re.compile('^{0}_WRITELOCK$'.format(index_name))
+            for filename in index.storage:
+                if re.match(pattern_lock, filename):
+                    index.storage.delete_file(filename)
+                    self.__logger.info(
+                        'delete {0} on {1}'.format(index_name, os.path.join(index.storage.folder, filename)))
 
     def get_doc_count(self, index_name):
         index = self.get_index(index_name)
