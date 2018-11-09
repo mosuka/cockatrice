@@ -24,7 +24,7 @@ from cockatrice.index_http_server import IndexHTTPServer
 
 
 class IndexNode:
-    def __init__(self, bind_addr, peer_addrs, conf=None, index_dir=None, http_port=8080,
+    def __init__(self, bind_addr, peer_addrs=None, conf=None, index_dir=None, http_port=8080,
                  logger=getLogger(NAME), http_logger=getLogger(NAME + '_http'), metrics_registry=CollectorRegistry()):
         self.__bind_addr = bind_addr
         self.__peer_addrs = peer_addrs

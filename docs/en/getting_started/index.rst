@@ -23,7 +23,7 @@ To use it to start Cockatrice you can simply enter:
 
 .. code-block:: bash
 
-    $ cockatrice server
+    $ cockatrice server --index-dir=/tmp/cockatrice/node1/index
 
 This will start Cockatrice, listening on default port (8080).
 
@@ -35,4 +35,4 @@ You can see the result in plain text format. The result of the above command is:
 
 .. code-block:: text
 
-    cockatrice <VERSION> is running.
+    cockatrice 0.3.0 is running.

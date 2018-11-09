@@ -115,7 +115,7 @@ def server_handler(args):
     try:
         if args.seed_addr is not None:
             # clear the peer addresses due to update peer addresses from the cluster.
-            args.peer_addrs.clear()
+            args.peer_addrs = []
 
             # execute a command to get status from the cluster
             status_result = execute('status', bind_addr=args.seed_addr, timeout=0.5)
@@ -178,7 +178,7 @@ def main():
                                type=str, help='the address to listen on for peer traffic')
     parser_server.add_argument('--seed-addr', dest='seed_addr', default=None, metavar='SEED_ADDR',
                                type=str, help='the address of the node in the existing cluster')
-    parser_server.add_argument('--peer-addr', dest='peer_addrs', default=[], action='append', metavar='PEER_ADDR',
+    parser_server.add_argument('--peer-addr', dest='peer_addrs', default=None, action='append', metavar='PEER_ADDR',
                                type=str, help='the address of the peer node in the cluster')
     parser_server.add_argument('--full-dump-file', dest='full_dump_file', default=None, metavar='FULL_DUMP_FILE',
                                type=str, help='file to store full serialized object')

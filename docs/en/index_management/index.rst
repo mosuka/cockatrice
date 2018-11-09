@@ -44,14 +44,14 @@ The result of the above command is:
       "index": {
         "doc_count": 0,
         "doc_count_all": 0,
-        "last_modified": 1539674088.2373083,
+        "last_modified": 1541768662.8663597,
         "latest_generation": 0,
         "name": "myindex",
         "storage": {
           "files": [
             "_myindex_0.toc"
           ],
-          "folder": "/tmp/cockatrice/index",
+          "folder": "/tmp/cockatrice/node1/index",
           "readonly": false,
           "supports_mmap": true
         },
@@ -62,7 +62,7 @@ The result of the above command is:
         "description": "Request fulfilled, document follows",
         "phrase": "OK"
       },
-      "time": 0.0008370876312255859
+      "time": 0.0016748905181884766
     }
 
 

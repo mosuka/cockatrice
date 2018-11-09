@@ -11,9 +11,9 @@ Cockatrice is easy to bring up the cluster. You can bring up 3-node cluster with
 
 .. code-block:: bash
 
-    $ cockatrice server --bind-addr=127.0.0.1:7070 --peer-addr=127.0.0.1:7071 --peer-addr=127.0.0.1:7072 --dump-file=/tmp/cockatrice/node1/raft/data.dump --index-dir=/tmp/cockatrice/node1/index --http-port=8080
-    $ cockatrice server --bind-addr=127.0.0.1:7071 --peer-addr=127.0.0.1:7070 --peer-addr=127.0.0.1:7072 --dump-file=/tmp/cockatrice/node2/raft/data.dump --index-dir=/tmp/cockatrice/node2/index --http-port=8081
-    $ cockatrice server --bind-addr=127.0.0.1:7072 --peer-addr=127.0.0.1:7070 --peer-addr=127.0.0.1:7071 --dump-file=/tmp/cockatrice/node3/raft/data.dump --index-dir=/tmp/cockatrice/node3/index --http-port=8082
+    $ cockatrice server --bind-addr=127.0.0.1:7070 --peer-addr=127.0.0.1:7071 --peer-addr=127.0.0.1:7072 --index-dir=/tmp/cockatrice/node1/index --http-port=8080
+    $ cockatrice server --bind-addr=127.0.0.1:7071 --peer-addr=127.0.0.1:7070 --peer-addr=127.0.0.1:7072 --index-dir=/tmp/cockatrice/node2/index --http-port=8081
+    $ cockatrice server --bind-addr=127.0.0.1:7072 --peer-addr=127.0.0.1:7070 --peer-addr=127.0.0.1:7071 --index-dir=/tmp/cockatrice/node3/index --http-port=8082
 
 Above example shows each Cockatrice node running on the same host, so each node must listen on different ports. This would not be necessary if each node ran on a different host.
 
@@ -98,7 +98,7 @@ This section describes how to scale the cluster. Let's start first node by the f
 
 .. code-block:: bash
 
-    $ cockatrice server --bind-addr=127.0.0.1:7070 --dump-file=/tmp/cockatrice/node1/raft/data.dump --index-dir=/tmp/cockatrice/node1/index --http-port=8080
+    $ cockatrice server --bind-addr=127.0.0.1:7070 --index-dir=/tmp/cockatrice/node1/index --http-port=8080
 
 Then, execute join command with new node on one of the existing nodes.
 
@@ -111,14 +111,14 @@ The above command will wait until the new node starts up. You need to launch new
 
 .. code-block:: bash
 
-    $ cockatrice server --bind-addr=127.0.0.1:7071 --dump-file=/tmp/cockatrice/node2/raft/data.dump --index-dir=/tmp/cockatrice/node2/index --peer-addr=127.0.0.1:7070 --http-port=8081
+    $ cockatrice server --bind-addr=127.0.0.1:7071 --index-dir=/tmp/cockatrice/node2/index --peer-addr=127.0.0.1:7070 --http-port=8081
 
 Also, recommend 3 or more odd number of nodes in the cluster due to avoid split brain. You should launch one more new node with correct initial peers like following:
 
 .. code-block:: bash
 
     $ cockatrice join --bind-addr=127.0.0.1:7070 --join-addr=127.0.0.1:7072
-    $ cockatrice server --bind-addr=127.0.0.1:7072 --dump-file=/tmp/cockatrice/node3/raft/data.dump --index-dir=/tmp/cockatrice/node3/index --peer-addr=127.0.0.1:7070 --peer-addr=127.0.0.1:7071 --http-port=8082
+    $ cockatrice server --bind-addr=127.0.0.1:7072 --index-dir=/tmp/cockatrice/node3/index --peer-addr=127.0.0.1:7070 --peer-addr=127.0.0.1:7071 --http-port=8082
 
 
 Create a cluster with dynamic membership without manual operation
@@ -129,8 +129,8 @@ Start first node in standalone mode by following command:
 
 .. code-block:: bash
 
-    $ cockatrice server --bind-addr=127.0.0.1:7070 --dump-file=/tmp/cockatrice/node1/raft/data.dump --index-dir=/tmp/cockatrice/node1/index --http-port=8080
-    $ cockatrice server --bind-addr=127.0.0.1:7071 --seed-addr=127.0.0.1:7070 --dump-file=/tmp/cockatrice/node2/raft/data.dump --index-dir=/tmp/cockatrice/node2/index --http-port=8081
-    $ cockatrice server --bind-addr=127.0.0.1:7072 --seed-addr=127.0.0.1:7070 --dump-file=/tmp/cockatrice/node3/raft/data.dump --index-dir=/tmp/cockatrice/node3/index --http-port=8082
+    $ cockatrice server --bind-addr=127.0.0.1:7070 --index-dir=/tmp/cockatrice/node1/index --http-port=8080
+    $ cockatrice server --bind-addr=127.0.0.1:7071 --seed-addr=127.0.0.1:7070 --index-dir=/tmp/cockatrice/node2/index --http-port=8081
+    $ cockatrice server --bind-addr=127.0.0.1:7072 --seed-addr=127.0.0.1:7070 --index-dir=/tmp/cockatrice/node3/index --http-port=8082
 
 Just add ``--seed-addr`` parameter and start it. These are the same as that create a cluster with dynamic membership by manual operation. The above command performs register a new node and starts one at the same time.
