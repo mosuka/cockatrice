@@ -57,6 +57,8 @@ class IndexHTTPServer:
                                 methods=['DELETE'])
         self.__app.add_url_rule('/rest/<index_name>/_search', 'search_documents', self.__search_documents,
                                 methods=['GET', 'POST'])
+        self.__app.add_url_rule('/rest/<index_name>/_optimize', 'optimize_index', self.__optimize_index,
+                                methods=['GET'])
         self.__app.add_url_rule('/rest/_cluster', 'cluster', self.__cluster, methods=['GET'])
         # self.__app.add_url_rule('/rest/_node', 'join', self.__join, methods=['PUT'])
         # self.__app.add_url_rule('/rest/_node', 'leave', self.__leave, methods=['DELETE'])
@@ -288,6 +290,43 @@ class IndexHTTPServer:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.BAD_REQUEST
             self.__logger.error(ex)
+        except Exception as ex:
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            self.__logger.error(ex)
+        finally:
+            data['time'] = time.time() - start_time
+            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+                              'description': status_code.description}
+
+        # make response
+        resp = jsonify(data)
+        resp.status_code = status_code
+
+        return resp
+
+    def __optimize_index(self, index_name):
+        start_time = time.time()
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            self.__record_http_log(request, response)
+            self.__record_http_metrics(start_time, request, response)
+            return response
+
+        data = {}
+        status_code = None
+        try:
+            sync = False
+            if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
+                sync = True
+
+            self.__index_server.optimize_index(index_name, sync=sync)
+
+            if sync:
+                status_code = HTTPStatus.OK
+            else:
+                status_code = HTTPStatus.ACCEPTED
         except Exception as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.INTERNAL_SERVER_ERROR
