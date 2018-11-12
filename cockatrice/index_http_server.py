@@ -61,6 +61,8 @@ class IndexHTTPServer:
         # self.__app.add_url_rule('/rest/_node', 'join', self.__join, methods=['PUT'])
         # self.__app.add_url_rule('/rest/_node', 'leave', self.__leave, methods=['DELETE'])
         self.__app.add_url_rule('/metrics', 'metrics', self.__metrics, methods=['GET'])
+        self.__app.add_url_rule('/liveness', 'liveness', self.__liveness, methods=['GET'])
+        self.__app.add_url_rule('/readiness', 'readiness', self.__readiness, methods=['GET'])
 
         # disable Flask default logger
         self.__app.logger.disabled = True
@@ -733,6 +735,69 @@ class IndexHTTPServer:
             resp.content_type = 'text/plain; charset="UTF-8"'
             resp.data = '{0}\n{1}'.format(resp.status_code.phrase, resp.status_code.description)
             self.__logger.error(ex)
+
+        return resp
+
+    def __liveness(self):
+        start_time = time.time()
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            self.__record_http_log(request, response)
+            self.__record_http_metrics(start_time, request, response)
+            return response
+
+        data = {}
+        status_code = None
+        try:
+            data['liveness'] = True
+            status_code = HTTPStatus.OK
+        except Exception as ex:
+            data['liveness'] = False
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            self.__logger.error(ex)
+        finally:
+            data['time'] = time.time() - start_time
+            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+                              'description': status_code.description}
+
+        # make response
+        resp = jsonify(data)
+        resp.status_code = status_code
+
+        return resp
+
+    def __readiness(self):
+        start_time = time.time()
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            self.__record_http_log(request, response)
+            self.__record_http_metrics(start_time, request, response)
+            return response
+
+        data = {}
+        status_code = None
+        try:
+            if self.__index_server.isReady():
+                data['readiness'] = True
+                status_code = HTTPStatus.OK
+            else:
+                raise Exception('index server is not ready')
+        except Exception as ex:
+            data['readiness'] = False
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            self.__logger.error(ex)
+        finally:
+            data['time'] = time.time() - start_time
+            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+                              'description': status_code.description}
+
+        # make response
+        resp = jsonify(data)
+        resp.status_code = status_code
 
         return resp
 
