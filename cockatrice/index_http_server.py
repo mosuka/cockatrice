@@ -42,29 +42,23 @@ class IndexHTTPServer:
 
         self.__app = Flask('index_http_server')
         self.__app.add_url_rule('/', 'root', self.__root, methods=['GET'])
-        self.__app.add_url_rule('/rest/<index_name>', 'get_index', self.__get_index, methods=['GET'])
-        self.__app.add_url_rule('/rest/<index_name>', 'create_index', self.__create_index, methods=['PUT'])
-        self.__app.add_url_rule('/rest/<index_name>', 'delete_index', self.__delete_index, methods=['DELETE'])
-        self.__app.add_url_rule('/rest/<index_name>/_doc/<doc_id>', 'get_document', self.__get_document,
-                                methods=['GET'])
-        self.__app.add_url_rule('/rest/<index_name>/_doc/<doc_id>', 'index_document', self.__index_document,
-                                methods=['PUT'])
-        self.__app.add_url_rule('/rest/<index_name>/_doc/<doc_id>', 'delete_document', self.__delete_document,
-                                methods=['DELETE'])
-        self.__app.add_url_rule('/rest/<index_name>/_docs', 'index_documents', self.__index_documents,
-                                methods=['PUT'])
-        self.__app.add_url_rule('/rest/<index_name>/_docs', 'delete_documents', self.__delete_documents,
-                                methods=['DELETE'])
-        self.__app.add_url_rule('/rest/<index_name>/_search', 'search_documents', self.__search_documents,
-                                methods=['GET', 'POST'])
-        self.__app.add_url_rule('/rest/<index_name>/_optimize', 'optimize_index', self.__optimize_index,
-                                methods=['GET'])
-        self.__app.add_url_rule('/rest/_cluster', 'cluster', self.__cluster, methods=['GET'])
-        # self.__app.add_url_rule('/rest/_node', 'join', self.__join, methods=['PUT'])
-        # self.__app.add_url_rule('/rest/_node', 'leave', self.__leave, methods=['DELETE'])
-        self.__app.add_url_rule('/metrics', 'metrics', self.__metrics, methods=['GET'])
-        self.__app.add_url_rule('/liveness', 'liveness', self.__liveness, methods=['GET'])
-        self.__app.add_url_rule('/readiness', 'readiness', self.__readiness, methods=['GET'])
+        self.__app.add_url_rule('/<index_name>', 'get_index', self.__get_index, methods=['GET'])
+        self.__app.add_url_rule('/<index_name>', 'create_index', self.__create_index, methods=['PUT'])
+        self.__app.add_url_rule('/<index_name>', 'delete_index', self.__delete_index, methods=['DELETE'])
+        self.__app.add_url_rule('/<index_name>/_optimize', 'optimize_index', self.__optimize_index, methods=['GET'])
+        self.__app.add_url_rule('/<index_name>/_doc/<doc_id>', 'get_document', self.__get_document, methods=['GET'])
+        self.__app.add_url_rule('/<index_name>/_doc/<doc_id>', 'index_document', self.__index_document, methods=['PUT'])
+        self.__app.add_url_rule('/<index_name>/_doc/<doc_id>', 'delete_document', self.__delete_document, methods=['DELETE'])
+        self.__app.add_url_rule('/<index_name>/_docs', 'index_documents', self.__index_documents, methods=['PUT'])
+        self.__app.add_url_rule('/<index_name>/_docs', 'delete_documents', self.__delete_documents, methods=['DELETE'])
+        self.__app.add_url_rule('/<index_name>/_search', 'search_documents', self.__search_documents, methods=['GET', 'POST'])
+        self.__app.add_url_rule('/-/_node', 'get_node', self.__get_node, methods=['GET'])
+        # self.__app.add_url_rule('/-/_node', 'add_node', self.__add_node, methods=['PUT'])
+        # self.__app.add_url_rule('/-/_node', 'remove_node', self.__remove_node, methods=['DELETE'])
+        # self.__app.add_url_rule('/-/_cluster', 'get_cluster', self.__get_cluster, methods=['GET'])
+        self.__app.add_url_rule('/-/_health/liveness', 'liveness', self.__liveness, methods=['GET'])
+        self.__app.add_url_rule('/-/_health/readiness', 'readiness', self.__readiness, methods=['GET'])
+        self.__app.add_url_rule('/-/_metrics', 'metrics', self.__metrics, methods=['GET'])
 
         # disable Flask default logger
         self.__app.logger.disabled = True
@@ -660,7 +654,7 @@ class IndexHTTPServer:
 
         return resp
 
-    def __cluster(self):
+    def __get_node(self):
         start_time = time.time()
 
         @after_this_request
@@ -672,7 +666,7 @@ class IndexHTTPServer:
         data = {}
         status_code = None
         try:
-            data['cluster_status'] = self.__index_server.getStatus()
+            data['node'] = self.__index_server.getStatus()
             status_code = HTTPStatus.OK
         except Exception as ex:
             data['error'] = '{0}'.format(ex.args[0])
