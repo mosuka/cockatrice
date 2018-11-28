@@ -11,7 +11,7 @@ A schema is required to create an index, you need to put the schema in the reque
 
 .. code-block:: bash
 
-    $ curl -s -X PUT -H "Content-type: text/x-yaml" --data-binary @./conf/schema.yaml http://localhost:8080/myindex | jq .
+    $ curl -s -X PUT -H "Content-type: text/x-yaml" --data-binary @./conf/schema.yaml http://localhost:8080/myindex?use_ram_storage=True | jq .
 
 You can see the result in JSON format. The result of the above command is:
 
@@ -44,16 +44,16 @@ The result of the above command is:
       "index": {
         "doc_count": 0,
         "doc_count_all": 0,
-        "last_modified": 1541768662.8663597,
+        "last_modified": -1,
         "latest_generation": 0,
         "name": "myindex",
         "storage": {
           "files": [
             "_myindex_0.toc"
           ],
-          "folder": "/tmp/cockatrice/node1/index",
+          "folder": "",
           "readonly": false,
-          "supports_mmap": true
+          "supports_mmap": false
         },
         "version": -111
       },
@@ -62,7 +62,7 @@ The result of the above command is:
         "description": "Request fulfilled, document follows",
         "phrase": "OK"
       },
-      "time": 0.0016748905181884766
+      "time": 0.0014028549194335938
     }
 
 

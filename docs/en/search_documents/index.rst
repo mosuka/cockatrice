@@ -11,7 +11,7 @@ Searching documents by the following command:
 
 .. code-block:: bash
 
-    $ curl -s -X GET http://localhost:8080/rest/myindex/_search?query=search | jq .
+    $ curl -s -X GET http://localhost:8080/myindex/_search?query=search | jq .
 
 You can see the result in JSON format. The result of the above command is:
 
@@ -32,7 +32,7 @@ You can see the result in JSON format. The result of the above command is:
             },
             "pos": 0,
             "rank": 0,
-            "score": 1.7234593504967473
+            "score": 1.6081254289003828
           },
           {
             "doc": {
@@ -46,7 +46,7 @@ You can see the result in JSON format. The result of the above command is:
             },
             "pos": 1,
             "rank": 1,
-            "score": 1.7042117821338238
+            "score": 1.5904654156439162
           },
           {
             "doc": {
@@ -60,7 +60,7 @@ You can see the result in JSON format. The result of the above command is:
             },
             "pos": 2,
             "rank": 2,
-            "score": 1.619574615564863
+            "score": 1.515225291088596
           },
           {
             "doc": {
@@ -74,7 +74,7 @@ You can see the result in JSON format. The result of the above command is:
             },
             "pos": 3,
             "rank": 3,
-            "score": 1.5951006619362313
+            "score": 1.4922266045792822
           },
           {
             "doc": {
@@ -88,7 +88,7 @@ You can see the result in JSON format. The result of the above command is:
             },
             "pos": 4,
             "rank": 4,
-            "score": 1.5232201764110038
+            "score": 1.4257952540764172
           }
         ],
         "is_last_page": true,
@@ -102,5 +102,5 @@ You can see the result in JSON format. The result of the above command is:
         "description": "Request fulfilled, document follows",
         "phrase": "OK"
       },
-      "time": 0.010915756225585938
+      "time": 0.012568235397338867
     }
