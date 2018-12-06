@@ -23,7 +23,7 @@ You can see the result in JSON format. The result of the above command is:
         "description": "Request accepted, processing continues off-line",
         "phrase": "Accepted"
       },
-      "time": 0.08018112182617188
+      "time": 0.03571200370788574
     }
 
 
@@ -62,7 +62,7 @@ The result of the above command is:
         "description": "Request fulfilled, document follows",
         "phrase": "OK"
       },
-      "time": 0.0014028549194335938
+      "time": 0.00017118453979492188
     }
 
 

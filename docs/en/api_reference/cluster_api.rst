@@ -1,12 +1,12 @@
 Cluster APIs
 ============
 
-Cluster API
------------
+Get Node API
+------------
 
 .. code-block:: text
 
-    GET /rest/_cluster
+    GET /-/_node
 
 
 Add Node API
@@ -14,7 +14,7 @@ Add Node API
 
 .. code-block:: text
 
-    GET /rest/_node?node=<NODE_NAME>
+    GET /-/_node?node=<NODE_NAME>
 
 * ``<NODE_NAME>``: The node name.
 
@@ -24,6 +24,6 @@ Delete Node API
 
 .. code-block:: text
 
-    DELETE /rest/_node?node=<NODE_NAME>
+    DELETE /-/_node?node=<NODE_NAME>
 
 * ``<NODE_NAME>``: The node name.

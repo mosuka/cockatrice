@@ -54,7 +54,7 @@ You can see the result in JSON format. The result of the above command is:
         "description": "Request fulfilled, document follows",
         "phrase": "OK"
       },
-      "time": 0.011947870254516602
+      "time": 0.004673957824707031
     }
 
 

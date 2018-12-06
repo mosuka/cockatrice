@@ -7,7 +7,7 @@ Get Document API
 
 .. code-block:: text
 
-    GET /rest/<INDEX_NAME>/_doc/<DOC_ID>
+    GET /<INDEX_NAME>/_doc/<DOC_ID>
 
 * ``<INDEX_NAME>``: The index name.
 * ``<DOC_ID>``: The document ID to retrieve.
@@ -18,7 +18,7 @@ Index Document API
 
 .. code-block:: text
 
-    PUT /rest/<INDEX_NAME>/_doc/<DOC_ID>?sync=<SYNC>
+    PUT /<INDEX_NAME>/_doc/<DOC_ID>?sync=<SYNC>
     {
       "name": "Cockatrice",
       ...
@@ -35,7 +35,7 @@ Delete Document API
 
 .. code-block:: text
 
-    DELETE /rest/<INDEX_NAME>/_doc/<DOC_ID>?sync=<SYNC>
+    DELETE /<INDEX_NAME>/_doc/<DOC_ID>?sync=<SYNC>
 
 * ``<INDEX_NAME>``: The index name.
 * ``<DOC_ID>``: The document ID to delete.
@@ -47,7 +47,7 @@ Index Documents API
 
 .. code-block:: text
 
-    PUT /rest/<INDEX_NAME>/_docs?sync=<SYNC>
+    PUT /<INDEX_NAME>/_docs?sync=<SYNC>
     [
       {
         "id": "1",
@@ -68,7 +68,7 @@ Delete Documents API
 
 .. code-block:: text
 
-    DELETE /rest/<INDEX_NAME>/_docs?sync=<SYNC>
+    DELETE /<INDEX_NAME>/_docs?sync=<SYNC>
     [
       "1",
       "2",

@@ -12,7 +12,7 @@ The most basic usage is the following:
 
 .. code-block:: text
 
-    PUT /rest/<INDEX_NAME>?sync=<SYNC>
+    PUT /<INDEX_NAME>?sync=<SYNC>
     ---
     schema:
       id:
@@ -35,7 +35,7 @@ The most basic usage is the following:
 
 .. code-block:: text
 
-    GET /rest/<INDEX_NAME>
+    GET /<INDEX_NAME>
 
 * ``<INDEX_NAME>``: The index name.
 
@@ -48,7 +48,7 @@ The most basic usage is the following:
 
 .. code-block:: text
 
-    DELETE /rest/<INDEX_NAME>?sync=<SYNC>
+    DELETE /<INDEX_NAME>?sync=<SYNC>
 
 * ``<INDEX_NAME>``: The index name.
 * ``<SYNC>``: Specifies whether to execute the command synchronously or asynchronously. If ``True`` is specified, command will execute synchronously. Default is ``False``, command will execute asynchronously.

@@ -49,7 +49,7 @@ Contents
    cluster_management/index
    monitoring_cockatrice/index
    health_check/index
-   rest_api_reference/index
+   api_reference/index
 
 
 Indices and tables
