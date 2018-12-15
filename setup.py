@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 import os
 
@@ -62,9 +62,7 @@ setup(
         'Topic :: Text Processing :: Indexing'
     ],
     url='https://github.com/mosuka/cockatrice',
-    packages=[
-        'cockatrice'
-    ],
+    packages=find_packages('.'),
     platforms='any',
     install_requires=[
         'pysyncobj==0.3.4',
