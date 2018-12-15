@@ -14,5 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-NAME = 'cockatrice'
-VERSION = '0.5.0'
+
+import importlib
+
+
+def get_instance(class_name, **class_args):
+    class_data = class_name.split('.')
+
+    module_path = '.'.join(class_data[:-1])
+    class_name = class_data[-1]
+
+    module = importlib.import_module(module_path)
+    class_obj = getattr(module, class_name)
+
+    if class_args:
+        return class_obj(**class_args)
+    else:
+        return class_obj()

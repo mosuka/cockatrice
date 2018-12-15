@@ -6,7 +6,7 @@ Search API
 
 .. code-block:: text
 
-    GET /<INDEX_NAME>?query=<QUERY>&search_field=<SEARCH_FIELD>&page_num=<PAGE_NUM>&page_len=<PAGE_LEN>
+    GET /indices/<INDEX_NAME>/search?query=<QUERY>&search_field=<SEARCH_FIELD>&page_num=<PAGE_NUM>&page_len=<PAGE_LEN>
 
 * ``<INDEX_NAME>``: The index name to search.
 * ``<QUERY>``: The unicode string to search index.

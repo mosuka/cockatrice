@@ -11,7 +11,7 @@ If you already started a cockatrice, you can get metrics by the following comman
 
 .. code-block:: bash
 
-    $ curl -s -X GET http://localhost:8080/-/_metrics
+    $ curl -s -X GET http://localhost:8080/metrics
 
 You can see the result in Prometheus exposition format. The result of the above command is:
 

@@ -46,6 +46,7 @@ Contents
    index_management/index
    document_management/index
    search_documents/index
+   scoring/index
    cluster_management/index
    monitoring_cockatrice/index
    health_check/index

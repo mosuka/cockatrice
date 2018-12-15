@@ -11,7 +11,7 @@ A schema is required to create an index, you need to put the schema in the reque
 
 .. code-block:: bash
 
-    $ curl -s -X PUT -H "Content-type: text/x-yaml" --data-binary @./conf/schema.yaml http://localhost:8080/myindex?use_ram_storage=True | jq .
+    $ curl -s -X PUT -H "Content-type: text/x-yaml" --data-binary @./conf/schema.yaml http://localhost:8080/indices/myindex?use_ram_storage=True | jq .
 
 You can see the result in JSON format. The result of the above command is:
 
@@ -34,7 +34,7 @@ If you created an index, you can retrieve index information by the following com
 
 .. code-block:: bash
 
-    $ curl -s -X GET http://localhost:8080/myindex | jq .
+    $ curl -s -X GET http://localhost:8080/indices/myindex | jq .
 
 The result of the above command is:
 
@@ -73,7 +73,7 @@ You can delete indexes that are no longer needed. Delete an index by the followi
 
 .. code-block:: bash
 
-    $ curl -s -X DELETE http://localhost:8080/myindex | jq .
+    $ curl -s -X DELETE http://localhost:8080/indices/myindex | jq .
 
 You can see the result in JSON format. The result of the above command is:
 

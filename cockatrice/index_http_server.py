@@ -23,9 +23,11 @@ from logging import getLogger
 from flask import Flask, jsonify, request, after_this_request, Response
 from prometheus_client.core import CollectorRegistry, Counter, Histogram, Gauge
 from prometheus_client.exposition import CONTENT_TYPE_LATEST, generate_latest
+from whoosh.scoring import BM25F
 
 from cockatrice import NAME, VERSION
 from cockatrice.schema import Schema
+from cockatrice.scoring import MultiWeighting
 
 TRUE_STRINGS = ['true', 'yes', 'on', 't', 'y', '1']
 
@@ -41,24 +43,23 @@ class IndexHTTPServer:
         self.__index_server = index_server
 
         self.__app = Flask('index_http_server')
-        self.__app.add_url_rule('/', 'root', self.__root, methods=['GET'])
-        self.__app.add_url_rule('/<index_name>', 'get_index', self.__get_index, methods=['GET'])
-        self.__app.add_url_rule('/<index_name>', 'create_index', self.__create_index, methods=['PUT'])
-        self.__app.add_url_rule('/<index_name>', 'delete_index', self.__delete_index, methods=['DELETE'])
-        self.__app.add_url_rule('/<index_name>/_optimize', 'optimize_index', self.__optimize_index, methods=['GET'])
-        self.__app.add_url_rule('/<index_name>/_doc/<doc_id>', 'get_document', self.__get_document, methods=['GET'])
-        self.__app.add_url_rule('/<index_name>/_doc/<doc_id>', 'index_document', self.__index_document, methods=['PUT'])
-        self.__app.add_url_rule('/<index_name>/_doc/<doc_id>', 'delete_document', self.__delete_document, methods=['DELETE'])
-        self.__app.add_url_rule('/<index_name>/_docs', 'index_documents', self.__index_documents, methods=['PUT'])
-        self.__app.add_url_rule('/<index_name>/_docs', 'delete_documents', self.__delete_documents, methods=['DELETE'])
-        self.__app.add_url_rule('/<index_name>/_search', 'search_documents', self.__search_documents, methods=['GET', 'POST'])
-        self.__app.add_url_rule('/-/_node', 'get_node', self.__get_node, methods=['GET'])
-        # self.__app.add_url_rule('/-/_node', 'add_node', self.__add_node, methods=['PUT'])
-        # self.__app.add_url_rule('/-/_node', 'remove_node', self.__remove_node, methods=['DELETE'])
-        # self.__app.add_url_rule('/-/_cluster', 'get_cluster', self.__get_cluster, methods=['GET'])
-        self.__app.add_url_rule('/-/_health/liveness', 'liveness', self.__liveness, methods=['GET'])
-        self.__app.add_url_rule('/-/_health/readiness', 'readiness', self.__readiness, methods=['GET'])
-        self.__app.add_url_rule('/-/_metrics', 'metrics', self.__metrics, methods=['GET'])
+        self.__app.add_url_rule('/', endpoint='get_node', view_func=self.__get_node, methods=['GET'])
+        self.__app.add_url_rule('/indices/<index_name>', endpoint='get_index', view_func=self.__get_index, methods=['GET'])
+        self.__app.add_url_rule('/indices/<index_name>', endpoint='create_index', view_func=self.__create_index, methods=['PUT'])
+        self.__app.add_url_rule('/indices/<index_name>', endpoint='delete_index', view_func=self.__delete_index, methods=['DELETE'])
+        self.__app.add_url_rule('/indices/<index_name>/documents/<doc_id>', endpoint='get_document', view_func=self.__get_document, methods=['GET'])
+        self.__app.add_url_rule('/indices/<index_name>/documents/<doc_id>', endpoint='index_document', view_func=self.__index_document, methods=['PUT'])
+        self.__app.add_url_rule('/indices/<index_name>/documents/<doc_id>', endpoint='delete_document', view_func=self.__delete_document, methods=['DELETE'])
+        self.__app.add_url_rule('/indices/<index_name>/documents', endpoint='index_documents', view_func=self.__index_documents, methods=['PUT'])
+        self.__app.add_url_rule('/indices/<index_name>/documents', endpoint='delete_documents', view_func=self.__delete_documents, methods=['DELETE'])
+        self.__app.add_url_rule('/indices/<index_name>/search', endpoint='search_documents', view_func=self.__search_documents, methods=['GET', 'POST'])
+        self.__app.add_url_rule('/indices/<index_name>/optimize', endpoint='optimize_index', view_func=self.__optimize_index, methods=['GET'])
+        # self.__app.add_url_rule('/cluster/<node_name>', endpoint='get_node', view_func=self.__get_node, methods=['GET'])
+        # self.__app.add_url_rule('/cluster/<node_name>', endpoint='get_node', view_func=self.__get_node, methods=['PUT'])
+        # self.__app.add_url_rule('/cluster/<node_name>', endpoint='get_node', view_func=self.__get_node, methods=['DELETEW'])
+        self.__app.add_url_rule('/health/liveness', endpoint='liveness', view_func=self.__liveness, methods=['GET'])
+        self.__app.add_url_rule('/health/readiness', endpoint='readiness', view_func=self.__readiness, methods=['GET'])
+        self.__app.add_url_rule('/metrics', endpoint='metrics', view_func=self.__metrics, methods=['GET'])
 
         # disable Flask default logger
         self.__app.logger.disabled = True
@@ -178,28 +179,6 @@ class IndexHTTPServer:
 
         return
 
-    def __root(self):
-        start_time = time.time()
-
-        @after_this_request
-        def to_do_after_this_request(response):
-            self.__record_http_log(request, response)
-            self.__record_http_metrics(start_time, request, response)
-            return response
-
-        resp = Response()
-        try:
-            resp.status_code = HTTPStatus.OK
-            resp.content_type = 'text/plain; charset="UTF-8"'
-            resp.data = NAME + ' ' + VERSION + ' is running.'
-        except Exception as ex:
-            resp.status_code = HTTPStatus.INTERNAL_SERVER_ERROR
-            resp.content_type = 'text/plain; charset="UTF-8"'
-            resp.data = '{0}\n{1}'.format(resp.status_code.phrase, resp.status_code.description)
-            self.__logger.error(ex)
-
-        return resp
-
     def __get_index(self, index_name):
         start_time = time.time()
 
@@ -299,7 +278,7 @@ class IndexHTTPServer:
 
         return resp
 
-    def __optimize_index(self, index_name):
+    def __delete_index(self, index_name):
         start_time = time.time()
 
         @after_this_request
@@ -315,7 +294,7 @@ class IndexHTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            self.__index_server.optimize_index(index_name, sync=sync)
+            self.__index_server.delete_index(index_name, sync=sync)
 
             if sync:
                 status_code = HTTPStatus.OK
@@ -336,7 +315,7 @@ class IndexHTTPServer:
 
         return resp
 
-    def __delete_index(self, index_name):
+    def __optimize_index(self, index_name):
         start_time = time.time()
 
         @after_this_request
@@ -352,7 +331,7 @@ class IndexHTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            self.__index_server.delete_index(index_name, sync=sync)
+            self.__index_server.optimize_index(index_name, sync=sync)
 
             if sync:
                 status_code = HTTPStatus.OK
@@ -600,6 +579,13 @@ class IndexHTTPServer:
         data = {}
         status_code = None
         try:
+            weighting = BM25F
+            if len(request.data) > 0:
+                try:
+                    weighting = MultiWeighting(request.data)
+                except Exception as ex:
+                    self.__logger.error('failed to load weighting config: {0}'.format(ex))
+
             query = request.args.get('query', default='', type=str)
 
             search_field = request.args.get('search_field', default=self.__index_server.get_index(
@@ -608,7 +594,7 @@ class IndexHTTPServer:
             page_len = request.args.get('page_len', default=10, type=int)
 
             results_page = self.__index_server.search_documents(index_name, query, search_field, page_num,
-                                                                page_len=page_len)
+                                                                page_len=page_len, weighting=weighting)
 
             data['results'] = {
                 'is_last_page': results_page.is_last_page(),

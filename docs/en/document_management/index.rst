@@ -10,7 +10,7 @@ If you already created an index named ``myindex``, indexing a document by the fo
 
 .. code-block:: bash
 
-    $ curl -s -X PUT -H "Content-Type:application/json" http://localhost:8080/myindex/_doc/1 -d @./example/doc1.json | jq .
+    $ curl -s -X PUT -H "Content-Type:application/json" http://localhost:8080/indices/myindex/documents/1 -d @./example/doc1.json | jq .
 
 You can see the result in JSON format. The result of the above command is:
 
@@ -33,7 +33,7 @@ If you already indexed a document ID ``1`` in ``myindex``, getting a document th
 
 .. code-block:: bash
 
-    $ curl -s -X GET http://localhost:8080/myindex/_doc/1 | jq .
+    $ curl -s -X GET http://localhost:8080/indices/myindex/documents/1 | jq .
 
 You can see the result in JSON format. The result of the above command is:
 
@@ -65,7 +65,7 @@ Deleting a document from ``myindex`` by the following command:
 
 .. code-block:: bash
 
-    $ curl -s -X DELETE http://localhost:8080/myindex/_doc/1 | jq .
+    $ curl -s -X DELETE http://localhost:8080/indices/myindex/documents/1 | jq .
 
 You can see the result in JSON format. The result of the above command is:
 
@@ -88,7 +88,7 @@ Indexing documents in bulk by the following command:
 
 .. code-block:: bash
 
-    $ curl -s -X PUT -H "Content-Type:application/json" http://localhost:8080/myindex/_docs -d @./example/bulk_index.json | jq .
+    $ curl -s -X PUT -H "Content-Type:application/json" http://localhost:8080/indices/myindex/documents -d @./example/bulk_index.json | jq .
 
 You can see the result in JSON format. The result of the above command is:
 
@@ -111,7 +111,7 @@ Deleting documents in bulk by the following command:
 
 .. code-block:: bash
 
-    $ curl -s -X DELETE -H "Content-Type:application/json" http://localhost:8080/myindex/_docs -d @./example/bulk_delete.json | jq .
+    $ curl -s -X DELETE -H "Content-Type:application/json" http://localhost:8080/indices/myindex/documents -d @./example/bulk_delete.json | jq .
 
 You can see the result in JSON format. The result of the above command is:
 

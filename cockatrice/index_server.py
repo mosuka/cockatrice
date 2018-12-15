@@ -62,9 +62,6 @@ class IndexServer(SyncObj):
 
         super().destroy()
 
-    def get_indices(self):
-        return self.__indices
-
     def get_ram_storage(self):
         return self.__ram_storage
 
@@ -99,24 +96,41 @@ class IndexServer(SyncObj):
 
     def open_index(self, index_name, schema=None):
         index = None
+
         try:
             if self.__ram_storage.index_exists(indexname=index_name):
                 self.__logger.info('opening {0} in ram storage on memory'.format(index_name))
-                self.__indices[index_name] = self.__ram_storage.open_index(indexname=index_name, schema=schema)
+                index = self.__ram_storage.open_index(indexname=index_name, schema=schema)
             elif self.__file_storage is not None and self.__file_storage.index_exists(indexname=index_name):
                 self.__logger.info('opening {0} in file storage on {1}'.format(index_name, self.__file_storage.folder))
-                self.__indices[index_name] = self.__file_storage.open_index(indexname=index_name, schema=schema)
+                index = self.__file_storage.open_index(indexname=index_name, schema=schema)
             else:
                 raise KeyError('index does not exist')
-            index = self.__indices[index_name]
+            self.__indices[index_name] = index
         except Exception as ex:
-            self.__logger.error(ex)
+            self.__logger.error('failed to open {0}: {1}'.format(index_name, ex))
+
+        return index
+
+    @replicated
+    def close_index(self, index_name):
+        index = self.__indices.pop(index_name)
+
+        if index is None:
+            self.__logger.info('{0} already closed'.format(index_name))
+        else:
+            if index.storage.folder == '':
+                self.__logger.info('closing {0} in ram storage on memory'.format(index_name))
+            else:
+                self.__logger.info('closing {0} in file storage on {1}'.format(index_name, index.storage.folder))
+            index.close()
 
         return index
 
     @replicated
     def create_index(self, index_name, schema, use_ram_storage=False):
         index = None
+
         try:
             if self.__index_exists(index_name):
                 raise KeyError('index already exists')
@@ -133,54 +147,19 @@ class IndexServer(SyncObj):
                     raise ValueError('file storage has not been created')
             index = self.__indices[index_name]
         except Exception as ex:
-            self.__logger.error(ex)
-
-        return index
-
-    def get_index(self, index_name):
-        index = self.__indices[index_name] if index_name in self.__indices else None
-        if index is None:
-            self.__logger.info('index is not available')
-
-        return index
-
-    @replicated
-    def optimize_index(self, index_name):
-        index = self.get_index(index_name)
-        if index is not None:
-            if index.storage.folder == '':
-                self.__logger.info('optimizing {0} in ram storage on memory'.format(index_name))
-            else:
-                self.__logger.info('optimizing {0} in file storage on {1}'.format(index_name, index.storage.folder))
-            index.optimize()
-
-    def get_doc_count(self, index_name):
-        index = self.get_index(index_name)
-
-        return None if index is None else index.doc_count()
-
-    @replicated
-    def close_index(self, index_name):
-        index = self.__indices.pop(index_name)
-        if index is None:
-            self.__logger.info('{0} already closed'.format(index_name))
-        else:
-            if index.storage.folder == '':
-                self.__logger.info('closing {0} in ram storage on memory'.format(index_name))
-            else:
-                self.__logger.info('closing {0} in file storage on {1}'.format(index_name, index.storage.folder))
-            index.close()
+            self.__logger.error('failed to create {0}: {1}'.format(index_name, ex))
 
         return index
 
     @replicated
     def delete_index(self, index_name):
+        success = False
+
         # close index
         self.close_index(index_name, _doApply=True)
 
         # delete index files
         try:
-            storage = None
             if self.__ram_storage.index_exists(indexname=index_name):
                 storage = self.__ram_storage
             elif self.__file_storage is not None and self.__file_storage.index_exists(indexname=index_name):
@@ -208,107 +187,214 @@ class IndexServer(SyncObj):
                 if re.match(pattern_lock, filename):
                     self.__logger.info('deleting {0}'.format(os.path.join(storage.folder, filename)))
                     storage.delete_file(filename)
+
+            success = True
         except Exception as ex:
-            self.__logger.error(ex)
+            self.__logger.error('failed to delete {0}: {1}'.format(index_name, ex))
+
+        return success
+
+    def get_indices(self):
+        return self.__indices
+
+    def get_index(self, index_name):
+        index = self.get_indices().get(index_name)
+        if index is None:
+            msg = '{0} is not available'.format(index_name)
+            self.__logger.error(msg)
+            raise KeyError(msg)
+        return index
+
+    @replicated
+    def optimize_index(self, index_name):
+        success = False
+
+        try:
+            index = self.get_index(index_name)
+            if index.storage.folder == '':
+                self.__logger.info('optimizing {0} in ram storage on memory'.format(index_name))
+            else:
+                self.__logger.info('optimizing {0} in file storage on {1}'.format(index_name, index.storage.folder))
+            index.optimize()
+            success = True
+        except Exception as ex:
+            self.__logger.error('failed to optimize {0}: {1}'.format(index_name, ex))
+
+        return success
+
+    def get_doc_count(self, index_name):
+        try:
+            cnt = self.get_index(index_name).doc_count()
+        except Exception as ex:
+            self.__logger.error('failed to get document count in {0}'.format(index_name))
+            raise ex
+
+        return cnt
+
+    def get_writer(self, index_name):
+        try:
+            writer = self.get_index(index_name).writer()
+        except Exception as ex:
+            self.__logger.error('failed to get index writer in {0}'.format(index_name))
+            raise ex
+
+        return writer
+
+    def get_schema(self, index_name):
+        try:
+            schema = self.get_index(index_name).schema
+        except Exception as ex:
+            self.__logger.error('failed to get index schema in {0}'.format(index_name))
+            raise ex
+
+        return schema
+
+    def get_searcher(self, index_name, weighting=None):
+        try:
+            if weighting is None:
+                searcher = self.get_index(index_name).searcher()
+            else:
+                searcher = self.get_index(index_name).searcher(weighting=weighting)
+        except Exception as ex:
+            self.__logger.error('failed to get index searcher in {0}'.format(index_name))
+            raise ex
+
+        return searcher
 
     @replicated
     def index_document(self, index_name, doc_id, fields):
-        writer = self.__indices[index_name].writer()
+        success = False
 
         try:
-            doc = {self.__indices[index_name].schema.get_unique_field(): doc_id}
+            writer = self.get_writer(index_name)
+            doc = {
+                self.get_schema(index_name).get_unique_field(): doc_id
+            }
             doc.update(fields)
-
-            self.__logger.debug('indexing document in {0}: {1}'.format(index_name, doc))
-
-            writer.update_document(**doc)
-            writer.commit()
+            try:
+                self.__logger.debug('indexing document in {0}: {1}'.format(index_name, doc))
+                writer.update_document(**doc)
+                success = True
+            except Exception as ex:
+                self.__logger.error('failed to index document in {0}: {1}'.format(index_name, doc))
+                raise ex
+            finally:
+                if success:
+                    writer.commit()
+                else:
+                    writer.cancel()
         except Exception as ex:
-            self.__logger.error(ex)
-            writer.cancel()
+            self.__logger.error('failed to index document in {0}: {1}'.format(index_name, ex))
+
+        return success
 
     @replicated
     def delete_document(self, index_name, doc_id):
-        writer = self.__indices[index_name].writer()
+        success = False
 
         try:
-            unique_field = self.__indices[index_name].schema.get_unique_field()
-
-            self.__logger.debug('deleting document in {0}: {1}:{2}'.format(index_name, unique_field, doc_id))
-
-            writer.delete_by_term(unique_field, doc_id)
-            writer.commit()
+            writer = self.get_writer(index_name)
+            unique_field = self.get_schema(index_name).get_unique_field()
+            try:
+                self.__logger.debug('deleting document in {0}: {1}:{2}'.format(index_name, unique_field, doc_id))
+                writer.delete_by_term(unique_field, doc_id)
+                success = True
+            except Exception as ex:
+                self.__logger.error('failed to delete document in {0}: {1}:{2}'.format(index_name, unique_field, doc_id))
+                raise ex
+            finally:
+                if success:
+                    writer.commit()
+                else:
+                    writer.cancel()
         except Exception as ex:
-            self.__logger.error(ex)
-            writer.cancel()
+            self.__logger.error('failed to delete document in {0}: {1}'.format(index_name, ex))
+
+        return success
 
     @replicated
     def index_documents(self, index_name, docs):
-        writer = self.__indices[index_name].writer()
-
         cnt = 0
+
         try:
-            for doc in docs:
-                self.__logger.debug('indexing document in {0}: {1}'.format(index_name, doc))
-
-                writer.update_document(**doc)
-                cnt = cnt + 1
-
-            writer.commit()
+            success = False
+            writer = self.get_writer(index_name)
+            try:
+                for doc in docs:
+                    self.__logger.debug('indexing document in {0}: {1}'.format(index_name, doc))
+                    writer.update_document(**doc)
+                    cnt = cnt + 1
+                success = True
+            except Exception as ex:
+                self.__logger.error('failed to index documents in {0} in bulk'.format(index_name))
+                raise ex
+            finally:
+                if success:
+                    writer.commit()
+                else:
+                    cnt = 0  # clear
+                    writer.cancel()
         except Exception as ex:
-            self.__logger.error(ex)
-            writer.cancel()
-            cnt = 0
+            self.__logger.error('failed to index documents in {0} in bulk: {1}'.format(index_name, ex))
 
         return cnt
 
     @replicated
     def delete_documents(self, index_name, doc_ids):
-        writer = self.__indices[index_name].writer()
-
         cnt = 0
+
         try:
-            unique_field = self.__indices[index_name].schema.get_unique_field()
-
-            for doc_id in doc_ids:
-                self.__logger.debug('deleting document in {0}: {1}:{2}'.format(index_name, unique_field, doc_id))
-
-                writer.delete_by_term(unique_field, doc_id)
-                cnt = cnt + 1
-
-            writer.commit()
+            success = False
+            writer = self.get_writer(index_name)
+            unique_field = self.get_schema(index_name).get_unique_field()
+            try:
+                for doc_id in doc_ids:
+                    self.__logger.debug('deleting document in {0}: {1}:{2}'.format(index_name, unique_field, doc_id))
+                    writer.delete_by_term(unique_field, doc_id)
+                    cnt = cnt + 1
+                success = True
+            except Exception as ex:
+                self.__logger.error('failed to delete documents in {0} in bulk'.format(index_name))
+                raise ex
+            finally:
+                if success:
+                    writer.commit()
+                else:
+                    cnt = 0  # clear
+                    writer.cancel()
         except Exception as ex:
-            self.__logger.error(ex)
-            writer.cancel()
-            cnt = 0
+            self.__logger.error('failed to delete documents in {0} in bulk: {1}'.format(index_name, ex))
 
         return cnt
 
     def get_document(self, index_name, doc_id):
-        doc = None
         try:
-            unique_field = self.__indices[index_name].schema.get_unique_field()
-
-            self.__logger.debug('getting document in {0}: {1}:{2}'.format(index_name, unique_field, doc_id))
-
-            doc = self.search_documents(index_name, doc_id, unique_field, 1, 1)
+            unique_field = self.get_schema(index_name).get_unique_field()
+            try:
+                self.__logger.debug('getting document in {0}: {1}:{2}'.format(index_name, unique_field, doc_id))
+                doc = self.search_documents(index_name, doc_id, unique_field, 1, page_len=1)
+            except Exception as ex:
+                self.__logger.error('failed to get document in {0}: {1}:{2}'.format(index_name, unique_field, doc_id))
+                raise ex
         except Exception as ex:
-            self.__logger.error(ex)
+            self.__logger.error('failed to get document in {0}'.format(index_name))
+            raise ex
 
         return doc
 
-    def search_documents(self, index_name, query, search_field, page_num, page_len=10, **kwargs):
-        searcher = self.__indices[index_name].searcher()
-
-        results_page = None
+    def search_documents(self, index_name, query, search_field, page_num, page_len=10, weighting=None, **kwargs):
         try:
-            query_parser = QueryParser(search_field, self.__indices[index_name].schema)
-            query = query_parser.parse(query)
-
-            self.__logger.debug('searching documents in {0}: {1}'.format(index_name, query))
-
-            results_page = searcher.search_page(query, page_num, pagelen=page_len, **kwargs)
+            searcher = self.get_searcher(index_name, weighting=weighting)
+            query_parser = QueryParser(search_field, self.get_schema(index_name))
+            query_obj = query_parser.parse(query)
+            try:
+                self.__logger.debug('searching documents in {0}: {1}'.format(index_name, query_obj))
+                results_page = searcher.search_page(query_obj, page_num, pagelen=page_len, **kwargs)
+            except Exception as ex:
+                self.__logger.error('failed to search documents in {0}: {1}'.format(index_name, query_obj))
+                raise ex
         except Exception as ex:
-            self.__logger.error(ex)
+            self.__logger.error('failed to search documents in {0}'.format(index_name))
+            raise ex
 
         return results_page

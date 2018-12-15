@@ -6,7 +6,9 @@ Get Node API
 
 .. code-block:: text
 
-    GET /-/_node
+    GET /cluster/<NODE_NAME>
+
+* ``<NODE_NAME>``: The node name.
 
 
 Add Node API
@@ -14,7 +16,7 @@ Add Node API
 
 .. code-block:: text
 
-    GET /-/_node?node=<NODE_NAME>
+    PUT /cluster/<NODE_NAME>
 
 * ``<NODE_NAME>``: The node name.
 
@@ -24,6 +26,6 @@ Delete Node API
 
 .. code-block:: text
 
-    DELETE /-/_node?node=<NODE_NAME>
+    DELETE /cluster/<NODE_NAME>
 
 * ``<NODE_NAME>``: The node name.

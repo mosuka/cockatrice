@@ -80,7 +80,7 @@ class TestIndexHTTPServer(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_metrics(self):
-        response = self.test_client.get('/-/_metrics')
+        response = self.test_client.get('/metrics')
 
         expected_status_code = HTTPStatus.OK
         actual_status_code = response.status_code
@@ -99,7 +99,7 @@ class TestIndexHTTPServer(unittest.TestCase):
             schema_yaml = file_obj.read()
 
         # create index
-        response = self.test_client.put('/' + index_name, data=schema_yaml, query_string='sync=True')
+        response = self.test_client.put('/indices/' + index_name, data=schema_yaml, query_string='sync=True')
         expected_status_code = HTTPStatus.CREATED
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
@@ -110,13 +110,13 @@ class TestIndexHTTPServer(unittest.TestCase):
             schema_yaml = file_obj.read()
 
         # create index
-        response = self.test_client.put('/' + index_name, data=schema_yaml, query_string='sync=True')
+        response = self.test_client.put('/indices/' + index_name, data=schema_yaml, query_string='sync=True')
         expected_status_code = HTTPStatus.CREATED
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
 
         # get index
-        response = self.test_client.get('/' + index_name)
+        response = self.test_client.get('/indices/' + index_name)
         expected_status_code = HTTPStatus.OK
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
@@ -127,25 +127,25 @@ class TestIndexHTTPServer(unittest.TestCase):
             schema_yaml = file_obj.read()
 
         # create index
-        response = self.test_client.put('/' + index_name, data=schema_yaml, query_string='sync=True')
+        response = self.test_client.put('/indices/' + index_name, data=schema_yaml, query_string='sync=True')
         expected_status_code = HTTPStatus.CREATED
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
 
         # get index
-        response = self.test_client.get('/' + index_name)
+        response = self.test_client.get('/indices/' + index_name)
         expected_status_code = HTTPStatus.OK
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
 
         # delete index
-        response = self.test_client.delete('/' + index_name, query_string='sync=True')
+        response = self.test_client.delete('/indices/' + index_name, query_string='sync=True')
         expected_status_code = HTTPStatus.OK
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
 
         # get index
-        response = self.test_client.get('/' + index_name)
+        response = self.test_client.get('/indices/' + index_name)
         expected_status_code = HTTPStatus.NOT_FOUND
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
@@ -156,7 +156,7 @@ class TestIndexHTTPServer(unittest.TestCase):
             schema_yaml = file_obj.read()
 
         # create index
-        response = self.test_client.put('/' + index_name, data=schema_yaml, query_string='sync=True')
+        response = self.test_client.put('/indices/' + index_name, data=schema_yaml, query_string='sync=True')
         expected_status_code = HTTPStatus.CREATED
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
@@ -166,7 +166,7 @@ class TestIndexHTTPServer(unittest.TestCase):
 
         doc_id = '1'
 
-        response = self.test_client.put('/' + index_name + '/_doc/' + doc_id, data=json.dumps(doc_json),
+        response = self.test_client.put('/indices/' + index_name + '/documents/' + doc_id, data=json.dumps(doc_json),
                                         query_string='sync=True')
 
         expected_status_code = HTTPStatus.CREATED
@@ -185,7 +185,7 @@ class TestIndexHTTPServer(unittest.TestCase):
             schema_yaml = file_obj.read()
 
         # create index
-        response = self.test_client.put('/' + index_name, data=schema_yaml, query_string='sync=True')
+        response = self.test_client.put('/indices/' + index_name, data=schema_yaml, query_string='sync=True')
         expected_status_code = HTTPStatus.CREATED
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
@@ -196,14 +196,14 @@ class TestIndexHTTPServer(unittest.TestCase):
         doc_id = '1'
 
         # index document
-        response = self.test_client.put('/' + index_name + '/_doc/' + doc_id, data=doc_json,
+        response = self.test_client.put('/indices/' + index_name + '/documents/' + doc_id, data=doc_json,
                                         query_string='sync=True')
         expected_status_code = HTTPStatus.CREATED
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
 
         # get document
-        response = self.test_client.get('/' + index_name + '/_doc/' + doc_id)
+        response = self.test_client.get('/indices/' + index_name + '/documents/' + doc_id)
         expected_status_code = HTTPStatus.OK
         actual_status_code = response.status_code
         self.assertEqual(expected_status_code, actual_status_code)
@@ -218,31 +218,41 @@ class TestIndexHTTPServer(unittest.TestCase):
         actual_doc_id = data['doc']['fields']['id']
         self.assertEqual(expected_doc_id, actual_doc_id)
 
-    # def test_delete(self):
-    #     example_file = self.example_dir + '/doc1.json'
-    #
-    #     file_obj = open(example_file, 'r', encoding='utf-8')
-    #     example_data = json.loads(file_obj.read(), encoding='utf-8')
-    #     file_obj.close()
-    #
-    #     doc_id = '1'
-    #     sync = True
-    #
-    #     self.client.put('/rest/doc/' + doc_id, data=json.dumps(example_data),
-    #                     query_string='sync=' + str(sync))
-    #
-    #     response = self.client.delete_document('/rest/doc/' + doc_id, query_string='sync=' + str(sync))
-    #
-    #     expected_status_code = HTTPStatus.OK
-    #     actual_status_code = response.status_code
-    #     self.assertEqual(expected_status_code, actual_status_code)
-    #
-    #     response = self.client.get('/rest/doc/' + doc_id)
-    #
-    #     expected_status_code = HTTPStatus.NOT_FOUND
-    #     actual_status_code = response.status_code
-    #     self.assertEqual(expected_status_code, actual_status_code)
-    #
+    def test_delete_document(self):
+        index_name = 'test_index'
+        with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
+            schema_yaml = file_obj.read()
+
+        # create index
+        response = self.test_client.put('/indices/' + index_name, data=schema_yaml, query_string='sync=True')
+        expected_status_code = HTTPStatus.CREATED
+        actual_status_code = response.status_code
+        self.assertEqual(expected_status_code, actual_status_code)
+
+        with open(self.example_dir + '/doc1.json', 'r', encoding='utf-8') as file_obj:
+            doc_json = file_obj.read()
+
+        doc_id = '1'
+
+        # index document
+        response = self.test_client.put('/indices/' + index_name + '/documents/' + doc_id, data=doc_json,
+                                        query_string='sync=True')
+        expected_status_code = HTTPStatus.CREATED
+        actual_status_code = response.status_code
+        self.assertEqual(expected_status_code, actual_status_code)
+
+        # delete document
+        response = self.test_client.delete('/indices/' + index_name + '/documents/' + doc_id, query_string='sync=True')
+        expected_status_code = HTTPStatus.OK
+        actual_status_code = response.status_code
+        self.assertEqual(expected_status_code, actual_status_code)
+
+        # get document
+        response = self.test_client.get('/indices/' + index_name + '/documents/' + doc_id + doc_id)
+        expected_status_code = HTTPStatus.NOT_FOUND
+        actual_status_code = response.status_code
+        self.assertEqual(expected_status_code, actual_status_code)
+
     # def test_bulk_index(self):
     #     example_file = self.example_dir + '/bulk_index.json'
     #

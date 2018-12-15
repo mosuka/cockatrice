@@ -65,29 +65,29 @@ Once cluster is created, you can create indices. let's create an index to 127.0.
 
 .. code-block:: bash
 
-    $ curl -s -X PUT -H "Content-type: text/x-yaml" --data-binary @./conf/schema.yaml http://localhost:8080/myindex | jq .
+    $ curl -s -X PUT -H "Content-type: text/x-yaml" --data-binary @./conf/schema.yaml http://localhost:8080/indices/myindex | jq .
 
 If the above command succeeds, same index will be created on all the nodes in the cluster. Check your index on each nodes.
 
 .. code-block:: bash
 
-    $ curl -s -X GET http://localhost:8080/myindex | jq .
-    $ curl -s -X GET http://localhost:8081/myindex | jq .
-    $ curl -s -X GET http://localhost:8082/myindex | jq .
+    $ curl -s -X GET http://localhost:8080/indices/myindex | jq .
+    $ curl -s -X GET http://localhost:8081/indices/myindex | jq .
+    $ curl -s -X GET http://localhost:8082/indices/myindex | jq .
 
 Let's index a document to 127.0.0.1:8080 by the following command:
 
 .. code-block:: bash
 
-    $ curl -s -X PUT -H "Content-Type:application/json" http://localhost:8080/myindex/_doc/1 -d @./example/doc1.json | jq .
+    $ curl -s -X PUT -H "Content-Type:application/json" http://localhost:8080/indices/myindex/documents/1 -d @./example/doc1.json | jq .
 
 If the above command succeeds, same document will be indexed on all the nodes in the cluster. Check your document on each nodes.
 
 .. code-block:: bash
 
-    $ curl -s -X GET http://localhost:8080/myindex/_doc/1 | jq .
-    $ curl -s -X GET http://localhost:8081/myindex/_doc/1 | jq .
-    $ curl -s -X GET http://localhost:8082/myindex/_doc/1 | jq .
+    $ curl -s -X GET http://localhost:8080/indices/myindex/documents/1 | jq .
+    $ curl -s -X GET http://localhost:8081/indices/myindex/documents/1 | jq .
+    $ curl -s -X GET http://localhost:8082/indices/myindex/documents/1 | jq .
 
 
 Create a cluster with dynamic membership by manual operation

@@ -1,0 +1,16 @@
+---
+#
+# define weighting
+#
+weighting:
+  default:
+    class: whoosh.scoring.BM25F
+    args:
+      B: 0.75
+      K1: 1.2
+  title:
+    class: whoosh.scoring.TF_IDF
+  text:
+    class: whoosh.scoring.PL2
+    args:
+      c: 1.0
