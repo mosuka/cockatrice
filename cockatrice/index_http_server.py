@@ -27,7 +27,7 @@ from whoosh.scoring import BM25F
 
 from cockatrice import NAME, VERSION
 from cockatrice.schema import Schema
-from cockatrice.scoring import MultiWeighting
+from cockatrice.scoring import get_multi_weighting
 
 TRUE_STRINGS = ['true', 'yes', 'on', 't', 'y', '1']
 
@@ -582,7 +582,7 @@ class IndexHTTPServer:
             weighting = BM25F
             if len(request.data) > 0:
                 try:
-                    weighting = MultiWeighting(request.data)
+                    weighting = get_multi_weighting(request.data)
                 except Exception as ex:
                     self.__logger.error('failed to load weighting config: {0}'.format(ex))
 

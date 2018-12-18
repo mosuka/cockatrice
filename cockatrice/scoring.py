@@ -14,40 +14,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from copy import deepcopy
-
 import yaml
-from whoosh.scoring import MultiWeighting as WhooshMultiWeighting, BM25F
+from whoosh.scoring import MultiWeighting, BM25F
 
 from cockatrice.util.loader import get_instance
 
 
-class MultiWeighting(WhooshMultiWeighting):
-    def __init__(self, weighting_yaml):
-        self.__dict = {}
+def get_weighting(class_name, **class_args):
+    try:
+        weighting = get_instance(class_name, **class_args)
+    except Exception as ex:
+        raise ex
 
-        default = None
-        weightings = {}
+    return weighting
 
-        try:
-            self.__dict = yaml.safe_load(weighting_yaml)
-            for field_name in self.__dict['weighting'].keys():
-                if field_name == 'default':
-                    default = self.__get_weighting(field_name)
-                else:
-                    weightings[field_name] = self.__get_weighting(field_name)
-            if default is None:
-                default = BM25F(B=0.75, K1=1.2)
-            super().__init__(default, **weightings)
-        except Exception as ex:
-            raise ex
 
-    def __get_weighting(self, name):
-        class_name = self.__dict['weighting'][name]['class']
-        class_args = {}
-        if 'args' in self.__dict['weighting'][name]:
-            class_args = deepcopy(self.__dict['weighting'][name]['args'])
+def get_multi_weighting(weighting_yaml):
+    try:
+        yaml_dict = yaml.safe_load(weighting_yaml)
 
-        instance = get_instance(class_name, **class_args)
+        default_weighting = BM25F
+        weighting_dict = {}
 
-        return instance
+        for field_name in yaml_dict['weighting'].keys():
+            class_name = yaml_dict['weighting'][field_name]['class']
+            class_args = yaml_dict['weighting'][field_name]['args'] if 'args' in yaml_dict['weighting'][field_name] else {}
+            instance = get_instance(class_name, **class_args)
+            if field_name == 'default':
+                default_weighting = instance
+            else:
+                weighting_dict[field_name] = instance
+
+        weighting = MultiWeighting(default_weighting, **weighting_dict)
+    except Exception as ex:
+        raise ex
+
+    return weighting
