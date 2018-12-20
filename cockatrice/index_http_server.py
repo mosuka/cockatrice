@@ -25,7 +25,7 @@ from prometheus_client.core import CollectorRegistry, Counter, Histogram, Gauge
 from prometheus_client.exposition import CONTENT_TYPE_LATEST, generate_latest
 from whoosh.scoring import BM25F
 
-from cockatrice import NAME
+from cockatrice import NAME, VERSION, DEFAULT_HTTP_PORT
 from cockatrice.schema import Schema
 from cockatrice.scoring import get_multi_weighting
 
@@ -33,7 +33,7 @@ TRUE_STRINGS = ['true', 'yes', 'on', 't', 'y', '1']
 
 
 class IndexHTTPServer:
-    def __init__(self, index_server, port=8080, logger=getLogger(NAME),
+    def __init__(self, index_server, port=DEFAULT_HTTP_PORT, logger=getLogger(NAME),
                  http_logger=getLogger(NAME + '_http'), metrics_registry=CollectorRegistry()):
         self.__logger = logger
         self.__http_logger = http_logger
@@ -43,7 +43,7 @@ class IndexHTTPServer:
         self.__index_server = index_server
 
         self.__app = Flask('index_http_server')
-        self.__app.add_url_rule('/', endpoint='get_node', view_func=self.__get_node, methods=['GET'])
+        self.__app.add_url_rule('/', endpoint='root', view_func=self.__root, methods=['GET'])
         self.__app.add_url_rule('/indices/<index_name>', endpoint='get_index', view_func=self.__get_index, methods=['GET'])
         self.__app.add_url_rule('/indices/<index_name>', endpoint='create_index', view_func=self.__create_index, methods=['PUT'])
         self.__app.add_url_rule('/indices/<index_name>', endpoint='delete_index', view_func=self.__delete_index, methods=['DELETE'])
@@ -179,6 +179,28 @@ class IndexHTTPServer:
 
         return
 
+    def __root(self):
+        start_time = time.time()
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            self.__record_http_log(request, response)
+            self.__record_http_metrics(start_time, request, response)
+            return response
+
+        resp = Response()
+        try:
+            resp.status_code = HTTPStatus.OK
+            resp.content_type = 'text/plain; charset="UTF-8"'
+            resp.data = NAME + ' ' + VERSION + ' is running.\n'
+        except Exception as ex:
+            resp.status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            resp.content_type = 'text/plain; charset="UTF-8"'
+            resp.data = '{0}\n{1}'.format(resp.status_code.phrase, resp.status_code.description)
+            self.__logger.error(ex)
+
+        return resp
+
     def __get_index(self, index_name):
         start_time = time.time()
 
@@ -245,11 +267,7 @@ class IndexHTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            use_ram_storage = False
-            if request.args.get('use_ram_storage', default='', type=str).lower() in TRUE_STRINGS:
-                use_ram_storage = True
-
-            index = self.__index_server.create_index(index_name, Schema(request.data), use_ram_storage=use_ram_storage, sync=sync)
+            index = self.__index_server.create_index(index_name, Schema(request.data), sync=sync)
 
             if sync:
                 if index is None:

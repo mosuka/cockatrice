@@ -32,7 +32,7 @@ You can see the result in JSON format. The result of the above command is:
             },
             "pos": 0,
             "rank": 0,
-            "score": 1.6081254289003828
+            "score": 1.7928099079920008
           },
           {
             "doc": {
@@ -46,7 +46,7 @@ You can see the result in JSON format. The result of the above command is:
             },
             "pos": 1,
             "rank": 1,
-            "score": 1.5904654156439162
+            "score": 1.7730448689827392
           },
           {
             "doc": {
@@ -60,7 +60,7 @@ You can see the result in JSON format. The result of the above command is:
             },
             "pos": 2,
             "rank": 2,
-            "score": 1.515225291088596
+            "score": 1.6882037387583286
           },
           {
             "doc": {
@@ -74,7 +74,7 @@ You can see the result in JSON format. The result of the above command is:
             },
             "pos": 3,
             "rank": 3,
-            "score": 1.4922266045792822
+            "score": 1.6626056232111253
           },
           {
             "doc": {
@@ -88,7 +88,7 @@ You can see the result in JSON format. The result of the above command is:
             },
             "pos": 4,
             "rank": 4,
-            "score": 1.4257952540764172
+            "score": 1.5883802067794877
           }
         ],
         "is_last_page": true,
@@ -102,7 +102,7 @@ You can see the result in JSON format. The result of the above command is:
         "description": "Request fulfilled, document follows",
         "phrase": "OK"
       },
-      "time": 0.012568235397338867
+      "time": 0.021579980850219727
     }
 
 
@@ -135,7 +135,7 @@ You can see the result in JSON format. The result of the above command is:
             },
             "pos": 0,
             "rank": 0,
-            "score": 1.2892670083152373
+            "score": 1.245740159716303
           },
           {
             "doc": {
@@ -149,7 +149,7 @@ You can see the result in JSON format. The result of the above command is:
             },
             "pos": 1,
             "rank": 1,
-            "score": 0.8750303435706207
+            "score": 0.8458503364028286
           },
           {
             "doc": {
@@ -163,7 +163,7 @@ You can see the result in JSON format. The result of the above command is:
             },
             "pos": 2,
             "rank": 2,
-            "score": 0.731594763898467
+            "score": 0.7080130633767222
           },
           {
             "doc": {
@@ -177,7 +177,7 @@ You can see the result in JSON format. The result of the above command is:
             },
             "pos": 3,
             "rank": 3,
-            "score": 0.35527308744466946
+            "score": 0.34399698713879023
           },
           {
             "doc": {
@@ -191,7 +191,7 @@ You can see the result in JSON format. The result of the above command is:
             },
             "pos": 4,
             "rank": 4,
-            "score": 0.27604640785584816
+            "score": 0.2683300227447003
           }
         ],
         "is_last_page": true,
@@ -205,5 +205,5 @@ You can see the result in JSON format. The result of the above command is:
         "description": "Request fulfilled, document follows",
         "phrase": "OK"
       },
-      "time": 0.046224117279052734
+      "time": 0.043231964111328125
     }

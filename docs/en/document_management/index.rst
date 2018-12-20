@@ -22,7 +22,7 @@ You can see the result in JSON format. The result of the above command is:
         "description": "Request accepted, processing continues off-line",
         "phrase": "Accepted"
       },
-      "time": 0.00015020370483398438
+      "time": 0.0008370876312255859
     }
 
 
@@ -44,7 +44,7 @@ You can see the result in JSON format. The result of the above command is:
         "fields": {
           "contributor": "43.225.167.166",
           "id": "1",
-          "text": "A search engine is an information retrieval system designed to help find information stored on a computer system. The search results are usually presented in a list and are commonly called hits. Search engines help to minimize the time required to find information and the amount of information which must be consulted, akin to other techniques for managing information overload. The most public, visible form of a search engine is a Web search engine which searches for information on the World Wide Web.",
+          "text": "A search engine is an information retrieval system designed to help find information stored on a computer system. The search results are usually presented in a list and are commonly called hits. Search engines help to minimize the time required to find information and the amount of information which must be consulted, akin to other techniques for managing information overload.\nThe most public, visible form of a search engine is a Web search engine which searches for information on the World Wide Web.",
           "timestamp": "20180704054100",
           "title": "Search engine (computing)"
         }
@@ -54,7 +54,7 @@ You can see the result in JSON format. The result of the above command is:
         "description": "Request fulfilled, document follows",
         "phrase": "OK"
       },
-      "time": 0.004673957824707031
+      "time": 0.03580117225646973
     }
 
 
@@ -77,7 +77,7 @@ You can see the result in JSON format. The result of the above command is:
         "description": "Request accepted, processing continues off-line",
         "phrase": "Accepted"
       },
-      "time": 6.699562072753906e-05
+      "time": 0.0005609989166259766
     }
 
 
@@ -100,7 +100,7 @@ You can see the result in JSON format. The result of the above command is:
         "description": "Request accepted, processing continues off-line",
         "phrase": "Accepted"
       },
-      "time": 0.00018596649169921875
+      "time": 0.0008728504180908203
     }
 
 
@@ -123,5 +123,5 @@ You can see the result in JSON format. The result of the above command is:
         "description": "Request accepted, processing continues off-line",
         "phrase": "Accepted"
       },
-      "time": 0.00232696533203125
+      "time": 0.0012569427490234375
     }

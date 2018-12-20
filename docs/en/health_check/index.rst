@@ -24,7 +24,7 @@ You can see the result in JSON format. The result of the above command is:
         "description": "Request fulfilled, document follows",
         "phrase": "OK"
       },
-      "time": 2.288818359375e-05
+      "time": 3.123283386230469e-05
     }
 
 
@@ -48,5 +48,5 @@ You can see the result in JSON format. The result of the above command is:
         "description": "Request fulfilled, document follows",
         "phrase": "OK"
       },
-      "time": 0.0001971721649169922
+      "time": 4.124641418457031e-05
     }

@@ -20,14 +20,14 @@ import re
 from logging import getLogger
 
 from pysyncobj import SyncObj, replicated
-from whoosh.filedb.filestore import FileStorage, RamStorage
+from whoosh.filedb.filestore import FileStorage
 from whoosh.qparser import QueryParser
 
-from cockatrice import NAME
+from cockatrice import NAME, DEFAULT_INDEX_DIR
 
 
 class IndexServer(SyncObj):
-    def __init__(self, bind_addr, peer_addrs=None, conf=None, index_dir=None, logger=getLogger(NAME)):
+    def __init__(self, bind_addr, peer_addrs=None, conf=None, index_dir=DEFAULT_INDEX_DIR, logger=getLogger(NAME)):
         self.__logger = logger
         self.__logger.info('starting index server')
 
@@ -39,17 +39,10 @@ class IndexServer(SyncObj):
 
         self.__indices = {}
 
-        self.__logger.info('creating ram storage on memory')
-        self.__ram_storage = RamStorage()
-
-        self.__file_storage = None
-        if index_dir is None:
-            self.__logger.info('skipping file storage creation')
-        else:
-            self.__logger.info('creating index dir on {0}'.format(index_dir))
-            os.makedirs(index_dir, exist_ok=True)
-            self.__logger.info('creating file storage on {0}'.format(index_dir))
-            self.__file_storage = FileStorage(index_dir, supports_mmap=True, readonly=False, debug=False)
+        self.__logger.info('creating index dir on {0}'.format(index_dir))
+        os.makedirs(index_dir, exist_ok=True)
+        self.__logger.info('creating file storage on {0}'.format(index_dir))
+        self.__file_storage = FileStorage(index_dir, supports_mmap=True, readonly=False, debug=False)
 
         # open existing indices on startup
         self.__open_existing_indices()
@@ -62,31 +55,21 @@ class IndexServer(SyncObj):
 
         super().destroy()
 
-    def get_ram_storage(self):
-        return self.__ram_storage
-
     def get_file_storage(self):
         return self.__file_storage
 
     def __index_exists(self, index_name):
-        return self.__ram_storage.index_exists(indexname=index_name) \
-               or (self.__file_storage is not None and self.__file_storage.index_exists(indexname=index_name))
+        return self.__file_storage.index_exists(indexname=index_name)
 
     def __get_existing_index_names(self):
         index_names = []
 
-        self.__logger.info('seeking indices on memory')
         pattern_toc = re.compile('^_(.+)_\\d+\\.toc$')
-        for filename in self.__ram_storage:
+        self.__logger.info('seeking indices on {0}'.format(self.__file_storage.folder))
+        for filename in self.__file_storage:
             match = pattern_toc.search(filename)
             if match:
                 index_names.append(match.group(1))
-        if self.__file_storage is not None:
-            self.__logger.info('seeking indices on {0}'.format(self.__file_storage.folder))
-            for filename in self.__file_storage:
-                match = pattern_toc.search(filename)
-                if match:
-                    index_names.append(match.group(1))
 
         return index_names
 
@@ -98,10 +81,7 @@ class IndexServer(SyncObj):
         index = None
 
         try:
-            if self.__ram_storage.index_exists(indexname=index_name):
-                self.__logger.info('opening {0} in ram storage on memory'.format(index_name))
-                index = self.__ram_storage.open_index(indexname=index_name, schema=schema)
-            elif self.__file_storage is not None and self.__file_storage.index_exists(indexname=index_name):
+            if self.__file_storage.index_exists(indexname=index_name):
                 self.__logger.info('opening {0} in file storage on {1}'.format(index_name, self.__file_storage.folder))
                 index = self.__file_storage.open_index(indexname=index_name, schema=schema)
             else:
@@ -128,23 +108,16 @@ class IndexServer(SyncObj):
         return index
 
     @replicated
-    def create_index(self, index_name, schema, use_ram_storage=False):
+    def create_index(self, index_name, schema):
         index = None
 
         try:
             if self.__index_exists(index_name):
                 raise KeyError('index already exists')
 
-            if use_ram_storage:
-                self.__logger.info('creating {0} in ram storage on memory'.format(index_name))
-                self.__indices[index_name] = self.__ram_storage.create_index(schema, indexname=index_name)
-            else:
-                if self.__file_storage is not None:
-                    self.__logger.info(
-                        'creating {0} in file storage on {1}'.format(index_name, self.__file_storage.folder))
-                    self.__indices[index_name] = self.__file_storage.create_index(schema, indexname=index_name)
-                else:
-                    raise ValueError('file storage has not been created')
+            self.__logger.info(
+                'creating {0} in file storage on {1}'.format(index_name, self.__file_storage.folder))
+            self.__indices[index_name] = self.__file_storage.create_index(schema, indexname=index_name)
             index = self.__indices[index_name]
         except Exception as ex:
             self.__logger.error('failed to create {0}: {1}'.format(index_name, ex))
@@ -160,33 +133,23 @@ class IndexServer(SyncObj):
 
         # delete index files
         try:
-            if self.__ram_storage.index_exists(indexname=index_name):
-                storage = self.__ram_storage
-            elif self.__file_storage is not None and self.__file_storage.index_exists(indexname=index_name):
-                storage = self.__file_storage
-            else:
-                raise KeyError('index does not exist')
-
-            if storage.folder == '':
-                self.__logger.info('deleting {0} in ram storage on memory'.format(index_name))
-            else:
-                self.__logger.info('deleting {0} in file storage on {1}'.format(index_name, storage.folder))
+            self.__logger.info('deleting {0} in file storage on {1}'.format(index_name, self.__file_storage.folder))
 
             pattern_toc = re.compile('^_{0}_(\\d+)\\.toc$'.format(index_name))
-            for filename in storage:
+            for filename in self.__file_storage:
                 if re.match(pattern_toc, filename):
-                    self.__logger.info('deleting {0}'.format(os.path.join(storage.folder, filename)))
-                    storage.delete_file(filename)
+                    self.__logger.info('deleting {0}'.format(os.path.join(self.__file_storage.folder, filename)))
+                    self.__file_storage.delete_file(filename)
             pattern_seg = re.compile('^{0}_([a-z0-9]+)\\.seg$'.format(index_name))
-            for filename in storage:
+            for filename in self.__file_storage:
                 if re.match(pattern_seg, filename):
-                    self.__logger.info('deleting {0}'.format(os.path.join(storage.folder, filename)))
-                    storage.delete_file(filename)
+                    self.__logger.info('deleting {0}'.format(os.path.join(self.__file_storage.folder, filename)))
+                    self.__file_storage.delete_file(filename)
             pattern_lock = re.compile('^{0}_WRITELOCK$'.format(index_name))
-            for filename in storage:
+            for filename in self.__file_storage:
                 if re.match(pattern_lock, filename):
-                    self.__logger.info('deleting {0}'.format(os.path.join(storage.folder, filename)))
-                    storage.delete_file(filename)
+                    self.__logger.info('deleting {0}'.format(os.path.join(self.__file_storage.folder, filename)))
+                    self.__file_storage.delete_file(filename)
 
             success = True
         except Exception as ex:

@@ -11,7 +11,7 @@ A schema is required to create an index, you need to put the schema in the reque
 
 .. code-block:: bash
 
-    $ curl -s -X PUT -H "Content-type: text/x-yaml" --data-binary @./conf/schema.yaml http://localhost:8080/indices/myindex?use_ram_storage=True | jq .
+    $ curl -s -X PUT -H "Content-type: text/x-yaml" --data-binary @./conf/schema.yaml http://localhost:8080/indices/myindex | jq .
 
 You can see the result in JSON format. The result of the above command is:
 
@@ -23,7 +23,7 @@ You can see the result in JSON format. The result of the above command is:
         "description": "Request accepted, processing continues off-line",
         "phrase": "Accepted"
       },
-      "time": 0.03571200370788574
+      "time": 0.3310730457305908
     }
 
 
@@ -44,16 +44,16 @@ The result of the above command is:
       "index": {
         "doc_count": 0,
         "doc_count_all": 0,
-        "last_modified": -1,
+        "last_modified": 1545283032.1162639,
         "latest_generation": 0,
         "name": "myindex",
         "storage": {
           "files": [
             "_myindex_0.toc"
           ],
-          "folder": "",
+          "folder": "/tmp/cockatrice/index",
           "readonly": false,
-          "supports_mmap": false
+          "supports_mmap": true
         },
         "version": -111
       },
@@ -62,7 +62,7 @@ The result of the above command is:
         "description": "Request fulfilled, document follows",
         "phrase": "OK"
       },
-      "time": 0.00017118453979492188
+      "time": 0.002009153366088867
     }
 
 
@@ -85,5 +85,5 @@ You can see the result in JSON format. The result of the above command is:
         "description": "Request accepted, processing continues off-line",
         "phrase": "Accepted"
       },
-      "time": 0.0006439685821533203
+      "time": 0.00032520294189453125
     }

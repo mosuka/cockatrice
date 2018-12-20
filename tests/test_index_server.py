@@ -23,8 +23,7 @@ from logging import getLogger, StreamHandler, Formatter, DEBUG, INFO
 from tempfile import TemporaryDirectory
 
 from pysyncobj import SyncObjConf
-from whoosh.filedb.filestore import RamStorage, FileStorage
-from prometheus_client.core import CollectorRegistry
+from whoosh.filedb.filestore import FileStorage
 
 from cockatrice import NAME
 from cockatrice.index_server import IndexServer
@@ -57,8 +56,6 @@ class TestIndexServer(unittest.TestCase):
             dynamicMembershipChange=True
         )
 
-        # metrics_registry = CollectorRegistry()
-
         self.data_node = IndexServer(bind_addr, peer_addrs, conf, index_dir, logger=logger)
 
     def tearDown(self):
@@ -69,37 +66,16 @@ class TestIndexServer(unittest.TestCase):
         with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
             schema_yaml = file_obj.read()
 
-        # create ram index
-        index_name = 'test_ram_index'
-        schema = Schema(schema_yaml)
-        index = self.data_node.create_index(index_name, schema, use_ram_storage=True, sync=True)
-        self.assertTrue(isinstance(index.storage, RamStorage))
-        self.assertFalse(isinstance(index.storage, FileStorage))
-
-        # create ram index
-        index_name = 'test2_ram_index'
-        schema = Schema(schema_yaml)
-        index = self.data_node.create_index(index_name, schema, use_ram_storage=True, sync=True)
-        self.assertTrue(isinstance(index.storage, RamStorage))
-        self.assertFalse(isinstance(index.storage, FileStorage))
-
-        # check the number of ram indices
-        expected_file_count = 2
-        actual_file_count = len(self.data_node.get_ram_storage().list())
-        self.assertEqual(expected_file_count, actual_file_count)
-
-        # create file index
+        # create index
         index_name = 'test_file_index'
         schema = Schema(schema_yaml)
-        index = self.data_node.create_index(index_name, schema, use_ram_storage=False, sync=True)
-        self.assertFalse(isinstance(index.storage, RamStorage))
+        index = self.data_node.create_index(index_name, schema, sync=True)
         self.assertTrue(isinstance(index.storage, FileStorage))
 
-        # create file index
+        # create index
         index_name = 'test2_file_index'
         schema = Schema(schema_yaml)
-        index = self.data_node.create_index(index_name, schema, use_ram_storage=False, sync=True)
-        self.assertFalse(isinstance(index.storage, RamStorage))
+        index = self.data_node.create_index(index_name, schema, sync=True)
         self.assertTrue(isinstance(index.storage, FileStorage))
 
         # check the number of file file indices
@@ -111,43 +87,16 @@ class TestIndexServer(unittest.TestCase):
         with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
             schema_yaml = file_obj.read()
 
-        # create ram index
-        index_name = 'test_ram_index'
-        schema = Schema(schema_yaml)
-        index = self.data_node.create_index(index_name, schema, use_ram_storage=True, sync=True)
-        self.assertTrue(isinstance(index.storage, RamStorage))
-        self.assertFalse(isinstance(index.storage, FileStorage))
-
-        # create ram index
-        index_name = 'test2_ram_index'
-        schema = Schema(schema_yaml)
-        index = self.data_node.create_index(index_name, schema, use_ram_storage=True, sync=True)
-        self.assertTrue(isinstance(index.storage, RamStorage))
-        self.assertFalse(isinstance(index.storage, FileStorage))
-
-        # check the number of ram indices
-        expected_file_count = 2
-        actual_file_count = len(self.data_node.get_ram_storage().list())
-        self.assertEqual(expected_file_count, actual_file_count)
-
-        # delete ram index
-        self.data_node.delete_index(index_name, sync=True)
-        expected_file_count = 1
-        actual_file_count = len(self.data_node.get_ram_storage().list())
-        self.assertEqual(expected_file_count, actual_file_count)
-
-        # create file index
+        # create index
         index_name = 'test_file_index'
         schema = Schema(schema_yaml)
-        index = self.data_node.create_index(index_name, schema, use_ram_storage=False, sync=True)
-        self.assertFalse(isinstance(index.storage, RamStorage))
+        index = self.data_node.create_index(index_name, schema, sync=True)
         self.assertTrue(isinstance(index.storage, FileStorage))
 
-        # create file index
+        # create index
         index_name = 'test2_file_index'
         schema = Schema(schema_yaml)
-        index = self.data_node.create_index(index_name, schema, use_ram_storage=False, sync=True)
-        self.assertFalse(isinstance(index.storage, RamStorage))
+        index = self.data_node.create_index(index_name, schema, sync=True)
         self.assertTrue(isinstance(index.storage, FileStorage))
 
         expected_file_count = 2
@@ -163,36 +112,23 @@ class TestIndexServer(unittest.TestCase):
         with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
             schema_yaml = file_obj.read()
 
-        # create ram index
-        index_name = 'test_ram_index'
-        schema = Schema(schema_yaml)
-        index = self.data_node.create_index(index_name, schema, use_ram_storage=True, sync=True)
-        self.assertTrue(isinstance(index.storage, RamStorage))
-        self.assertFalse(isinstance(index.storage, FileStorage))
-
-        i = self.data_node.get_index(index_name)
-        self.assertTrue(isinstance(i.storage, RamStorage))
-        self.assertFalse(isinstance(i.storage, FileStorage))
-
-        # create file index
+        # create index
         index_name = 'test_file_index'
         schema = Schema(schema_yaml)
-        index = self.data_node.create_index(index_name, schema, use_ram_storage=False, sync=True)
-        self.assertFalse(isinstance(index.storage, RamStorage))
+        index = self.data_node.create_index(index_name, schema, sync=True)
         self.assertTrue(isinstance(index.storage, FileStorage))
 
         i = self.data_node.get_index(index_name)
-        self.assertFalse(isinstance(i.storage, RamStorage))
         self.assertTrue(isinstance(i.storage, FileStorage))
 
     def test_index_document(self):
         with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
             schema_yaml = file_obj.read()
 
-        # create file index
+        # create index
         index_name = 'test_file_index'
         schema = Schema(schema_yaml)
-        self.data_node.create_index(index_name, schema, use_ram_storage=False, sync=True)
+        self.data_node.create_index(index_name, schema, sync=True)
 
         test_doc_id = '1'
         with open(self.example_dir + '/doc1.json', 'r', encoding='utf-8') as file_obj:
@@ -212,10 +148,10 @@ class TestIndexServer(unittest.TestCase):
         with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
             schema_yaml = file_obj.read()
 
-        # create file index
+        # create index
         index_name = 'test_file_index'
         schema = Schema(schema_yaml)
-        self.data_node.create_index(index_name, schema, use_ram_storage=False, sync=True)
+        self.data_node.create_index(index_name, schema, sync=True)
 
         test_doc_id = '1'
         with open(self.example_dir + '/doc1.json', 'r', encoding='utf-8') as file_obj:
@@ -243,10 +179,10 @@ class TestIndexServer(unittest.TestCase):
         with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
             schema_yaml = file_obj.read()
 
-        # create file index
+        # create index
         index_name = 'test_file_index'
         schema = Schema(schema_yaml)
-        self.data_node.create_index(index_name, schema, use_ram_storage=False, sync=True)
+        self.data_node.create_index(index_name, schema, sync=True)
 
         with open(self.example_dir + '/bulk_index.json', 'r', encoding='utf-8') as file_obj:
             test_docs = json.loads(file_obj.read(), encoding='utf-8')
@@ -283,10 +219,10 @@ class TestIndexServer(unittest.TestCase):
         with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
             schema_yaml = file_obj.read()
 
-        # create file index
+        # create index
         index_name = 'test_file_index'
         schema = Schema(schema_yaml)
-        self.data_node.create_index(index_name, schema, use_ram_storage=False, sync=True)
+        self.data_node.create_index(index_name, schema, sync=True)
 
         with open(self.example_dir + '/bulk_index.json', 'r', encoding='utf-8') as file_obj:
             test_docs = json.loads(file_obj.read(), encoding='utf-8')
@@ -354,10 +290,10 @@ class TestIndexServer(unittest.TestCase):
         with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
             schema_yaml = file_obj.read()
 
-        # create file index
+        # create index
         index_name = 'test_file_index'
         schema = Schema(schema_yaml)
-        self.data_node.create_index(index_name, schema, use_ram_storage=False, sync=True)
+        self.data_node.create_index(index_name, schema, sync=True)
 
         test_doc_id = '1'
         with open(self.example_dir + '/doc1.json', 'r', encoding='utf-8') as file_obj:
@@ -380,7 +316,7 @@ class TestIndexServer(unittest.TestCase):
         # create file index
         index_name = 'test_file_index'
         schema = Schema(schema_yaml)
-        self.data_node.create_index(index_name, schema, use_ram_storage=False, sync=True)
+        self.data_node.create_index(index_name, schema, sync=True)
 
         with open(self.example_dir + '/bulk_index.json', 'r', encoding='utf-8') as file_obj:
             test_docs = json.loads(file_obj.read(), encoding='utf-8')

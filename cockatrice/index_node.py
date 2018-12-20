@@ -18,13 +18,13 @@ from logging import getLogger
 
 from prometheus_client.core import CollectorRegistry
 
-from cockatrice import NAME
+from cockatrice import NAME, DEFAULT_INDEX_DIR, DEFAULT_HTTP_PORT
 from cockatrice.index_server import IndexServer
 from cockatrice.index_http_server import IndexHTTPServer
 
 
 class IndexNode:
-    def __init__(self, bind_addr, peer_addrs=None, conf=None, index_dir=None, http_port=8080,
+    def __init__(self, bind_addr, peer_addrs=None, conf=None, index_dir=DEFAULT_INDEX_DIR, http_port=DEFAULT_HTTP_PORT,
                  logger=getLogger(NAME), http_logger=getLogger(NAME + '_http'), metrics_registry=CollectorRegistry()):
         self.__bind_addr = bind_addr
         self.__peer_addrs = peer_addrs

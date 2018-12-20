@@ -1,14 +1,12 @@
 Cluster APIs
 ============
 
-Get Node API
-------------
+Get Cluster API
+---------------
 
 .. code-block:: text
 
-    GET /cluster/<NODE_NAME>
-
-* ``<NODE_NAME>``: The node name.
+    GET /cluster
 
 
 Add Node API
