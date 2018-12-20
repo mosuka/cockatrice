@@ -16,51 +16,38 @@
 
 import os
 
-from logging import getLogger
-
 from pysyncobj.poller import createPoller
 from pysyncobj.tcp_connection import TcpConnection
 from pysyncobj.encryptor import getEncryptor
 
-from cockatrice import NAME
-
-
-def execute(cmd, args=None, bind_addr='127.0.0.1:7070', password=None, timeout=1, logger=getLogger(NAME)):
-    result = Executor(cmd, args=args, bind_addr=bind_addr, password=password, timeout=timeout).get_result()
-    if result is None:
-        logger.error('failed to execute command')
-    else:
-        logger.info(result['message'])
-
-    return result
+from cockatrice.util.resolver import get_ipv4
 
 
 class Executor:
     def __init__(self, cmd, args=None, bind_addr='127.0.0.1:7070', password=None, timeout=1):
-        self.__result = None
+        try:
+            self.__result = None
 
-        self.__request = [cmd]
-        if args is not None:
-            self.__request.extend(args)
+            self.__request = [cmd]
+            if args is not None:
+                self.__request.extend(args)
 
-        host, port = bind_addr.split(":", 1)
+            host, port = bind_addr.split(":", 1)
 
-        self.__host = host
-        self.__port = int(port)
-        self.__password = password
-
-        self.__poller = createPoller('auto')
-        self.__connection = TcpConnection(self.__poller, onMessageReceived=self.__on_message_received,
-                                          onConnected=self.__on_connected, onDisconnected=self.__on_disconnected,
-                                          socket=None, timeout=10.0, sendBufferSize=2 ** 13, recvBufferSize=2 ** 13)
-
-        if self.__password is not None:
-            self.__connection.encryptor = getEncryptor(self.__password)
-
-        self.__is_connected = self.__connection.connect(self.__host, self.__port)
-
-        while self.__is_connected:
-            self.__poller.poll(timeout)
+            self.__host = get_ipv4(host)
+            self.__port = int(port)
+            self.__password = password
+            self.__poller = createPoller('auto')
+            self.__connection = TcpConnection(self.__poller, onMessageReceived=self.__on_message_received,
+                                              onConnected=self.__on_connected, onDisconnected=self.__on_disconnected,
+                                              socket=None, timeout=10.0, sendBufferSize=2 ** 13, recvBufferSize=2 ** 13)
+            if self.__password is not None:
+                self.__connection.encryptor = getEncryptor(self.__password)
+            self.__is_connected = self.__connection.connect(self.__host, self.__port)
+            while self.__is_connected:
+                self.__poller.poll(timeout)
+        except Exception as ex:
+            raise ex
 
     def __on_message_received(self, message):
         if self.__connection.encryptor and not self.__connection.sendRandKey:
@@ -68,12 +55,7 @@ class Executor:
             self.__connection.send(self.__request)
             return
 
-        if isinstance(message, str):
-            self.__result = {'message': message}
-        elif isinstance(message, dict):
-            self.__result = {'message': 'SUCCESS', 'data': message}
-        else:
-            self.__result = {'message': str(message)}
+        self.__result = message
         self.__connection.disconnect()
 
     def __on_connected(self):
@@ -89,3 +71,24 @@ class Executor:
 
     def get_result(self):
         return self.__result
+
+
+def execute(cmd, args=None, bind_addr='127.0.0.1:7070', password=None, timeout=1):
+    try:
+        response = Executor(cmd, args=args, bind_addr=bind_addr, password=password, timeout=timeout).get_result()
+    except Exception as ex:
+        raise ex
+
+    return response
+
+
+def get_status(bind_addr='127.0.0.1:7070', password=None, timeout=1):
+    return execute('status', args=None, bind_addr=bind_addr, password=password, timeout=timeout)
+
+
+def add_node(node_name, bind_addr='127.0.0.1:7070', password=None, timeout=1):
+    return execute('add', args=[node_name], bind_addr=bind_addr, password=password, timeout=timeout)
+
+
+def delete_node(node_name, bind_addr='127.0.0.1:7070', password=None, timeout=1):
+    return execute('remove', args=[node_name], bind_addr=bind_addr, password=password, timeout=timeout)

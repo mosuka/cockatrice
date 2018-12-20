@@ -31,7 +31,7 @@ from pysyncobj import SyncObjConf
 
 from cockatrice import NAME, VERSION
 from cockatrice.index_node import IndexNode
-from cockatrice.command import execute
+from cockatrice.command import get_status, add_node, delete_node
 
 
 def signal_handler(signal, frame):
@@ -118,7 +118,7 @@ def server_handler(args):
             args.peer_addrs = []
 
             # execute a command to get status from the cluster
-            status_result = execute('status', bind_addr=args.seed_addr, timeout=0.5)
+            status_result = get_status(bind_addr=args.seed_addr, timeout=0.5)
             if status_result is None:
                 raise ValueError('command execution failed to {0}'.format(args.seed_addr))
 
@@ -133,8 +133,7 @@ def server_handler(args):
                         args.peer_addrs.append(partner_addr)
 
             if args.bind_addr not in args.peer_addrs:
-                Thread(target=execute, kwargs={'cmd': 'add', 'args': [args.bind_addr], 'bind_addr': args.seed_addr,
-                                               'timeout': 0.5, 'logger': logger}).start()
+                Thread(target=add_node, kwargs={'node_name': args.bind_addr, 'bind_addr': args.seed_addr, 'timeout': 0.5, 'logger': logger}).start()
 
             # remove this node's address from peer addresses.
             if args.bind_addr in args.peer_addrs:
@@ -152,15 +151,15 @@ def server_handler(args):
 
 
 def status_handler(args):
-    print(json.dumps(execute('status', bind_addr=args.bind_addr, timeout=0.5)))
+    print(json.dumps(get_status(bind_addr=args.bind_addr, timeout=0.5)))
 
 
 def join_handler(args):
-    print(json.dumps(execute('add', args=[args.join_addr], bind_addr=args.bind_addr, timeout=0.5)))
+    print(json.dumps(add_node(args.join_addr, bind_addr=args.bind_addr, timeout=0.5)))
 
 
 def leave_handler(args):
-    print(json.dumps(execute('remove', args=[args.leave_addr], bind_addr=args.bind_addr, timeout=0.5)))
+    print(json.dumps(delete_node(args.leave_addr, bind_addr=args.bind_addr, timeout=0.5)))
 
 
 def main():

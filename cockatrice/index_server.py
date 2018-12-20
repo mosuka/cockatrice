@@ -262,7 +262,7 @@ class IndexServer(SyncObj):
         return searcher
 
     @replicated
-    def index_document(self, index_name, doc_id, fields):
+    def put_document(self, index_name, doc_id, fields):
         success = False
 
         try:
@@ -313,7 +313,7 @@ class IndexServer(SyncObj):
         return success
 
     @replicated
-    def index_documents(self, index_name, docs):
+    def put_documents(self, index_name, docs):
         cnt = 0
 
         try:

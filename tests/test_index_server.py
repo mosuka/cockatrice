@@ -199,7 +199,7 @@ class TestIndexServer(unittest.TestCase):
             test_fields = json.loads(file_obj.read(), encoding='utf-8')
 
         # index document
-        self.data_node.index_document(index_name, test_doc_id, test_fields, sync=True)
+        self.data_node.put_document(index_name, test_doc_id, test_fields, sync=True)
 
         # get document
         page = self.data_node.get_document(index_name, test_doc_id)
@@ -222,7 +222,7 @@ class TestIndexServer(unittest.TestCase):
             test_fields = json.loads(file_obj.read(), encoding='utf-8')
 
         # index document
-        self.data_node.index_document(index_name, test_doc_id, test_fields, sync=True)
+        self.data_node.put_document(index_name, test_doc_id, test_fields, sync=True)
 
         # get document
         page = self.data_node.get_document(index_name, test_doc_id)
@@ -252,7 +252,7 @@ class TestIndexServer(unittest.TestCase):
             test_docs = json.loads(file_obj.read(), encoding='utf-8')
 
         # index documents in bulk
-        self.data_node.index_documents(index_name, test_docs, sync=True)
+        self.data_node.put_documents(index_name, test_docs, sync=True)
 
         page = self.data_node.get_document(index_name, '1')
         expected_count = 1
@@ -292,7 +292,7 @@ class TestIndexServer(unittest.TestCase):
             test_docs = json.loads(file_obj.read(), encoding='utf-8')
 
         # index documents in bulk
-        self.data_node.index_documents(index_name, test_docs, sync=True)
+        self.data_node.put_documents(index_name, test_docs, sync=True)
 
         page = self.data_node.get_document(index_name, '1')
         expected_count = 1
@@ -364,7 +364,7 @@ class TestIndexServer(unittest.TestCase):
             test_fields = json.loads(file_obj.read(), encoding='utf-8')
 
         # index document
-        self.data_node.index_document(index_name, test_doc_id, test_fields, sync=True)
+        self.data_node.put_document(index_name, test_doc_id, test_fields, sync=True)
 
         # get document
         page = self.data_node.get_document(index_name, test_doc_id)
@@ -386,7 +386,7 @@ class TestIndexServer(unittest.TestCase):
             test_docs = json.loads(file_obj.read(), encoding='utf-8')
 
         # index documents in bulk
-        self.data_node.index_documents(index_name, test_docs, sync=True)
+        self.data_node.put_documents(index_name, test_docs, sync=True)
 
         # search documents
         page = self.data_node.search_documents(index_name, 'search', search_field='text', page_num=1, page_len=10)
