@@ -14,18 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from logging import getLogger
-
-from prometheus_client.core import CollectorRegistry
-
-from cockatrice import NAME, DEFAULT_INDEX_DIR, DEFAULT_HTTP_PORT
+import cockatrice
 from cockatrice.index_server import IndexServer
 from cockatrice.index_http_server import IndexHTTPServer
 
 
 class IndexNode:
-    def __init__(self, bind_addr, peer_addrs=None, conf=None, index_dir=DEFAULT_INDEX_DIR, http_port=DEFAULT_HTTP_PORT,
-                 logger=getLogger(NAME), http_logger=getLogger(NAME + '_http'), metrics_registry=CollectorRegistry()):
+    def __init__(self, bind_addr, peer_addrs=cockatrice.DEFAULT_PEER_ADDRS, conf=cockatrice.DEFAULT_SYNC_CONFIG, index_dir=cockatrice.DEFAULT_INDEX_DIR, http_port=cockatrice.DEFAULT_HTTP_PORT,
+                 logger=cockatrice.DEFAULT_LOGGER, http_logger=cockatrice.DEFAULT_HTTP_LOGGER, metrics_registry=cockatrice.DEFAULT_METRICS_REGISTRY):
         self.__bind_addr = bind_addr
         self.__peer_addrs = peer_addrs
         self.__conf = conf

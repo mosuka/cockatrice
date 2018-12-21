@@ -20,16 +20,12 @@ import os
 import sys
 import signal
 import json
-
 from threading import Thread
 from argparse import ArgumentParser
-from logging import getLogger, StreamHandler, Formatter, CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET
+from logging import StreamHandler, Formatter, CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET
 from logging.handlers import RotatingFileHandler
 
-from prometheus_client.core import CollectorRegistry
-from pysyncobj import SyncObjConf
-
-from cockatrice import NAME, VERSION, DEFAULT_BIND_ADDR, DEFAULT_LOG_COMPACTION_MIN_ENTRIES, DEFAULT_LOG_COMPACTION_MIN_TIME, DEFAULT_INDEX_DIR, DEFAULT_HTTP_PORT, DEFAULT_LOG_LEVEL
+import cockatrice
 from cockatrice.index_node import IndexNode
 from cockatrice.command import get_status, add_node, delete_node
 
@@ -40,7 +36,7 @@ def signal_handler(signal, frame):
 
 def server_handler(args):
     # create logger and handler
-    logger = getLogger(NAME)
+    logger = cockatrice.DEFAULT_LOGGER
     log_handler = StreamHandler()
 
     # determine log destination
@@ -78,7 +74,7 @@ def server_handler(args):
     logger.addHandler(log_handler)
 
     # create http logger and handler
-    http_logger = getLogger(NAME + '_http')
+    http_logger = cockatrice.DEFAULT_HTTP_LOGGER
     http_log_handler = StreamHandler()
 
     # determine http log destination
@@ -97,18 +93,15 @@ def server_handler(args):
     http_logger.addHandler(http_log_handler)
 
     # metrics registry
-    metrics_registry = CollectorRegistry()
+    metrics_registry = cockatrice.DEFAULT_METRICS_REGISTRY
 
-    if args.full_dump_file is not None:
-        os.makedirs(os.path.dirname(args.full_dump_file), exist_ok=True)
-
-    conf = SyncObjConf()
-
+    # sync config
+    os.makedirs(os.path.dirname(args.full_dump_file), exist_ok=True)
+    conf = cockatrice.DEFAULT_SYNC_CONFIG
     conf.fullDumpFile = args.full_dump_file
     conf.logCompactionMinEntries = args.log_compaction_min_entries
     conf.logCompactionMinTime = args.log_compaction_min_time
     conf.dynamicMembershipChange = True
-
     conf.validate()
 
     index_node = None
@@ -168,30 +161,30 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)
 
     parser = ArgumentParser(description='cockatrice command')
-    parser.add_argument('-v', '--version', action='version', version='cockatrice {}'.format(VERSION))
+    parser.add_argument('-v', '--version', action='version', version='cockatrice {}'.format(cockatrice.VERSION))
 
     subparsers = parser.add_subparsers()
 
     parser_server = subparsers.add_parser('server', help='see `server --help`')
-    parser_server.add_argument('--bind-addr', dest='bind_addr', default=DEFAULT_BIND_ADDR, metavar='BIND_ADDR',
+    parser_server.add_argument('--bind-addr', dest='bind_addr', default=cockatrice.DEFAULT_BIND_ADDR, metavar='BIND_ADDR',
                                type=str, help='the address to listen on for peer traffic')
     parser_server.add_argument('--seed-addr', dest='seed_addr', default=None, metavar='SEED_ADDR',
                                type=str, help='the address of the node in the existing cluster')
-    parser_server.add_argument('--peer-addr', dest='peer_addrs', default=None, action='append', metavar='PEER_ADDR',
+    parser_server.add_argument('--peer-addr', dest='peer_addrs', default=cockatrice.DEFAULT_PEER_ADDRS, action='append', metavar='PEER_ADDR',
                                type=str, help='the address of the peer node in the cluster')
-    parser_server.add_argument('--full-dump-file', dest='full_dump_file', default=None, metavar='FULL_DUMP_FILE',
+    parser_server.add_argument('--full-dump-file', dest='full_dump_file', default=cockatrice.DEFAULT_FULL_DUMP_FILE, metavar='FULL_DUMP_FILE',
                                type=str, help='file to store full serialized object')
-    parser_server.add_argument('--log-compaction-min-entries', dest='log_compaction_min_entries', default=DEFAULT_LOG_COMPACTION_MIN_ENTRIES,
+    parser_server.add_argument('--log-compaction-min-entries', dest='log_compaction_min_entries', default=cockatrice.DEFAULT_LOG_COMPACTION_MIN_ENTRIES,
                                metavar='LOG_COMPACTION_MIN_ENTRIES', type=int,
                                help='log-compaction interval min entries')
-    parser_server.add_argument('--log-compaction-min-time', dest='log_compaction_min_time', default=DEFAULT_LOG_COMPACTION_MIN_TIME,
+    parser_server.add_argument('--log-compaction-min-time', dest='log_compaction_min_time', default=cockatrice.DEFAULT_LOG_COMPACTION_MIN_TIME,
                                metavar='LOG_COMPACTION_MIN_TIME', type=int,
                                help='log-compaction interval min time in seconds')
-    parser_server.add_argument('--index-dir', dest='index_dir', default=DEFAULT_INDEX_DIR, metavar='INDEX_DIR',
+    parser_server.add_argument('--index-dir', dest='index_dir', default=cockatrice.DEFAULT_INDEX_DIR, metavar='INDEX_DIR',
                                type=str, help='index dir')
-    parser_server.add_argument('--http-port', dest='http_port', default=DEFAULT_HTTP_PORT, metavar='HTTP_PORT',
+    parser_server.add_argument('--http-port', dest='http_port', default=cockatrice.DEFAULT_HTTP_PORT, metavar='HTTP_PORT',
                                type=int, help='the port to listen on for HTTP traffic')
-    parser_server.add_argument('--log-level', dest='log_level', default=DEFAULT_LOG_LEVEL, metavar='LOG_LEVEL', type=str,
+    parser_server.add_argument('--log-level', dest='log_level', default=cockatrice.DEFAULT_LOG_LEVEL, metavar='LOG_LEVEL', type=str,
                                help='log level')
     parser_server.add_argument('--log-file', dest='log_file', default=None, metavar='LOG_FILE', type=str,
                                help='log file')
@@ -200,19 +193,19 @@ def main():
     parser_server.set_defaults(handler=server_handler)
 
     parser_status = subparsers.add_parser('status', help='see `status --help`')
-    parser_status.add_argument('--bind-addr', dest='bind_addr', default=DEFAULT_BIND_ADDR, metavar='BIND_ADDR', type=str,
+    parser_status.add_argument('--bind-addr', dest='bind_addr', default=cockatrice.DEFAULT_BIND_ADDR, metavar='BIND_ADDR', type=str,
                                help='the address to listen on for peer traffic')
     parser_status.set_defaults(handler=status_handler)
 
     parser_join = subparsers.add_parser('join', help='see `join --help`')
-    parser_join.add_argument('--bind-addr', dest='bind_addr', default=DEFAULT_BIND_ADDR, metavar='BIND_ADDR', type=str,
+    parser_join.add_argument('--bind-addr', dest='bind_addr', default=cockatrice.DEFAULT_BIND_ADDR, metavar='BIND_ADDR', type=str,
                              help='the address to listen on for peer traffic')
     parser_join.add_argument('--join-addr', dest='join_addr', default=None, metavar='JOIN_ADDR', type=str,
                              help='the address of node to join to the cluster')
     parser_join.set_defaults(handler=join_handler)
 
     parser_join = subparsers.add_parser('leave', help='see `leave --help`')
-    parser_join.add_argument('--bind-addr', dest='bind_addr', default=DEFAULT_BIND_ADDR, metavar='BIND_ADDR', type=str,
+    parser_join.add_argument('--bind-addr', dest='bind_addr', default=cockatrice.DEFAULT_BIND_ADDR, metavar='BIND_ADDR', type=str,
                              help='the address to listen on for peer traffic')
     parser_join.add_argument('--leave-addr', dest='leave_addr', default=None, metavar='LEAVE_ADDR', type=str,
                              help='the address of node to leave from the cluster')

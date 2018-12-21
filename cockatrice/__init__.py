@@ -14,12 +14,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from logging import getLogger
+
+from pysyncobj import SyncObjConf
+from prometheus_client.core import CollectorRegistry
+
 NAME = 'cockatrice'
 VERSION = '0.5.1'
 
+DEFAULT_LOGGER = getLogger(NAME)
+DEFAULT_HTTP_LOGGER = getLogger(NAME + '_http')
+DEFAULT_METRICS_REGISTRY = CollectorRegistry()
+DEFAULT_SYNC_CONFIG = SyncObjConf()
 DEFAULT_BIND_ADDR = '127.0.0.1:7070'
+DEFAULT_PEER_ADDRS = []
 DEFAULT_LOG_COMPACTION_MIN_ENTRIES = 5000
 DEFAULT_LOG_COMPACTION_MIN_TIME = 300
 DEFAULT_INDEX_DIR = '/tmp/cockatrice/index'
+DEFAULT_FULL_DUMP_FILE = '/tmp/cockatrice/index.zip'
 DEFAULT_HTTP_PORT = 8080
 DEFAULT_LOG_LEVEL = 'DEBUG'

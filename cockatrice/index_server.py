@@ -16,25 +16,28 @@
 
 import os
 import re
-
-from logging import getLogger
+import threading
+import zipfile
+import pysyncobj.pickle as pickle
 
 from pysyncobj import SyncObj, replicated
 from whoosh.filedb.filestore import FileStorage
 from whoosh.qparser import QueryParser
 
-from cockatrice import NAME, DEFAULT_INDEX_DIR
+import cockatrice
 
 
 class IndexServer(SyncObj):
-    def __init__(self, bind_addr, peer_addrs=None, conf=None, index_dir=DEFAULT_INDEX_DIR, logger=getLogger(NAME)):
+    def __init__(self, bind_addr, peer_addrs=cockatrice.DEFAULT_PEER_ADDRS, conf=cockatrice.DEFAULT_SYNC_CONFIG, index_dir=cockatrice.DEFAULT_INDEX_DIR, logger=cockatrice.DEFAULT_LOGGER):
         self.__logger = logger
-        self.__logger.info('starting index server')
+        self.__logger.info('starting index server: {0}, {1}'.format(bind_addr, peer_addrs))
 
-        peer_addrs = peer_addrs if peer_addrs is not None else []
+        self.__lock = threading.RLock()
 
-        self.__logger.info('binding an address of the transport on {0}'.format(bind_addr))
-        self.__logger.info('setting peer addresses is {0}'.format(peer_addrs))
+        conf.serializer = self.__serialize
+        conf.deserializer = self.__deserialize
+        conf.validate()
+
         super(IndexServer, self).__init__(bind_addr, peer_addrs, conf=conf)
 
         self.__indices = {}
@@ -54,6 +57,37 @@ class IndexServer(SyncObj):
             self.close_index(index_name)
 
         super().destroy()
+
+    def __serialize(self, filename, raft_data):
+        try:
+            with self.__lock:
+                self.__logger.info('creating {0}'.format(filename))
+                with zipfile.ZipFile(filename, 'w', zipfile.ZIP_DEFLATED) as f:
+                    for index_filename in self.__file_storage:
+                        abs_index_path = os.path.join(self.__file_storage.folder, index_filename)
+                        self.__logger.info('storing {0}'.format(abs_index_path))
+                        f.write(abs_index_path, index_filename)
+                    self.__logger.info('storing Raft data')
+                    f.writestr('raft.bin', pickle.dumps(raft_data))
+        except Exception as ex:
+            self.__logger.error(ex)
+
+    def __deserialize(self, filename):
+        try:
+            with self.__lock:
+                self.__logger.info('cleaning {0}'.format(self.__file_storage.folder))
+                self.__file_storage.destroy()
+
+                self.__logger.info('reading {0}'.format(filename))
+                with zipfile.ZipFile(filename, 'r') as f:
+                    for member in f.namelist():
+                        if member != 'raft.bin':
+                            self.__logger.info('restoring {0}'.format(os.path.join(self.__file_storage.folder, member)))
+                            f.extract(member, path=self.__file_storage.folder)
+                    self.__logger.info('restoring Raft data')
+                    return pickle.loads(f.read('raft.bin'))
+        except Exception as ex:
+            self.__logger.error(ex)
 
     def get_file_storage(self):
         return self.__file_storage

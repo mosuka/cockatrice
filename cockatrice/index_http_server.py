@@ -21,11 +21,11 @@ from http import HTTPStatus
 from logging import getLogger
 
 from flask import Flask, jsonify, request, after_this_request, Response
-from prometheus_client.core import CollectorRegistry, Counter, Histogram, Gauge
+from prometheus_client.core import Counter, Histogram, Gauge
 from prometheus_client.exposition import CONTENT_TYPE_LATEST, generate_latest
 from whoosh.scoring import BM25F
 
-from cockatrice import NAME, VERSION, DEFAULT_HTTP_PORT
+import cockatrice
 from cockatrice.schema import Schema
 from cockatrice.scoring import get_multi_weighting
 
@@ -33,8 +33,8 @@ TRUE_STRINGS = ['true', 'yes', 'on', 't', 'y', '1']
 
 
 class IndexHTTPServer:
-    def __init__(self, index_server, port=DEFAULT_HTTP_PORT, logger=getLogger(NAME),
-                 http_logger=getLogger(NAME + '_http'), metrics_registry=CollectorRegistry()):
+    def __init__(self, index_server, port=cockatrice.DEFAULT_HTTP_PORT, logger=cockatrice.DEFAULT_LOGGER,
+                 http_logger=cockatrice.DEFAULT_HTTP_LOGGER, metrics_registry=cockatrice.DEFAULT_METRICS_REGISTRY):
         self.__logger = logger
         self.__http_logger = http_logger
         self.__metrics_registry = metrics_registry
@@ -67,7 +67,7 @@ class IndexHTTPServer:
 
         # metrics
         self.__metrics_http_requests_total = Counter(
-            '{0}_http_requests_total'.format(NAME),
+            '{0}_http_requests_total'.format(cockatrice.NAME),
             'The number of requests.',
             [
                 'method',
@@ -77,7 +77,7 @@ class IndexHTTPServer:
             registry=self.__metrics_registry
         )
         self.__metrics_http_requests_bytes_total = Counter(
-            '{0}_http_requests_bytes_total'.format(NAME),
+            '{0}_http_requests_bytes_total'.format(cockatrice.NAME),
             'A summary of the invocation requests bytes.',
             [
                 'method',
@@ -86,7 +86,7 @@ class IndexHTTPServer:
             registry=self.__metrics_registry
         )
         self.__metrics_http_responses_bytes_total = Counter(
-            '{0}_http_responses_bytes_total'.format(NAME),
+            '{0}_http_responses_bytes_total'.format(cockatrice.NAME),
             'A summary of the invocation responses bytes.',
             [
                 'method',
@@ -95,7 +95,7 @@ class IndexHTTPServer:
             registry=self.__metrics_registry
         )
         self.__metrics_http_requests_duration_seconds = Histogram(
-            '{0}_http_requests_duration_seconds'.format(NAME),
+            '{0}_http_requests_duration_seconds'.format(cockatrice.NAME),
             'The invocation duration in seconds.',
             [
                 'method',
@@ -104,7 +104,7 @@ class IndexHTTPServer:
             registry=self.__metrics_registry
         )
         self.__metrics_index_documents = Gauge(
-            '{0}_index_documents'.format(NAME),
+            '{0}_index_documents'.format(cockatrice.NAME),
             'The number of documents.',
             [
                 'index_name',
@@ -192,7 +192,7 @@ class IndexHTTPServer:
         try:
             resp.status_code = HTTPStatus.OK
             resp.content_type = 'text/plain; charset="UTF-8"'
-            resp.data = NAME + ' ' + VERSION + ' is running.\n'
+            resp.data = cockatrice.NAME + ' ' + cockatrice.VERSION + ' is running.\n'
         except Exception as ex:
             resp.status_code = HTTPStatus.INTERNAL_SERVER_ERROR
             resp.content_type = 'text/plain; charset="UTF-8"'
