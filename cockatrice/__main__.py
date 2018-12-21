@@ -96,9 +96,9 @@ def server_handler(args):
     metrics_registry = cockatrice.DEFAULT_METRICS_REGISTRY
 
     # sync config
-    os.makedirs(os.path.dirname(args.full_dump_file), exist_ok=True)
+    os.makedirs(os.path.dirname(args.snapshot_file), exist_ok=True)
     conf = cockatrice.DEFAULT_SYNC_CONFIG
-    conf.fullDumpFile = args.full_dump_file
+    conf.fullDumpFile = args.snapshot_file
     conf.logCompactionMinEntries = args.log_compaction_min_entries
     conf.logCompactionMinTime = args.log_compaction_min_time
     conf.dynamicMembershipChange = True
@@ -172,8 +172,8 @@ def main():
                                type=str, help='the address of the node in the existing cluster')
     parser_server.add_argument('--peer-addr', dest='peer_addrs', default=cockatrice.DEFAULT_PEER_ADDRS, action='append', metavar='PEER_ADDR',
                                type=str, help='the address of the peer node in the cluster')
-    parser_server.add_argument('--full-dump-file', dest='full_dump_file', default=cockatrice.DEFAULT_FULL_DUMP_FILE, metavar='FULL_DUMP_FILE',
-                               type=str, help='file to store full serialized object')
+    parser_server.add_argument('--snapshot-file', dest='snapshot_file', default=cockatrice.DEFAULT_SNAPSHOT_FILE, metavar='SNAPSHOT_FILE',
+                               type=str, help='file to store snapshot of all indices')
     parser_server.add_argument('--log-compaction-min-entries', dest='log_compaction_min_entries', default=cockatrice.DEFAULT_LOG_COMPACTION_MIN_ENTRIES,
                                metavar='LOG_COMPACTION_MIN_ENTRIES', type=int,
                                help='log-compaction interval min entries')

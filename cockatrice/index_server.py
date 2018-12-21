@@ -34,11 +34,12 @@ class IndexServer(SyncObj):
 
         self.__lock = threading.RLock()
 
-        conf.serializer = self.__serialize
-        conf.deserializer = self.__deserialize
-        conf.validate()
+        self.conf = conf
+        self.conf.serializer = self.__serialize
+        self.conf.deserializer = self.__deserialize
+        self.conf.validate()
 
-        super(IndexServer, self).__init__(bind_addr, peer_addrs, conf=conf)
+        super(IndexServer, self).__init__(bind_addr, peer_addrs, conf=self.conf)
 
         self.__indices = {}
 
@@ -395,3 +396,11 @@ class IndexServer(SyncObj):
             raise ex
 
         return results_page
+
+    def open_snapshot_file(self):
+        try:
+            f = open(self.conf.fullDumpFile, mode='rb')
+        except Exception as ex:
+            raise ex
+
+        return f

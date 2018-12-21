@@ -20,7 +20,7 @@ import time
 from http import HTTPStatus
 from logging import getLogger
 
-from flask import Flask, jsonify, request, after_this_request, Response
+from flask import Flask, jsonify, request, after_this_request, Response, make_response
 from prometheus_client.core import Counter, Histogram, Gauge
 from prometheus_client.exposition import CONTENT_TYPE_LATEST, generate_latest
 from whoosh.scoring import BM25F
@@ -60,6 +60,7 @@ class IndexHTTPServer:
         self.__app.add_url_rule('/metrics', endpoint='metrics', view_func=self.__metrics, methods=['GET'])
         self.__app.add_url_rule('/health/liveness', endpoint='liveness', view_func=self.__liveness, methods=['GET'])
         self.__app.add_url_rule('/health/readiness', endpoint='readiness', view_func=self.__readiness, methods=['GET'])
+        self.__app.add_url_rule('/snapshot', endpoint='snapshot', view_func=self.__snapshot, methods=['GET'])
 
         # disable Flask default logger
         self.__app.logger.disabled = True
@@ -862,6 +863,35 @@ class IndexHTTPServer:
         # make response
         resp = jsonify(data)
         resp.status_code = status_code
+
+        return resp
+
+    def __snapshot(self):
+        start_time = time.time()
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            self.__record_http_log(request, response)
+            self.__record_http_metrics(start_time, request, response)
+            return response
+
+        resp = Response()
+        try:
+            resp.status_code = HTTPStatus.OK
+            resp.headers['Content-Type'] = 'application/zip'
+            with self.__index_server.open_snapshot_file() as f:
+                resp.headers['Content-Disposition'] = 'attachment; filename=' + f.name
+                resp.data = f.read()
+        except FileNotFoundError as ex:
+            resp.status_code = HTTPStatus.NOT_FOUND
+            resp.content_type = 'text/plain; charset="UTF-8"'
+            resp.data = '{0}\n{1}'.format(resp.status_code.phrase, resp.status_code.description)
+            self.__logger.error(ex)
+        except Exception as ex:
+            resp.status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            resp.content_type = 'text/plain; charset="UTF-8"'
+            resp.data = '{0}\n{1}'.format(resp.status_code.phrase, resp.status_code.description)
+            self.__logger.error(ex)
 
         return resp
 
