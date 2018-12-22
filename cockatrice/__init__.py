@@ -20,7 +20,7 @@ from pysyncobj import SyncObjConf
 from prometheus_client.core import CollectorRegistry
 
 NAME = 'cockatrice'
-VERSION = '0.5.1'
+VERSION = '0.6.0'
 
 DEFAULT_LOGGER = getLogger(NAME)
 DEFAULT_HTTP_LOGGER = getLogger(NAME + '_http')
@@ -31,6 +31,6 @@ DEFAULT_PEER_ADDRS = []
 DEFAULT_LOG_COMPACTION_MIN_ENTRIES = 5000
 DEFAULT_LOG_COMPACTION_MIN_TIME = 300
 DEFAULT_INDEX_DIR = '/tmp/cockatrice/index'
-DEFAULT_SNAPSHOT_FILE = '/tmp/cockatrice/index.zip'
+DEFAULT_SNAPSHOT_FILE = '/tmp/cockatrice/snapshot.zip'
 DEFAULT_HTTP_PORT = 8080
 DEFAULT_LOG_LEVEL = 'DEBUG'

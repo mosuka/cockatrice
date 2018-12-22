@@ -16,6 +16,7 @@
 
 import json
 import time
+from threading import Thread
 
 from http import HTTPStatus
 from logging import getLogger
@@ -24,12 +25,32 @@ from flask import Flask, jsonify, request, after_this_request, Response, make_re
 from prometheus_client.core import Counter, Histogram, Gauge
 from prometheus_client.exposition import CONTENT_TYPE_LATEST, generate_latest
 from whoosh.scoring import BM25F
+from werkzeug.serving import make_server
 
 import cockatrice
 from cockatrice.schema import Schema
 from cockatrice.scoring import get_multi_weighting
 
 TRUE_STRINGS = ['true', 'yes', 'on', 't', 'y', '1']
+
+
+class ServerThread(Thread):
+    def __init__(self, app, host='0.0.0.0', port=8080, logger=cockatrice.DEFAULT_LOGGER):
+        self.__logger = logger
+        self.__logger.info('creating server thread')
+
+        Thread.__init__(self)
+        self.srv = make_server(host, port, app)
+        self.ctx = app.app_context()
+        self.ctx.push()
+
+    def run(self):
+        self.__logger.info('starting server thread')
+        self.srv.serve_forever()
+
+    def shutdown(self):
+        self.__logger.info('stopping server thread')
+        self.srv.shutdown()
 
 
 class IndexHTTPServer:
@@ -60,7 +81,10 @@ class IndexHTTPServer:
         self.__app.add_url_rule('/metrics', endpoint='metrics', view_func=self.__metrics, methods=['GET'])
         self.__app.add_url_rule('/health/liveness', endpoint='liveness', view_func=self.__liveness, methods=['GET'])
         self.__app.add_url_rule('/health/readiness', endpoint='readiness', view_func=self.__readiness, methods=['GET'])
-        self.__app.add_url_rule('/snapshot', endpoint='snapshot', view_func=self.__snapshot, methods=['GET'])
+        self.__app.add_url_rule('/snapshot', endpoint='get_snapshot', view_func=self.__get_snapshot, methods=['GET'])
+        self.__app.add_url_rule('/snapshot', endpoint='put_snapshot', view_func=self.__put_snapshot, methods=['PUT'])
+
+        self.__server_thread = None
 
         # disable Flask default logger
         self.__app.logger.disabled = True
@@ -116,15 +140,15 @@ class IndexHTTPServer:
     def start(self):
         try:
             # run server
-            self.__logger.info('starting index http server')
-            self.__app.run(host='0.0.0.0', port=self.__port)
-        except OSError as ex:
-            self.__logger.critical(ex)
+            self.__logger.info('starting index http server: {0}'.format(self.__port))
+            self.__server_thread = ServerThread(self.__app, host='0.0.0.0', port=self.__port, logger=self.__logger)
+            self.__server_thread.start()
         except Exception as ex:
             self.__logger.critical(ex)
 
     def stop(self):
         self.__logger.info('stopping index http server')
+        self.__server_thread.shutdown()
 
     def __record_http_log(self, req, resp):
         log_message = '{0} - {1} [{2}] "{3} {4} {5}" {6} {7} "{8}" "{9}"'.format(
@@ -866,7 +890,7 @@ class IndexHTTPServer:
 
         return resp
 
-    def __snapshot(self):
+    def __get_snapshot(self):
         start_time = time.time()
 
         @after_this_request
@@ -892,6 +916,36 @@ class IndexHTTPServer:
             resp.content_type = 'text/plain; charset="UTF-8"'
             resp.data = '{0}\n{1}'.format(resp.status_code.phrase, resp.status_code.description)
             self.__logger.error(ex)
+
+        return resp
+
+    def __put_snapshot(self):
+        start_time = time.time()
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            self.__record_http_log(request, resp)
+            self.__record_http_metrics(start_time, request, resp)
+            return response
+
+        data = {}
+        status_code = None
+        try:
+            self.__index_server.forceLogCompaction()
+
+            status_code = HTTPStatus.ACCEPTED
+        except Exception as ex:
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            self.__logger.error(ex)
+        finally:
+            data['time'] = time.time() - start_time
+            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+                              'description': status_code.description}
+
+        # make response
+        resp = jsonify(data)
+        resp.status_code = status_code
 
         return resp
 

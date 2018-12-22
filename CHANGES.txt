@@ -1,0 +1,11 @@
+Cockatrice Change Log
+
+==================== Cockatrice 0.6.0 ====================
+
+January 30, 2019
+
+* Force log compaction
+* Expose snapshot
+* Add serializer and deserializer
+* Disable ram storage
+* Add Cluster API

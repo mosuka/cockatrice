@@ -56,10 +56,11 @@ class TestIndexServer(unittest.TestCase):
             dynamicMembershipChange=True
         )
 
-        self.data_node = IndexServer(bind_addr, peer_addrs, conf, index_dir, logger=logger)
+        self.index_server = IndexServer(bind_addr, peer_addrs, conf, index_dir, logger=logger)
+        self.index_server.start()
 
     def tearDown(self):
-        self.data_node.destroy()
+        self.index_server.stop()
         self.temp_dir.cleanup()
 
     def test_create_index(self):
@@ -69,18 +70,18 @@ class TestIndexServer(unittest.TestCase):
         # create index
         index_name = 'test_file_index'
         schema = Schema(schema_yaml)
-        index = self.data_node.create_index(index_name, schema, sync=True)
+        index = self.index_server.create_index(index_name, schema, sync=True)
         self.assertTrue(isinstance(index.storage, FileStorage))
 
         # create index
         index_name = 'test2_file_index'
         schema = Schema(schema_yaml)
-        index = self.data_node.create_index(index_name, schema, sync=True)
+        index = self.index_server.create_index(index_name, schema, sync=True)
         self.assertTrue(isinstance(index.storage, FileStorage))
 
         # check the number of file file indices
         expected_file_count = 2
-        actual_file_count = len(self.data_node.get_file_storage().list())
+        actual_file_count = len(self.index_server.get_file_storage().list())
         self.assertEqual(expected_file_count, actual_file_count)
 
     def test_delete_index(self):
@@ -90,22 +91,22 @@ class TestIndexServer(unittest.TestCase):
         # create index
         index_name = 'test_file_index'
         schema = Schema(schema_yaml)
-        index = self.data_node.create_index(index_name, schema, sync=True)
+        index = self.index_server.create_index(index_name, schema, sync=True)
         self.assertTrue(isinstance(index.storage, FileStorage))
 
         # create index
         index_name = 'test2_file_index'
         schema = Schema(schema_yaml)
-        index = self.data_node.create_index(index_name, schema, sync=True)
+        index = self.index_server.create_index(index_name, schema, sync=True)
         self.assertTrue(isinstance(index.storage, FileStorage))
 
         expected_file_count = 2
-        actual_file_count = len(self.data_node.get_file_storage().list())
+        actual_file_count = len(self.index_server.get_file_storage().list())
         self.assertEqual(expected_file_count, actual_file_count)
 
-        self.data_node.delete_index(index_name, sync=True)
+        self.index_server.delete_index(index_name, sync=True)
         expected_file_count = 1
-        actual_file_count = len(self.data_node.get_file_storage().list())
+        actual_file_count = len(self.index_server.get_file_storage().list())
         self.assertEqual(expected_file_count, actual_file_count)
 
     def test_get_index(self):
@@ -115,10 +116,10 @@ class TestIndexServer(unittest.TestCase):
         # create index
         index_name = 'test_file_index'
         schema = Schema(schema_yaml)
-        index = self.data_node.create_index(index_name, schema, sync=True)
+        index = self.index_server.create_index(index_name, schema, sync=True)
         self.assertTrue(isinstance(index.storage, FileStorage))
 
-        i = self.data_node.get_index(index_name)
+        i = self.index_server.get_index(index_name)
         self.assertTrue(isinstance(i.storage, FileStorage))
 
     def test_index_document(self):
@@ -128,17 +129,17 @@ class TestIndexServer(unittest.TestCase):
         # create index
         index_name = 'test_file_index'
         schema = Schema(schema_yaml)
-        self.data_node.create_index(index_name, schema, sync=True)
+        self.index_server.create_index(index_name, schema, sync=True)
 
         test_doc_id = '1'
         with open(self.example_dir + '/doc1.json', 'r', encoding='utf-8') as file_obj:
             test_fields = json.loads(file_obj.read(), encoding='utf-8')
 
         # index document
-        self.data_node.put_document(index_name, test_doc_id, test_fields, sync=True)
+        self.index_server.put_document(index_name, test_doc_id, test_fields, sync=True)
 
         # get document
-        page = self.data_node.get_document(index_name, test_doc_id)
+        page = self.index_server.get_document(index_name, test_doc_id)
 
         expected_count = 1
         actual_count = page.total
@@ -151,26 +152,26 @@ class TestIndexServer(unittest.TestCase):
         # create index
         index_name = 'test_file_index'
         schema = Schema(schema_yaml)
-        self.data_node.create_index(index_name, schema, sync=True)
+        self.index_server.create_index(index_name, schema, sync=True)
 
         test_doc_id = '1'
         with open(self.example_dir + '/doc1.json', 'r', encoding='utf-8') as file_obj:
             test_fields = json.loads(file_obj.read(), encoding='utf-8')
 
         # index document
-        self.data_node.put_document(index_name, test_doc_id, test_fields, sync=True)
+        self.index_server.put_document(index_name, test_doc_id, test_fields, sync=True)
 
         # get document
-        page = self.data_node.get_document(index_name, test_doc_id)
+        page = self.index_server.get_document(index_name, test_doc_id)
         expected_count = 1
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
         # delete document
-        self.data_node.delete_document(index_name, test_doc_id, sync=True)
+        self.index_server.delete_document(index_name, test_doc_id, sync=True)
 
         # get document
-        page = self.data_node.get_document(index_name, test_doc_id)
+        page = self.index_server.get_document(index_name, test_doc_id)
         expected_count = 0
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
@@ -182,35 +183,35 @@ class TestIndexServer(unittest.TestCase):
         # create index
         index_name = 'test_file_index'
         schema = Schema(schema_yaml)
-        self.data_node.create_index(index_name, schema, sync=True)
+        self.index_server.create_index(index_name, schema, sync=True)
 
         with open(self.example_dir + '/bulk_index.json', 'r', encoding='utf-8') as file_obj:
             test_docs = json.loads(file_obj.read(), encoding='utf-8')
 
         # index documents in bulk
-        self.data_node.put_documents(index_name, test_docs, sync=True)
+        self.index_server.put_documents(index_name, test_docs, sync=True)
 
-        page = self.data_node.get_document(index_name, '1')
+        page = self.index_server.get_document(index_name, '1')
         expected_count = 1
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.get_document(index_name, '2')
+        page = self.index_server.get_document(index_name, '2')
         expected_count = 1
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.get_document(index_name, '3')
+        page = self.index_server.get_document(index_name, '3')
         expected_count = 1
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.get_document(index_name, '4')
+        page = self.index_server.get_document(index_name, '4')
         expected_count = 1
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.get_document(index_name, '5')
+        page = self.index_server.get_document(index_name, '5')
         expected_count = 1
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
@@ -222,35 +223,35 @@ class TestIndexServer(unittest.TestCase):
         # create index
         index_name = 'test_file_index'
         schema = Schema(schema_yaml)
-        self.data_node.create_index(index_name, schema, sync=True)
+        self.index_server.create_index(index_name, schema, sync=True)
 
         with open(self.example_dir + '/bulk_index.json', 'r', encoding='utf-8') as file_obj:
             test_docs = json.loads(file_obj.read(), encoding='utf-8')
 
         # index documents in bulk
-        self.data_node.put_documents(index_name, test_docs, sync=True)
+        self.index_server.put_documents(index_name, test_docs, sync=True)
 
-        page = self.data_node.get_document(index_name, '1')
+        page = self.index_server.get_document(index_name, '1')
         expected_count = 1
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.get_document(index_name, '2')
+        page = self.index_server.get_document(index_name, '2')
         expected_count = 1
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.get_document(index_name, '3')
+        page = self.index_server.get_document(index_name, '3')
         expected_count = 1
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.get_document(index_name, '4')
+        page = self.index_server.get_document(index_name, '4')
         expected_count = 1
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.get_document(index_name, '5')
+        page = self.index_server.get_document(index_name, '5')
         expected_count = 1
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
@@ -259,29 +260,29 @@ class TestIndexServer(unittest.TestCase):
             test_docs = json.loads(file_obj.read(), encoding='utf-8')
 
         # index documents in bulk
-        self.data_node.delete_documents(index_name, test_docs, sync=True)
+        self.index_server.delete_documents(index_name, test_docs, sync=True)
 
-        page = self.data_node.get_document(index_name, '1')
+        page = self.index_server.get_document(index_name, '1')
         expected_count = 0
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.get_document(index_name, '2')
+        page = self.index_server.get_document(index_name, '2')
         expected_count = 0
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.get_document(index_name, '3')
+        page = self.index_server.get_document(index_name, '3')
         expected_count = 0
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.get_document(index_name, '4')
+        page = self.index_server.get_document(index_name, '4')
         expected_count = 0
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.get_document(index_name, '5')
+        page = self.index_server.get_document(index_name, '5')
         expected_count = 0
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
@@ -293,17 +294,17 @@ class TestIndexServer(unittest.TestCase):
         # create index
         index_name = 'test_file_index'
         schema = Schema(schema_yaml)
-        self.data_node.create_index(index_name, schema, sync=True)
+        self.index_server.create_index(index_name, schema, sync=True)
 
         test_doc_id = '1'
         with open(self.example_dir + '/doc1.json', 'r', encoding='utf-8') as file_obj:
             test_fields = json.loads(file_obj.read(), encoding='utf-8')
 
         # index document
-        self.data_node.put_document(index_name, test_doc_id, test_fields, sync=True)
+        self.index_server.put_document(index_name, test_doc_id, test_fields, sync=True)
 
         # get document
-        page = self.data_node.get_document(index_name, test_doc_id)
+        page = self.index_server.get_document(index_name, test_doc_id)
 
         expected_count = 1
         actual_count = page.total
@@ -316,33 +317,33 @@ class TestIndexServer(unittest.TestCase):
         # create file index
         index_name = 'test_file_index'
         schema = Schema(schema_yaml)
-        self.data_node.create_index(index_name, schema, sync=True)
+        self.index_server.create_index(index_name, schema, sync=True)
 
         with open(self.example_dir + '/bulk_index.json', 'r', encoding='utf-8') as file_obj:
             test_docs = json.loads(file_obj.read(), encoding='utf-8')
 
         # index documents in bulk
-        self.data_node.put_documents(index_name, test_docs, sync=True)
+        self.index_server.put_documents(index_name, test_docs, sync=True)
 
         # search documents
-        page = self.data_node.search_documents(index_name, 'search', search_field='text', page_num=1, page_len=10)
+        page = self.index_server.search_documents(index_name, 'search', search_field='text', page_num=1, page_len=10)
         expected_count = 5
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.search_documents(index_name, 'search engine', search_field='text', page_num=1,
-                                               page_len=10)
+        page = self.index_server.search_documents(index_name, 'search engine', search_field='text', page_num=1,
+                                                  page_len=10)
         expected_count = 3
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.search_documents(index_name, 'distributed search', search_field='text', page_num=1,
-                                               page_len=10)
+        page = self.index_server.search_documents(index_name, 'distributed search', search_field='text', page_num=1,
+                                                  page_len=10)
         expected_count = 2
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.data_node.search_documents(index_name, 'web search', search_field='text', page_num=1, page_len=10)
+        page = self.index_server.search_documents(index_name, 'web search', search_field='text', page_num=1, page_len=10)
         expected_count = 4
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)

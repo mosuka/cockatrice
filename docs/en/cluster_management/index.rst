@@ -11,9 +11,9 @@ Cockatrice is easy to bring up the cluster. You can bring up 3-node cluster with
 
 .. code-block:: bash
 
-    $ cockatrice server --bind-addr=127.0.0.1:7070 --peer-addr=127.0.0.1:7071 --peer-addr=127.0.0.1:7072 --index-dir=/tmp/cockatrice/node1/index --http-port=8080
-    $ cockatrice server --bind-addr=127.0.0.1:7071 --peer-addr=127.0.0.1:7070 --peer-addr=127.0.0.1:7072 --index-dir=/tmp/cockatrice/node2/index --http-port=8081
-    $ cockatrice server --bind-addr=127.0.0.1:7072 --peer-addr=127.0.0.1:7070 --peer-addr=127.0.0.1:7071 --index-dir=/tmp/cockatrice/node3/index --http-port=8082
+    $ cockatrice server --bind-addr=127.0.0.1:7070 --peer-addr=127.0.0.1:7071 --peer-addr=127.0.0.1:7072 --snapshot-file=/tmp/cockatrice/node1/snapshot.zip --index-dir=/tmp/cockatrice/node1/index --http-port=8080
+    $ cockatrice server --bind-addr=127.0.0.1:7071 --peer-addr=127.0.0.1:7070 --peer-addr=127.0.0.1:7072 --snapshot-file=/tmp/cockatrice/node2/snapshot.zip --index-dir=/tmp/cockatrice/node2/index --http-port=8081
+    $ cockatrice server --bind-addr=127.0.0.1:7072 --peer-addr=127.0.0.1:7070 --peer-addr=127.0.0.1:7071 --snapshot-file=/tmp/cockatrice/node3/snapshot.zip --index-dir=/tmp/cockatrice/node3/index --http-port=8082
 
 Above example shows each Cockatrice node running on the same host, so each node must listen on different ports. This would not be necessary if each node ran on a different host.
 

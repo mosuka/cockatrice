@@ -68,15 +68,17 @@ class TestIndexHTTPServer(unittest.TestCase):
             dynamicMembershipChange=True
         )
 
-        index_server = IndexServer(bind_addr, peer_addrs, conf, index_dir, logger=logger)
+        self.index_server = IndexServer(bind_addr, peer_addrs, conf, index_dir, logger=logger)
+        self.index_server.start()
 
-        self.index_http_server = IndexHTTPServer(index_server, port=http_port,
+        self.index_http_server = IndexHTTPServer(self.index_server, port=http_port,
                                                  logger=logger, http_logger=http_logger,
                                                  metrics_registry=metrics_registry)
 
         self.test_client = self.index_http_server.get_test_client()
 
     def tearDown(self):
+        self.index_server.stop()
         self.temp_dir.cleanup()
 
     def test_metrics(self):

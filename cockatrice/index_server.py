@@ -18,6 +18,7 @@ import os
 import re
 import threading
 import zipfile
+import time
 import pysyncobj.pickle as pickle
 
 from pysyncobj import SyncObj, replicated
@@ -30,34 +31,60 @@ import cockatrice
 class IndexServer(SyncObj):
     def __init__(self, bind_addr, peer_addrs=cockatrice.DEFAULT_PEER_ADDRS, conf=cockatrice.DEFAULT_SYNC_CONFIG, index_dir=cockatrice.DEFAULT_INDEX_DIR, logger=cockatrice.DEFAULT_LOGGER):
         self.__logger = logger
-        self.__logger.info('starting index server: {0}, {1}'.format(bind_addr, peer_addrs))
 
         self.__lock = threading.RLock()
 
-        self.conf = conf
-        self.conf.serializer = self.__serialize
-        self.conf.deserializer = self.__deserialize
-        self.conf.validate()
-
-        super(IndexServer, self).__init__(bind_addr, peer_addrs, conf=self.conf)
+        self.__bind_addr = bind_addr
+        self.__peer_addrs = peer_addrs
+        self.__index_dir = index_dir
+        self.__conf = conf
+        self.__conf.serializer = self.__serialize
+        self.__conf.deserializer = self.__deserialize
+        self.__conf.validate()
 
         self.__indices = {}
 
-        self.__logger.info('creating index dir on {0}'.format(index_dir))
-        os.makedirs(index_dir, exist_ok=True)
-        self.__logger.info('creating file storage on {0}'.format(index_dir))
-        self.__file_storage = FileStorage(index_dir, supports_mmap=True, readonly=False, debug=False)
+        self.__file_storage = None
+
+    def start(self):
+        self.__logger.info('creating file storage for indices on {0}'.format(self.__index_dir))
+        os.makedirs(self.__index_dir, exist_ok=True)
+        self.__file_storage = FileStorage(self.__index_dir, supports_mmap=True, readonly=False, debug=False)
+
+        self.__logger.info('starting index server: {0}, {1}'.format(self.__bind_addr, self.__peer_addrs))
+        super(IndexServer, self).__init__(self.__bind_addr, self.__peer_addrs, conf=self.__conf)
+
+        # waiting for the preparation to be completed
+        while not self.isReady():
+            time.sleep(1)
+        self.__logger.info('the index server is ready')
+
+        # waiting for the detecting the leader
+        while self._getLeader() is None:
+            time.sleep(1)
+
+        if self._isLeader():
+            self.__logger.info('the index server started as leader')
+        else:
+            self.__logger.info('the index server started as follower')
+            self.__sync_indices_from_leader()
 
         # open existing indices on startup
         self.__open_existing_indices()
 
-    def destroy(self):
+    def stop(self):
         self.__logger.info('stopping index server')
-
         for index_name in self.__indices.keys():
             self.close_index(index_name)
 
+        self.destroy()
+
+    def destroy(self):
         super().destroy()
+
+    def __sync_indices_from_leader(self):
+        self.__logger.info('synchronize the latest index from the leader node')
+        self.__logger.info(self._getLeader())
 
     def __serialize(self, filename, raft_data):
         try:
@@ -150,8 +177,7 @@ class IndexServer(SyncObj):
             if self.__index_exists(index_name):
                 raise KeyError('index already exists')
 
-            self.__logger.info(
-                'creating {0} in file storage on {1}'.format(index_name, self.__file_storage.folder))
+            self.__logger.info('creating {0} in file storage on {1}'.format(index_name, self.__file_storage.folder))
             self.__indices[index_name] = self.__file_storage.create_index(schema, indexname=index_name)
             index = self.__indices[index_name]
         except Exception as ex:
@@ -399,7 +425,7 @@ class IndexServer(SyncObj):
 
     def open_snapshot_file(self):
         try:
-            f = open(self.conf.fullDumpFile, mode='rb')
+            f = open(self.__conf.fullDumpFile, mode='rb')
         except Exception as ex:
             raise ex
 

@@ -136,6 +136,9 @@ def server_handler(args):
                                http_port=args.http_port, logger=logger, http_logger=http_logger,
                                metrics_registry=metrics_registry)
         index_node.start()
+
+        while True:
+            signal.pause()
     except ValueError as ex:
         print(ex)
     finally:
