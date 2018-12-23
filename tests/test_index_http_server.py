@@ -37,10 +37,11 @@ class TestIndexHTTPServer(unittest.TestCase):
         self.conf_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '../conf'))
         self.example_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '../example'))
 
-        http_port = 0
-        bind_addr = '0.0.0.0:0'
+        host = '0.0.0.0'
+        port = 0
         peer_addrs = []
         dump_file = self.temp_dir.name + '/data.dump'
+        http_port = 0
 
         index_dir = self.temp_dir.name + '/index'
 
@@ -68,8 +69,8 @@ class TestIndexHTTPServer(unittest.TestCase):
             dynamicMembershipChange=True
         )
 
-        self.index_server = IndexServer(bind_addr, peer_addrs, conf, index_dir, logger=logger)
-        self.index_http_server = IndexHTTPServer(self.index_server, port=http_port,
+        self.index_server = IndexServer(host, port, peer_addrs, conf, index_dir, logger=logger)
+        self.index_http_server = IndexHTTPServer(self.index_server, host, http_port,
                                                  logger=logger, http_logger=http_logger,
                                                  metrics_registry=metrics_registry)
 

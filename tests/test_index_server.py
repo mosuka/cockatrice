@@ -36,7 +36,8 @@ class TestIndexServer(unittest.TestCase):
         self.conf_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '../conf'))
         self.example_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '../example'))
 
-        bind_addr = '0.0.0.0:0'
+        host = '0.0.0.0'
+        port = 0
         peer_addrs = []
         dump_file = self.temp_dir.name + '/data.dump'
 
@@ -56,7 +57,7 @@ class TestIndexServer(unittest.TestCase):
             dynamicMembershipChange=True
         )
 
-        self.index_server = IndexServer(bind_addr, peer_addrs, conf, index_dir, logger=logger)
+        self.index_server = IndexServer(host, port, peer_addrs, conf, index_dir, logger=logger)
 
     def tearDown(self):
         self.index_server.stop()

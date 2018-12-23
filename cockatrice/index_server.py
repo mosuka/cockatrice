@@ -29,12 +29,14 @@ import cockatrice
 
 
 class IndexServer(SyncObj):
-    def __init__(self, bind_addr, peer_addrs=cockatrice.DEFAULT_PEER_ADDRS, conf=cockatrice.DEFAULT_SYNC_CONFIG, index_dir=cockatrice.DEFAULT_INDEX_DIR, logger=cockatrice.DEFAULT_LOGGER):
+    def __init__(self, host=cockatrice.DEFAULT_HOST, port=cockatrice.DEFAULT_PORT,
+                 peer_addrs=cockatrice.DEFAULT_PEER_ADDRS, conf=cockatrice.DEFAULT_SYNC_CONFIG,
+                 index_dir=cockatrice.DEFAULT_INDEX_DIR, logger=cockatrice.DEFAULT_LOGGER):
         self.__logger = logger
 
         self.__lock = threading.RLock()
 
-        self.__bind_addr = bind_addr
+        self.__bind_addr = '{0}:{1}'.format(host, port)
         self.__peer_addrs = peer_addrs
         self.__index_dir = index_dir
         self.__conf = conf
@@ -323,7 +325,8 @@ class IndexServer(SyncObj):
                 writer.delete_by_term(unique_field, doc_id)
                 success = True
             except Exception as ex:
-                self.__logger.error('failed to delete document in {0}: {1}:{2}'.format(index_name, unique_field, doc_id))
+                self.__logger.error('failed to delete document in {0}: {1}:{2}'.format(index_name, unique_field,
+                                                                                       doc_id))
                 raise ex
             finally:
                 if success:

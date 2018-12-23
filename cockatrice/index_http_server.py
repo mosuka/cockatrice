@@ -35,7 +35,7 @@ TRUE_STRINGS = ['true', 'yes', 'on', 't', 'y', '1']
 
 
 class ServerThread(Thread):
-    def __init__(self, app, host='0.0.0.0', port=8080, logger=cockatrice.DEFAULT_LOGGER):
+    def __init__(self, host, port, app, logger=cockatrice.DEFAULT_LOGGER):
         self.__logger = logger
         self.__logger.info('creating server thread')
 
@@ -54,30 +54,43 @@ class ServerThread(Thread):
 
 
 class IndexHTTPServer:
-    def __init__(self, index_server, port=cockatrice.DEFAULT_HTTP_PORT, logger=cockatrice.DEFAULT_LOGGER,
-                 http_logger=cockatrice.DEFAULT_HTTP_LOGGER, metrics_registry=cockatrice.DEFAULT_METRICS_REGISTRY):
+    def __init__(self, index_server, host=cockatrice.DEFAULT_HOST, port=cockatrice.DEFAULT_PORT,
+                 logger=cockatrice.DEFAULT_LOGGER, http_logger=cockatrice.DEFAULT_HTTP_LOGGER,
+                 metrics_registry=cockatrice.DEFAULT_METRICS_REGISTRY):
         self.__logger = logger
         self.__http_logger = http_logger
         self.__metrics_registry = metrics_registry
 
+        self.__host = host
         self.__port = port
         self.__index_server = index_server
 
         self.__app = Flask('index_http_server')
         self.__app.add_url_rule('/', endpoint='root', view_func=self.__root, methods=['GET'])
-        self.__app.add_url_rule('/indices/<index_name>', endpoint='get_index', view_func=self.__get_index, methods=['GET'])
-        self.__app.add_url_rule('/indices/<index_name>', endpoint='create_index', view_func=self.__create_index, methods=['PUT'])
-        self.__app.add_url_rule('/indices/<index_name>', endpoint='delete_index', view_func=self.__delete_index, methods=['DELETE'])
-        self.__app.add_url_rule('/indices/<index_name>/documents/<doc_id>', endpoint='get_document', view_func=self.__get_document, methods=['GET'])
-        self.__app.add_url_rule('/indices/<index_name>/documents/<doc_id>', endpoint='put_document', view_func=self.__put_document, methods=['PUT'])
-        self.__app.add_url_rule('/indices/<index_name>/documents/<doc_id>', endpoint='delete_document', view_func=self.__delete_document, methods=['DELETE'])
-        self.__app.add_url_rule('/indices/<index_name>/documents', endpoint='put_documents', view_func=self.__put_documents, methods=['PUT'])
-        self.__app.add_url_rule('/indices/<index_name>/documents', endpoint='delete_documents', view_func=self.__delete_documents, methods=['DELETE'])
-        self.__app.add_url_rule('/indices/<index_name>/search', endpoint='search_documents', view_func=self.__search_documents, methods=['GET', 'POST'])
-        self.__app.add_url_rule('/indices/<index_name>/optimize', endpoint='optimize_index', view_func=self.__optimize_index, methods=['GET'])
+        self.__app.add_url_rule('/indices/<index_name>', endpoint='get_index', view_func=self.__get_index,
+                                methods=['GET'])
+        self.__app.add_url_rule('/indices/<index_name>', endpoint='create_index', view_func=self.__create_index,
+                                methods=['PUT'])
+        self.__app.add_url_rule('/indices/<index_name>', endpoint='delete_index', view_func=self.__delete_index,
+                                methods=['DELETE'])
+        self.__app.add_url_rule('/indices/<index_name>/documents/<doc_id>', endpoint='get_document',
+                                view_func=self.__get_document, methods=['GET'])
+        self.__app.add_url_rule('/indices/<index_name>/documents/<doc_id>', endpoint='put_document',
+                                view_func=self.__put_document, methods=['PUT'])
+        self.__app.add_url_rule('/indices/<index_name>/documents/<doc_id>', endpoint='delete_document',
+                                view_func=self.__delete_document, methods=['DELETE'])
+        self.__app.add_url_rule('/indices/<index_name>/documents', endpoint='put_documents',
+                                view_func=self.__put_documents, methods=['PUT'])
+        self.__app.add_url_rule('/indices/<index_name>/documents', endpoint='delete_documents',
+                                view_func=self.__delete_documents, methods=['DELETE'])
+        self.__app.add_url_rule('/indices/<index_name>/search', endpoint='search_documents',
+                                view_func=self.__search_documents, methods=['GET', 'POST'])
+        self.__app.add_url_rule('/indices/<index_name>/optimize', endpoint='optimize_index',
+                                view_func=self.__optimize_index, methods=['GET'])
         self.__app.add_url_rule('/cluster', endpoint='get_cluster', view_func=self.__get_cluster, methods=['GET'])
         self.__app.add_url_rule('/cluster/<node_name>', endpoint='put_node', view_func=self.__put_node, methods=['PUT'])
-        self.__app.add_url_rule('/cluster/<node_name>', endpoint='delete_node', view_func=self.__delete_node, methods=['DELETE'])
+        self.__app.add_url_rule('/cluster/<node_name>', endpoint='delete_node', view_func=self.__delete_node,
+                                methods=['DELETE'])
         self.__app.add_url_rule('/metrics', endpoint='metrics', view_func=self.__metrics, methods=['GET'])
         self.__app.add_url_rule('/health/liveness', endpoint='liveness', view_func=self.__liveness, methods=['GET'])
         self.__app.add_url_rule('/health/readiness', endpoint='readiness', view_func=self.__readiness, methods=['GET'])
@@ -139,7 +152,7 @@ class IndexHTTPServer:
         try:
             # run server
             self.__logger.info('starting index http server: {0}'.format(self.__port))
-            self.__server_thread = ServerThread(self.__app, host='0.0.0.0', port=self.__port, logger=self.__logger)
+            self.__server_thread = ServerThread(self.__host, self.__port, self.__app, logger=self.__logger)
             self.__server_thread.start()
         except Exception as ex:
             self.__logger.critical(ex)

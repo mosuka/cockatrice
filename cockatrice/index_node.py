@@ -20,9 +20,13 @@ from cockatrice.index_http_server import IndexHTTPServer
 
 
 class IndexNode:
-    def __init__(self, bind_addr, peer_addrs=cockatrice.DEFAULT_PEER_ADDRS, conf=cockatrice.DEFAULT_SYNC_CONFIG, index_dir=cockatrice.DEFAULT_INDEX_DIR, http_port=cockatrice.DEFAULT_HTTP_PORT,
-                 logger=cockatrice.DEFAULT_LOGGER, http_logger=cockatrice.DEFAULT_HTTP_LOGGER, metrics_registry=cockatrice.DEFAULT_METRICS_REGISTRY):
-        self.__bind_addr = bind_addr
+    def __init__(self, host=cockatrice.DEFAULT_HOST, port=cockatrice.DEFAULT_PORT,
+                 peer_addrs=cockatrice.DEFAULT_PEER_ADDRS, conf=cockatrice.DEFAULT_SYNC_CONFIG,
+                 index_dir=cockatrice.DEFAULT_INDEX_DIR, http_port=cockatrice.DEFAULT_HTTP_PORT,
+                 logger=cockatrice.DEFAULT_LOGGER, http_logger=cockatrice.DEFAULT_HTTP_LOGGER,
+                 metrics_registry=cockatrice.DEFAULT_METRICS_REGISTRY):
+        self.__host = host
+        self.__port = port
         self.__peer_addrs = peer_addrs
         self.__conf = conf
         self.__index_dir = index_dir
@@ -33,8 +37,11 @@ class IndexNode:
 
         self.__logger.info('starting index node')
 
-        self.__index_server = IndexServer(self.__bind_addr, self.__peer_addrs, conf=self.__conf, index_dir=self.__index_dir, logger=self.__logger)
-        self.__index_http_server = IndexHTTPServer(self.__index_server, port=self.__http_port, logger=self.__logger, http_logger=self.__http_logger, metrics_registry=self.__metrics_registry)
+        self.__index_server = IndexServer(host=self.__host, port=self.__port, peer_addrs=self.__peer_addrs,
+                                          conf=self.__conf, index_dir=self.__index_dir, logger=self.__logger)
+        self.__index_http_server = IndexHTTPServer(self.__index_server, host=self.__host, port=self.__http_port,
+                                                   logger=self.__logger, http_logger=self.__http_logger,
+                                                   metrics_registry=self.__metrics_registry)
 
     def stop(self):
         self.__index_http_server.stop()

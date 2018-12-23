@@ -20,11 +20,12 @@ from pysyncobj.poller import createPoller
 from pysyncobj.tcp_connection import TcpConnection
 from pysyncobj.encryptor import getEncryptor
 
+import cockatrice
 from cockatrice.util.resolver import get_ipv4
 
 
 class Executor:
-    def __init__(self, cmd, args=None, bind_addr='127.0.0.1:7070', password=None, timeout=1):
+    def __init__(self, cmd, args=None, bind_addr=cockatrice.DEFAULT_BIND_ADDR, password=None, timeout=1):
         try:
             self.__result = None
 
