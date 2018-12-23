@@ -57,7 +57,6 @@ class TestIndexServer(unittest.TestCase):
         )
 
         self.index_server = IndexServer(bind_addr, peer_addrs, conf, index_dir, logger=logger)
-        self.index_server.start()
 
     def tearDown(self):
         self.index_server.stop()

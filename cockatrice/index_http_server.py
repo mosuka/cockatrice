@@ -84,8 +84,6 @@ class IndexHTTPServer:
         self.__app.add_url_rule('/snapshot', endpoint='get_snapshot', view_func=self.__get_snapshot, methods=['GET'])
         self.__app.add_url_rule('/snapshot', endpoint='put_snapshot', view_func=self.__put_snapshot, methods=['PUT'])
 
-        self.__server_thread = None
-
         # disable Flask default logger
         self.__app.logger.disabled = True
         getLogger('werkzeug').disabled = True
@@ -137,7 +135,7 @@ class IndexHTTPServer:
             registry=self.__metrics_registry
         )
 
-    def start(self):
+        self.__server_thread = None
         try:
             # run server
             self.__logger.info('starting index http server: {0}'.format(self.__port))

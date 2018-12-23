@@ -31,17 +31,10 @@ class IndexNode:
         self.__http_logger = http_logger
         self.__metrics_registry = metrics_registry
 
-        self.__index_server = None
-        self.__index_http_server = None
-
-    def start(self):
         self.__logger.info('starting index node')
 
         self.__index_server = IndexServer(self.__bind_addr, self.__peer_addrs, conf=self.__conf, index_dir=self.__index_dir, logger=self.__logger)
-        self.__index_server.start()
-
         self.__index_http_server = IndexHTTPServer(self.__index_server, port=self.__http_port, logger=self.__logger, http_logger=self.__http_logger, metrics_registry=self.__metrics_registry)
-        self.__index_http_server.start()
 
     def stop(self):
         self.__index_http_server.stop()

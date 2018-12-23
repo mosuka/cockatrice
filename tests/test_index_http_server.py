@@ -69,8 +69,6 @@ class TestIndexHTTPServer(unittest.TestCase):
         )
 
         self.index_server = IndexServer(bind_addr, peer_addrs, conf, index_dir, logger=logger)
-        self.index_server.start()
-
         self.index_http_server = IndexHTTPServer(self.index_server, port=http_port,
                                                  logger=logger, http_logger=http_logger,
                                                  metrics_registry=metrics_registry)
@@ -79,6 +77,7 @@ class TestIndexHTTPServer(unittest.TestCase):
 
     def tearDown(self):
         self.index_server.stop()
+        self.index_http_server.stop()
         self.temp_dir.cleanup()
 
     def test_metrics(self):

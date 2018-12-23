@@ -135,7 +135,6 @@ def server_handler(args):
         index_node = IndexNode(args.bind_addr, args.peer_addrs, conf=conf, index_dir=args.index_dir,
                                http_port=args.http_port, logger=logger, http_logger=http_logger,
                                metrics_registry=metrics_registry)
-        index_node.start()
 
         while True:
             signal.pause()

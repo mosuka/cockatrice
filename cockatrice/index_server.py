@@ -46,7 +46,6 @@ class IndexServer(SyncObj):
 
         self.__file_storage = None
 
-    def start(self):
         self.__logger.info('creating file storage for indices on {0}'.format(self.__index_dir))
         os.makedirs(self.__index_dir, exist_ok=True)
         self.__file_storage = FileStorage(self.__index_dir, supports_mmap=True, readonly=False, debug=False)
