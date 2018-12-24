@@ -21,7 +21,7 @@ import sys
 import signal
 import json
 from threading import Thread
-from argparse import ArgumentParser
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from logging import StreamHandler, Formatter, CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET
 from logging.handlers import RotatingFileHandler
 
@@ -165,12 +165,12 @@ def main():
     signal.signal(signal.SIGQUIT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    parser = ArgumentParser(description='cockatrice command')
+    parser = ArgumentParser(description='cockatrice command', formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-v', '--version', action='version', version='cockatrice {}'.format(cockatrice.VERSION))
 
     subparsers = parser.add_subparsers()
 
-    parser_server = subparsers.add_parser('server', help='see `server --help`')
+    parser_server = subparsers.add_parser('server', help='see `server --help`', formatter_class=ArgumentDefaultsHelpFormatter)
     parser_server.add_argument('--host', dest='host', default=cockatrice.DEFAULT_HOST, metavar='HOST',
                                type=str, help='the host address to listen on for peer traffic')
     parser_server.add_argument('--port', dest='port', default=cockatrice.DEFAULT_PORT, metavar='PORT',
@@ -200,19 +200,19 @@ def main():
                                help='http log file')
     parser_server.set_defaults(handler=server_handler)
 
-    parser_status = subparsers.add_parser('status', help='see `status --help`')
+    parser_status = subparsers.add_parser('status', help='see `status --help`', formatter_class=ArgumentDefaultsHelpFormatter)
     parser_status.add_argument('--bind-addr', dest='bind_addr', default=cockatrice.DEFAULT_BIND_ADDR,
                                metavar='BIND_ADDR', type=str, help='the address to listen on for peer traffic')
     parser_status.set_defaults(handler=status_handler)
 
-    parser_join = subparsers.add_parser('join', help='see `join --help`')
+    parser_join = subparsers.add_parser('join', help='see `join --help`', formatter_class=ArgumentDefaultsHelpFormatter)
     parser_join.add_argument('--bind-addr', dest='bind_addr', default=cockatrice.DEFAULT_BIND_ADDR, metavar='BIND_ADDR',
                              type=str, help='the address to listen on for peer traffic')
     parser_join.add_argument('--join-addr', dest='join_addr', default=None, metavar='JOIN_ADDR', type=str,
                              help='the address of node to join to the cluster')
     parser_join.set_defaults(handler=join_handler)
 
-    parser_join = subparsers.add_parser('leave', help='see `leave --help`')
+    parser_join = subparsers.add_parser('leave', help='see `leave --help`', formatter_class=ArgumentDefaultsHelpFormatter)
     parser_join.add_argument('--bind-addr', dest='bind_addr', default=cockatrice.DEFAULT_BIND_ADDR, metavar='BIND_ADDR',
                              type=str, help='the address to listen on for peer traffic')
     parser_join.add_argument('--leave-addr', dest='leave_addr', default=None, metavar='LEAVE_ADDR', type=str,
