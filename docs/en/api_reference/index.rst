@@ -8,3 +8,4 @@ RESTful API Reference
    document_api
    search_api
    cluster_api
+   snapshot_api

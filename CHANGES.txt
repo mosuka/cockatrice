@@ -4,6 +4,7 @@ Cockatrice Change Log
 
 January 30, 2019
 
+* Print default values in CLI usage
 * Force log compaction
 * Expose snapshot
 * Add serializer and deserializer
