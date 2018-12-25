@@ -16,18 +16,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
-import signal
 import json
-from threading import Thread
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from logging import StreamHandler, Formatter, CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET
+import os
+import signal
+import sys
+from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
+from logging import CRITICAL, DEBUG, ERROR, Formatter, INFO, NOTSET, StreamHandler, WARNING
 from logging.handlers import RotatingFileHandler
 
 import cockatrice
+from cockatrice.command import add_node, delete_node, get_snapshot, get_status
 from cockatrice.index_node import IndexNode
-from cockatrice.command import get_status, add_node, delete_node
 
 
 def signal_handler(signal, frame):
@@ -106,42 +105,12 @@ def server_handler(args):
 
     index_node = None
     try:
-        if args.seed_addr is not None:
-            bind_addr = '{0}:{1}'.format(args.host, args.port)
-
-            # clear the peer addresses due to update peer addresses from the cluster.
-            args.peer_addrs = []
-
-            # execute a command to get status from the cluster
-            status_result = get_status(bind_addr=args.seed_addr, timeout=0.5)
-            if status_result is None:
-                raise ValueError('command execution failed to {0}'.format(args.seed_addr))
-
-            # get peer addresses from above command result
-            self_addr = status_result['data']['self']
-            if self_addr not in args.peer_addrs:
-                args.peer_addrs.append(self_addr)
-            for k in status_result['data'].keys():
-                if k.startswith('partner_node_status_server_'):
-                    partner_addr = k[len('partner_node_status_server_'):]
-                    if partner_addr not in args.peer_addrs:
-                        args.peer_addrs.append(partner_addr)
-
-            if bind_addr not in args.peer_addrs:
-                Thread(target=add_node, kwargs={'node_name': bind_addr, 'bind_addr': args.seed_addr, 'timeout': 0.5,
-                                                'logger': logger}).start()
-
-            # remove this node's address from peer addresses.
-            if bind_addr in args.peer_addrs:
-                args.peer_addrs.remove(bind_addr)
-
-        index_node = IndexNode(host=args.host, port=args.port, peer_addrs=args.peer_addrs, conf=conf,
+        index_node = IndexNode(host=args.host, port=args.port, seed_addr=args.seed_addr, conf=conf,
                                index_dir=args.index_dir, http_port=args.http_port, logger=logger,
                                http_logger=http_logger, metrics_registry=metrics_registry)
-
         while True:
             signal.pause()
-    except ValueError as ex:
+    except Exception as ex:
         print(ex)
     finally:
         if index_node is not None:
@@ -160,6 +129,15 @@ def leave_handler(args):
     print(json.dumps(delete_node(args.leave_addr, bind_addr=args.bind_addr, timeout=0.5)))
 
 
+def snapshot_handler(args):
+    snapshot = get_snapshot(bind_addr=args.bind_addr, timeout=0.5)
+    if args.output_file is None:
+        print(snapshot)
+    else:
+        with open(args.output_file, 'wb') as f:
+            f.write(snapshot)
+
+
 def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGQUIT, signal_handler)
@@ -170,15 +148,15 @@ def main():
 
     subparsers = parser.add_subparsers()
 
-    parser_server = subparsers.add_parser('server', help='see `server --help`', formatter_class=ArgumentDefaultsHelpFormatter)
-    parser_server.add_argument('--host', dest='host', default=cockatrice.DEFAULT_HOST, metavar='HOST',
-                               type=str, help='the host address to listen on for peer traffic')
-    parser_server.add_argument('--port', dest='port', default=cockatrice.DEFAULT_PORT, metavar='PORT',
-                               type=int, help='the port to listen on for peer traffic')
-    parser_server.add_argument('--seed-addr', dest='seed_addr', default=None, metavar='SEED_ADDR',
-                               type=str, help='the address of the node in the existing cluster')
-    parser_server.add_argument('--peer-addr', dest='peer_addrs', default=cockatrice.DEFAULT_PEER_ADDRS, action='append',
-                               metavar='PEER_ADDR', type=str, help='the address of the peer node in the cluster')
+    # server
+    parser_server = subparsers.add_parser('server', help='see `server --help`',
+                                          formatter_class=ArgumentDefaultsHelpFormatter)
+    parser_server.add_argument('--host', dest='host', default=cockatrice.DEFAULT_HOST, metavar='HOST', type=str,
+                               help='the host address to listen on for peer traffic')
+    parser_server.add_argument('--port', dest='port', default=cockatrice.DEFAULT_PORT, metavar='PORT', type=int,
+                               help='the port to listen on for peer traffic')
+    parser_server.add_argument('--seed-addr', dest='seed_addr', default=None, metavar='SEED_ADDR', type=str,
+                               help='the address of the node in the existing cluster')
     parser_server.add_argument('--snapshot-file', dest='snapshot_file', default=cockatrice.DEFAULT_SNAPSHOT_FILE,
                                metavar='SNAPSHOT_FILE', type=str, help='file to store snapshot of all indices')
     parser_server.add_argument('--log-compaction-min-entries', dest='log_compaction_min_entries',
@@ -200,11 +178,14 @@ def main():
                                help='http log file')
     parser_server.set_defaults(handler=server_handler)
 
-    parser_status = subparsers.add_parser('status', help='see `status --help`', formatter_class=ArgumentDefaultsHelpFormatter)
+    # status
+    parser_status = subparsers.add_parser('status', help='see `status --help`',
+                                          formatter_class=ArgumentDefaultsHelpFormatter)
     parser_status.add_argument('--bind-addr', dest='bind_addr', default=cockatrice.DEFAULT_BIND_ADDR,
                                metavar='BIND_ADDR', type=str, help='the address to listen on for peer traffic')
     parser_status.set_defaults(handler=status_handler)
 
+    # join
     parser_join = subparsers.add_parser('join', help='see `join --help`', formatter_class=ArgumentDefaultsHelpFormatter)
     parser_join.add_argument('--bind-addr', dest='bind_addr', default=cockatrice.DEFAULT_BIND_ADDR, metavar='BIND_ADDR',
                              type=str, help='the address to listen on for peer traffic')
@@ -212,12 +193,23 @@ def main():
                              help='the address of node to join to the cluster')
     parser_join.set_defaults(handler=join_handler)
 
-    parser_join = subparsers.add_parser('leave', help='see `leave --help`', formatter_class=ArgumentDefaultsHelpFormatter)
-    parser_join.add_argument('--bind-addr', dest='bind_addr', default=cockatrice.DEFAULT_BIND_ADDR, metavar='BIND_ADDR',
-                             type=str, help='the address to listen on for peer traffic')
-    parser_join.add_argument('--leave-addr', dest='leave_addr', default=None, metavar='LEAVE_ADDR', type=str,
-                             help='the address of node to leave from the cluster')
-    parser_join.set_defaults(handler=leave_handler)
+    # leave
+    parser_leave = subparsers.add_parser('leave', help='see `leave --help`',
+                                         formatter_class=ArgumentDefaultsHelpFormatter)
+    parser_leave.add_argument('--bind-addr', dest='bind_addr', default=cockatrice.DEFAULT_BIND_ADDR,
+                              metavar='BIND_ADDR', type=str, help='the address to listen on for peer traffic')
+    parser_leave.add_argument('--leave-addr', dest='leave_addr', default=None, metavar='LEAVE_ADDR', type=str,
+                              help='the address of node to leave from the cluster')
+    parser_leave.set_defaults(handler=leave_handler)
+
+    # snapshot
+    parser_snapshot = subparsers.add_parser('snapshot', help='see `snapshot --help`',
+                                            formatter_class=ArgumentDefaultsHelpFormatter)
+    parser_snapshot.add_argument('--bind-addr', dest='bind_addr', default=cockatrice.DEFAULT_BIND_ADDR,
+                                 metavar='BIND_ADDR', type=str, help='the address to listen on for peer traffic')
+    parser_snapshot.add_argument('--output-file', dest='output_file', default=None, metavar='OUTPUT_FILE', type=str,
+                                 help='the snapshot file destination')
+    parser_snapshot.set_defaults(handler=snapshot_handler)
 
     args = parser.parse_args()
     if hasattr(args, 'handler'):

@@ -16,8 +16,8 @@
 
 from logging import getLogger
 
-from pysyncobj import SyncObjConf
 from prometheus_client.core import CollectorRegistry
+from pysyncobj import SyncObjConf
 
 NAME = 'cockatrice'
 VERSION = '0.6.0'

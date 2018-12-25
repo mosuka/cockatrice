@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import yaml
-from whoosh.scoring import MultiWeighting, BM25F
+from whoosh.scoring import BM25F, MultiWeighting
 
 from cockatrice.util.loader import get_instance
 
@@ -31,14 +31,14 @@ def get_weighting(class_name, **class_args):
 
 def get_multi_weighting(weighting_yaml):
     try:
-        yaml_dict = yaml.safe_load(weighting_yaml)
+        __dict = yaml.safe_load(weighting_yaml)
 
         default_weighting = BM25F
         weighting_dict = {}
 
-        for field_name in yaml_dict['weighting'].keys():
-            class_name = yaml_dict['weighting'][field_name]['class']
-            class_args = yaml_dict['weighting'][field_name]['args'] if 'args' in yaml_dict['weighting'][field_name] else {}
+        for field_name in __dict['weighting'].keys():
+            class_name = __dict['weighting'][field_name]['class']
+            class_args = __dict['weighting'][field_name]['args'] if 'args' in __dict['weighting'][field_name] else {}
             instance = get_instance(class_name, **class_args)
             if field_name == 'default':
                 default_weighting = instance

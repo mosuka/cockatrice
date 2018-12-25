@@ -4,6 +4,7 @@ Cockatrice Change Log
 
 January 30, 2019
 
+* Synchronize the latest index from the leader node
 * Print default values in CLI usage
 * Force log compaction
 * Expose snapshot

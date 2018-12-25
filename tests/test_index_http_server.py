@@ -14,21 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-
-import os
 import json
-
-from tempfile import TemporaryDirectory
-from logging import getLogger, StreamHandler, Formatter, DEBUG, INFO
+import os
+import unittest
 from http import HTTPStatus
+from logging import DEBUG, Formatter, getLogger, INFO, StreamHandler
+from tempfile import TemporaryDirectory
 
 from prometheus_client.core import CollectorRegistry
 from pysyncobj import SyncObjConf
 
 from cockatrice import NAME
-from cockatrice.index_server import IndexServer
 from cockatrice.index_http_server import IndexHTTPServer
+from cockatrice.index_server import IndexServer
 
 
 class TestIndexHTTPServer(unittest.TestCase):

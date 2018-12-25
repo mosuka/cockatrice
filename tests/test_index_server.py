@@ -14,12 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-
-import os
 import json
-
-from logging import getLogger, StreamHandler, Formatter, DEBUG, INFO
+import os
+import unittest
+from logging import DEBUG, Formatter, getLogger, INFO, StreamHandler
 from tempfile import TemporaryDirectory
 
 from pysyncobj import SyncObjConf
@@ -343,7 +341,8 @@ class TestIndexServer(unittest.TestCase):
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)
 
-        page = self.index_server.search_documents(index_name, 'web search', search_field='text', page_num=1, page_len=10)
+        page = self.index_server.search_documents(index_name, 'web search', search_field='text', page_num=1,
+                                                  page_len=10)
         expected_count = 4
         actual_count = page.total
         self.assertEqual(expected_count, actual_count)

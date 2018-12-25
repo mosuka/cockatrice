@@ -14,20 +14,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from os import path
+from threading import Thread
+
 import cockatrice
-from cockatrice.index_server import IndexServer
+from cockatrice.command import add_node, get_snapshot, get_status
 from cockatrice.index_http_server import IndexHTTPServer
+from cockatrice.index_server import IndexServer
 
 
 class IndexNode:
     def __init__(self, host=cockatrice.DEFAULT_HOST, port=cockatrice.DEFAULT_PORT,
-                 peer_addrs=cockatrice.DEFAULT_PEER_ADDRS, conf=cockatrice.DEFAULT_SYNC_CONFIG,
+                 seed_addr=None, conf=cockatrice.DEFAULT_SYNC_CONFIG,
                  index_dir=cockatrice.DEFAULT_INDEX_DIR, http_port=cockatrice.DEFAULT_HTTP_PORT,
                  logger=cockatrice.DEFAULT_LOGGER, http_logger=cockatrice.DEFAULT_HTTP_LOGGER,
                  metrics_registry=cockatrice.DEFAULT_METRICS_REGISTRY):
         self.__host = host
         self.__port = port
-        self.__peer_addrs = peer_addrs
+        self.__seed_addr = seed_addr
+        self.__peer_addrs = cockatrice.DEFAULT_PEER_ADDRS
         self.__conf = conf
         self.__index_dir = index_dir
         self.__http_port = http_port
@@ -37,13 +42,60 @@ class IndexNode:
 
         self.__logger.info('starting index node')
 
+        if self.__seed_addr is not None:
+            bind_addr = '{0}:{1}'.format(self.__host, self.__port)
+
+            # execute a command to get status from the cluster
+            self.__logger.info('getting cluster status via {0}'.format(self.__seed_addr))
+            status_result = get_status(bind_addr=self.__seed_addr, timeout=0.5)
+            if status_result is not None:
+                # get peer addresses from above command result
+                self_addr = status_result['self']
+                if self_addr not in self.__peer_addrs:
+                    self.__peer_addrs.append(self_addr)
+                for k in status_result.keys():
+                    if k.startswith('partner_node_status_server_'):
+                        partner_addr = k[len('partner_node_status_server_'):]
+                        if partner_addr not in self.__peer_addrs:
+                            self.__peer_addrs.append(partner_addr)
+
+                # add this node to the cluster
+                if bind_addr not in self.__peer_addrs:
+                    self.__logger.info('request to add {0} to {0}'.format(bind_addr, self.__seed_addr))
+                    Thread(target=add_node,
+                           kwargs={'node_name': bind_addr, 'bind_addr': self.__seed_addr, 'timeout': 0.5}).start()
+
+                # remove this node's address from peer addresses
+                if bind_addr in self.__peer_addrs:
+                    self.__peer_addrs.remove(bind_addr)
+
+                # get leader node
+                leader = status_result['leader']
+
+                # copy snapshot from the leader node
+                if not path.exists(self.__conf.fullDumpFile):
+                    try:
+                        self.__logger.info('copying snapshot from {0}'.format(leader))
+                        snapshot = get_snapshot(bind_addr=leader, timeout=0.5)
+                        if snapshot is not None:
+                            with open(self.__conf.fullDumpFile, 'wb') as f:
+                                f.write(snapshot)
+                            self.__logger.info('snapshot copied from {0}'.format(leader))
+                    except Exception as ex:
+                        self.__logger.error('failed to copy snapshot from {0}: {1}'.format(leader, ex))
+            else:
+                self.__logger.error('failed to get cluster status via {0}'.format(self.__seed_addr))
+
         self.__index_server = IndexServer(host=self.__host, port=self.__port, peer_addrs=self.__peer_addrs,
                                           conf=self.__conf, index_dir=self.__index_dir, logger=self.__logger)
         self.__index_http_server = IndexHTTPServer(self.__index_server, host=self.__host, port=self.__http_port,
                                                    logger=self.__logger, http_logger=self.__http_logger,
                                                    metrics_registry=self.__metrics_registry)
 
+        self.__logger.info('index node started')
+
     def stop(self):
+        self.__logger.info('stopping index node')
         self.__index_http_server.stop()
         self.__index_server.stop()
-        self.__logger.info('stopping index node')
+        self.__logger.info('index node stopped')

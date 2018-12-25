@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from whoosh.analysis import Tokenizer, Token
-from whoosh.compat import text_type
 from janome.tokenizer import Tokenizer as Janome
+from whoosh.analysis import Token, Tokenizer
+from whoosh.compat import text_type
 
 
 class JanomeTokenizer(Tokenizer):

@@ -16,16 +16,15 @@
 
 import json
 import time
-from threading import Thread
-
 from http import HTTPStatus
 from logging import getLogger
+from threading import Thread
 
-from flask import Flask, jsonify, request, after_this_request, Response, make_response
-from prometheus_client.core import Counter, Histogram, Gauge
+from flask import after_this_request, Flask, jsonify, request, Response
+from prometheus_client.core import Counter, Gauge, Histogram
 from prometheus_client.exposition import CONTENT_TYPE_LATEST, generate_latest
-from whoosh.scoring import BM25F
 from werkzeug.serving import make_server
+from whoosh.scoring import BM25F
 
 import cockatrice
 from cockatrice.schema import Schema
@@ -54,7 +53,7 @@ class ServerThread(Thread):
 
 
 class IndexHTTPServer:
-    def __init__(self, index_server, host=cockatrice.DEFAULT_HOST, port=cockatrice.DEFAULT_PORT,
+    def __init__(self, index_server, host=cockatrice.DEFAULT_HOST, port=cockatrice.DEFAULT_HTTP_PORT,
                  logger=cockatrice.DEFAULT_LOGGER, http_logger=cockatrice.DEFAULT_HTTP_LOGGER,
                  metrics_registry=cockatrice.DEFAULT_METRICS_REGISTRY):
         self.__logger = logger
@@ -64,6 +63,8 @@ class IndexHTTPServer:
         self.__host = host
         self.__port = port
         self.__index_server = index_server
+
+        self.__logger.info('starting index http server: {0}'.format(self.__port))
 
         self.__app = Flask('index_http_server')
         self.__app.add_url_rule('/', endpoint='root', view_func=self.__root, methods=['GET'])
@@ -151,9 +152,9 @@ class IndexHTTPServer:
         self.__server_thread = None
         try:
             # run server
-            self.__logger.info('starting index http server: {0}'.format(self.__port))
             self.__server_thread = ServerThread(self.__host, self.__port, self.__app, logger=self.__logger)
             self.__server_thread.start()
+            self.__logger.info('index http server started')
         except Exception as ex:
             self.__logger.critical(ex)
 

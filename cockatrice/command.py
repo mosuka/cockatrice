@@ -93,3 +93,7 @@ def add_node(node_name, bind_addr='127.0.0.1:7070', password=None, timeout=1):
 
 def delete_node(node_name, bind_addr='127.0.0.1:7070', password=None, timeout=1):
     return execute('remove', args=[node_name], bind_addr=bind_addr, password=password, timeout=timeout)
+
+
+def get_snapshot(bind_addr='127.0.0.1:7070', password=None, timeout=1):
+    return execute('get_snapshot', args=None, bind_addr=bind_addr, password=password, timeout=timeout)

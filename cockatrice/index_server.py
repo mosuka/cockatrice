@@ -14,14 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import functools
 import os
 import re
 import threading
-import zipfile
 import time
-import pysyncobj.pickle as pickle
+import zipfile
 
-from pysyncobj import SyncObj, replicated
+import pysyncobj.pickle as pickle
+from pysyncobj import replicated, SyncObj
 from whoosh.filedb.filestore import FileStorage
 from whoosh.qparser import QueryParser
 
@@ -48,30 +49,26 @@ class IndexServer(SyncObj):
 
         self.__file_storage = None
 
+        self.__logger.info('starting index server: {0}, {1}'.format(self.__bind_addr, self.__peer_addrs))
+
         self.__logger.info('creating file storage for indices on {0}'.format(self.__index_dir))
         os.makedirs(self.__index_dir, exist_ok=True)
         self.__file_storage = FileStorage(self.__index_dir, supports_mmap=True, readonly=False, debug=False)
 
-        self.__logger.info('starting index server: {0}, {1}'.format(self.__bind_addr, self.__peer_addrs))
         super(IndexServer, self).__init__(self.__bind_addr, self.__peer_addrs, conf=self.__conf)
+
+        self.__logger.info('index server started')
 
         # waiting for the preparation to be completed
         while not self.isReady():
+            self.__logger.info('waiting for the cluster to be ready')
             time.sleep(1)
         self.__logger.info('the index server is ready')
 
-        # waiting for the detecting the leader
-        while self._getLeader() is None:
-            time.sleep(1)
-
-        if self._isLeader():
-            self.__logger.info('the index server started as leader')
-        else:
-            self.__logger.info('the index server started as follower')
-            self.__sync_indices_from_leader()
-
         # open existing indices on startup
+        self.__logger.info('opening existing indices')
         self.__open_existing_indices()
+        self.__logger.info('existing indices opened')
 
     def stop(self):
         self.__logger.info('stopping index server')
@@ -83,11 +80,38 @@ class IndexServer(SyncObj):
     def destroy(self):
         super().destroy()
 
-    def __sync_indices_from_leader(self):
-        self.__logger.info('synchronize the latest index from the leader node')
-        self.__logger.info(self._getLeader())
+    def __onUtilityMessage(self, conn, message):
+        try:
+            if message[0] == 'status':
+                conn.send(self.getStatus())
+                return True
+            elif message[0] == 'add':
+                self.addNodeToCluster(message[1],
+                                      callback=functools.partial(self.__utilityCallback, conn=conn, cmd='ADD',
+                                                                 node=message[1]))
+                return True
+            elif message[0] == 'remove':
+                if message[1] == self.__selfNodeAddr:
+                    conn.send('FAIL REMOVE ' + message[1])
+                else:
+                    self.removeNodeFromCluster(message[1], callback=functools.partial(self.__utilityCallback, conn=conn,
+                                                                                      cmd='REMOVE', node=message[1]))
+                return True
+            elif message[0] == 'set_version':
+                self.setCodeVersion(message[1],
+                                    callback=functools.partial(self.__utilityCallback, conn=conn, cmd='SET_VERSION',
+                                                               node=str(message[1])))
+                return True
+            elif message[0] == 'get_snapshot':
+                with open(self.__conf.fullDumpFile, 'rb') as f:
+                    conn.send(f.read())
+                return True
+        except Exception as e:
+            conn.send(str(e))
+            return True
 
     def __serialize(self, filename, raft_data):
+        self.__logger.info('serializing data')
         try:
             with self.__lock:
                 self.__logger.info('creating {0}'.format(filename))
@@ -102,18 +126,19 @@ class IndexServer(SyncObj):
             self.__logger.error(ex)
 
     def __deserialize(self, filename):
+        self.__logger.info('deserializing data')
         try:
             with self.__lock:
                 self.__logger.info('cleaning {0}'.format(self.__file_storage.folder))
                 self.__file_storage.destroy()
+                self.__file_storage.create()
 
-                self.__logger.info('reading {0}'.format(filename))
                 with zipfile.ZipFile(filename, 'r') as f:
                     for member in f.namelist():
                         if member != 'raft.bin':
-                            self.__logger.info('restoring {0}'.format(os.path.join(self.__file_storage.folder, member)))
+                            self.__logger.info(
+                                'restoring {0}'.format(os.path.join(self.__file_storage.folder, member)))
                             f.extract(member, path=self.__file_storage.folder)
-                    self.__logger.info('restoring Raft data')
                     return pickle.loads(f.read('raft.bin'))
         except Exception as ex:
             self.__logger.error(ex)
@@ -148,7 +173,7 @@ class IndexServer(SyncObj):
                 self.__logger.info('opening {0} in file storage on {1}'.format(index_name, self.__file_storage.folder))
                 index = self.__file_storage.open_index(indexname=index_name, schema=schema)
             else:
-                raise KeyError('index does not exist')
+                raise KeyError('{0} does not exist on {1}'.format(index_name, self.__file_storage.folder))
             self.__indices[index_name] = index
         except Exception as ex:
             self.__logger.error('failed to open {0}: {1}'.format(index_name, ex))
