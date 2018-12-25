@@ -1,5 +1,12 @@
 Cockatrice Change Log
 
+==================== Cockatrice 0.6.2 ====================
+
+December 25, 2018
+
+* Add --log-file-max-bytes, --log-file-backup-count, --http-log-file-max-bytes, --http-log-file-backup-count flags
+
+
 ==================== Cockatrice 0.6.1 ====================
 
 December 25, 2018

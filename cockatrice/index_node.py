@@ -14,25 +14,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from logging import getLogger
 from os import path
 from threading import Thread
 
-import cockatrice.default
+from prometheus_client.core import CollectorRegistry
+from pysyncobj import SyncObjConf
+
 from cockatrice.command import add_node, get_snapshot, get_status
 from cockatrice.index_http_server import IndexHTTPServer
 from cockatrice.index_server import IndexServer
 
 
 class IndexNode:
-    def __init__(self, host=cockatrice.default.HOST, port=cockatrice.default.PORT,
-                 seed_addr=None, conf=cockatrice.default.SYNC_CONFIG,
-                 index_dir=cockatrice.default.INDEX_DIR, http_port=cockatrice.default.HTTP_PORT,
-                 logger=cockatrice.default.LOGGER, http_logger=cockatrice.default.HTTP_LOGGER,
-                 metrics_registry=cockatrice.default.METRICS_REGISTRY):
+    def __init__(self, host='localhost', port=7070, seed_addr=None, conf=SyncObjConf(),
+                 index_dir='/tmp/cockatrice/index', http_port=8080, logger=getLogger(), http_logger=getLogger(),
+                 metrics_registry=CollectorRegistry()):
         self.__host = host
         self.__port = port
         self.__seed_addr = seed_addr
-        self.__peer_addrs = cockatrice.default.PEER_ADDRS
+        self.__peer_addrs = []
         self.__conf = conf
         self.__index_dir = index_dir
         self.__http_port = http_port
@@ -61,7 +62,7 @@ class IndexNode:
 
                 # add this node to the cluster
                 if bind_addr not in self.__peer_addrs:
-                    self.__logger.info('request to add {0} to {0}'.format(bind_addr, self.__seed_addr))
+                    self.__logger.info('request to add {0} to {1}'.format(bind_addr, self.__seed_addr))
                     Thread(target=add_node,
                            kwargs={'node_name': bind_addr, 'bind_addr': self.__seed_addr, 'timeout': 0.5}).start()
 

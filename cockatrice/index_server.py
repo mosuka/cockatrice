@@ -20,19 +20,17 @@ import re
 import threading
 import time
 import zipfile
+from logging import getLogger
 
 import pysyncobj.pickle as pickle
-from pysyncobj import replicated, SyncObj
+from pysyncobj import replicated, SyncObj, SyncObjConf
 from whoosh.filedb.filestore import FileStorage
 from whoosh.qparser import QueryParser
 
-import cockatrice.default
-
 
 class IndexServer(SyncObj):
-    def __init__(self, host=cockatrice.default.HOST, port=cockatrice.default.PORT,
-                 peer_addrs=cockatrice.default.PEER_ADDRS, conf=cockatrice.default.SYNC_CONFIG,
-                 index_dir=cockatrice.default.INDEX_DIR, logger=cockatrice.default.LOGGER):
+    def __init__(self, host='localhost', port=7070, peer_addrs=[], conf=SyncObjConf(),
+                 index_dir='/tmp/cockatrice/index', logger=getLogger()):
         self.__logger = logger
 
         self.__lock = threading.RLock()

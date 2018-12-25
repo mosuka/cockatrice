@@ -17,13 +17,13 @@
 import json
 import os
 import unittest
-from logging import DEBUG, Formatter, INFO, StreamHandler
+from logging import DEBUG, Formatter, getLogger, INFO, StreamHandler
 from tempfile import TemporaryDirectory
 
 from pysyncobj import SyncObjConf
 from whoosh.filedb.filestore import FileStorage
 
-import cockatrice.default
+import cockatrice
 from cockatrice.index_server import IndexServer
 from cockatrice.schema import Schema
 
@@ -41,7 +41,7 @@ class TestIndexServer(unittest.TestCase):
 
         index_dir = self.temp_dir.name + '/index'
 
-        logger = cockatrice.default.LOGGER
+        logger = getLogger(cockatrice.NAME)
         log_handler = StreamHandler()
         logger.setLevel(DEBUG)
         log_handler.setLevel(INFO)
