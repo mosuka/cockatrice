@@ -26,7 +26,7 @@ from prometheus_client.exposition import CONTENT_TYPE_LATEST, generate_latest
 from werkzeug.serving import make_server
 from whoosh.scoring import BM25F
 
-import cockatrice
+import cockatrice.default
 from cockatrice.schema import Schema
 from cockatrice.scoring import get_multi_weighting
 
@@ -34,7 +34,7 @@ TRUE_STRINGS = ['true', 'yes', 'on', 't', 'y', '1']
 
 
 class ServerThread(Thread):
-    def __init__(self, host, port, app, logger=cockatrice.DEFAULT_LOGGER):
+    def __init__(self, host, port, app, logger=cockatrice.default.LOGGER):
         self.__logger = logger
         self.__logger.info('creating server thread')
 
@@ -53,9 +53,9 @@ class ServerThread(Thread):
 
 
 class IndexHTTPServer:
-    def __init__(self, index_server, host=cockatrice.DEFAULT_HOST, port=cockatrice.DEFAULT_HTTP_PORT,
-                 logger=cockatrice.DEFAULT_LOGGER, http_logger=cockatrice.DEFAULT_HTTP_LOGGER,
-                 metrics_registry=cockatrice.DEFAULT_METRICS_REGISTRY):
+    def __init__(self, index_server, host=cockatrice.default.HOST, port=cockatrice.default.HTTP_PORT,
+                 logger=cockatrice.default.LOGGER, http_logger=cockatrice.default.HTTP_LOGGER,
+                 metrics_registry=cockatrice.default.METRICS_REGISTRY):
         self.__logger = logger
         self.__http_logger = http_logger
         self.__metrics_registry = metrics_registry

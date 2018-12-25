@@ -26,13 +26,13 @@ from pysyncobj import replicated, SyncObj
 from whoosh.filedb.filestore import FileStorage
 from whoosh.qparser import QueryParser
 
-import cockatrice
+import cockatrice.default
 
 
 class IndexServer(SyncObj):
-    def __init__(self, host=cockatrice.DEFAULT_HOST, port=cockatrice.DEFAULT_PORT,
-                 peer_addrs=cockatrice.DEFAULT_PEER_ADDRS, conf=cockatrice.DEFAULT_SYNC_CONFIG,
-                 index_dir=cockatrice.DEFAULT_INDEX_DIR, logger=cockatrice.DEFAULT_LOGGER):
+    def __init__(self, host=cockatrice.default.HOST, port=cockatrice.default.PORT,
+                 peer_addrs=cockatrice.default.PEER_ADDRS, conf=cockatrice.default.SYNC_CONFIG,
+                 index_dir=cockatrice.default.INDEX_DIR, logger=cockatrice.default.LOGGER):
         self.__logger = logger
 
         self.__lock = threading.RLock()

@@ -18,13 +18,13 @@ import json
 import os
 import unittest
 from http import HTTPStatus
-from logging import DEBUG, Formatter, getLogger, INFO, StreamHandler
+from logging import DEBUG, Formatter, INFO, StreamHandler
 from tempfile import TemporaryDirectory
 
 from prometheus_client.core import CollectorRegistry
 from pysyncobj import SyncObjConf
 
-from cockatrice import NAME
+import cockatrice.default
 from cockatrice.index_http_server import IndexHTTPServer
 from cockatrice.index_server import IndexServer
 
@@ -43,7 +43,7 @@ class TestIndexHTTPServer(unittest.TestCase):
 
         index_dir = self.temp_dir.name + '/index'
 
-        logger = getLogger(NAME)
+        logger = cockatrice.default.LOGGER
         log_handler = StreamHandler()
         logger.setLevel(DEBUG)
         log_handler.setLevel(INFO)
@@ -51,7 +51,7 @@ class TestIndexHTTPServer(unittest.TestCase):
         log_handler.setFormatter(log_format)
         logger.addHandler(log_handler)
 
-        http_logger = getLogger(NAME + '_http')
+        http_logger = cockatrice.default.HTTP_LOGGER
         http_log_handler = StreamHandler()
         http_logger.setLevel(INFO)
         http_log_handler.setLevel(INFO)

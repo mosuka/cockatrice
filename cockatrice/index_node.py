@@ -17,22 +17,22 @@
 from os import path
 from threading import Thread
 
-import cockatrice
+import cockatrice.default
 from cockatrice.command import add_node, get_snapshot, get_status
 from cockatrice.index_http_server import IndexHTTPServer
 from cockatrice.index_server import IndexServer
 
 
 class IndexNode:
-    def __init__(self, host=cockatrice.DEFAULT_HOST, port=cockatrice.DEFAULT_PORT,
-                 seed_addr=None, conf=cockatrice.DEFAULT_SYNC_CONFIG,
-                 index_dir=cockatrice.DEFAULT_INDEX_DIR, http_port=cockatrice.DEFAULT_HTTP_PORT,
-                 logger=cockatrice.DEFAULT_LOGGER, http_logger=cockatrice.DEFAULT_HTTP_LOGGER,
-                 metrics_registry=cockatrice.DEFAULT_METRICS_REGISTRY):
+    def __init__(self, host=cockatrice.default.HOST, port=cockatrice.default.PORT,
+                 seed_addr=None, conf=cockatrice.default.SYNC_CONFIG,
+                 index_dir=cockatrice.default.INDEX_DIR, http_port=cockatrice.default.HTTP_PORT,
+                 logger=cockatrice.default.LOGGER, http_logger=cockatrice.default.HTTP_LOGGER,
+                 metrics_registry=cockatrice.default.METRICS_REGISTRY):
         self.__host = host
         self.__port = port
         self.__seed_addr = seed_addr
-        self.__peer_addrs = cockatrice.DEFAULT_PEER_ADDRS
+        self.__peer_addrs = cockatrice.default.PEER_ADDRS
         self.__conf = conf
         self.__index_dir = index_dir
         self.__http_port = http_port

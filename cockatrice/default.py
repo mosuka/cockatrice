@@ -14,5 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-NAME = 'cockatrice'
-VERSION = '0.6.1'
+from logging import getLogger
+
+from prometheus_client.core import CollectorRegistry
+from pysyncobj import SyncObjConf
+
+from cockatrice import NAME
+
+LOGGER = getLogger(NAME)
+HTTP_LOGGER = getLogger(NAME + '_http')
+METRICS_REGISTRY = CollectorRegistry()
+SYNC_CONFIG = SyncObjConf()
+HOST = '127.0.0.1'
+PORT = 7070
+BIND_ADDR = '{0}:{1}'.format(HOST, PORT)
+PEER_ADDRS = []
+LOG_COMPACTION_MIN_ENTRIES = 5000
+LOG_COMPACTION_MIN_TIME = 300
+INDEX_DIR = '/tmp/cockatrice/index'
+SNAPSHOT_FILE = '/tmp/cockatrice/snapshot.zip'
+HTTP_PORT = 8080
+LOG_LEVEL = 'DEBUG'
