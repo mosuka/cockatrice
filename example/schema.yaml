@@ -35,7 +35,7 @@ default_search_field: text
 #
 field_types:
   id:
-    class: "whoosh.fields.ID"
+    class: whoosh.fields.ID
     args:
       stored: false
       unique: false
@@ -43,16 +43,16 @@ field_types:
       sortable: false
       analyzer: null
   idlist:
-    class: "whoosh.fields.IDLIST"
+    class: whoosh.fields.IDLIST
     args:
       stored: false
       unique: false
       expression: null
       field_boost: 1.0
   stored:
-    class: "whoosh.fields.STORED"
+    class: whoosh.fields.STORED
   keyword:
-    class: "whoosh.fields.KEYWORD"
+    class: whoosh.fields.KEYWORD
     args:
       stored: false
       lowercase: false
@@ -64,7 +64,7 @@ field_types:
       vector: null
       analyzer: null
   text:
-    class: "whoosh.fields.TEXT"
+    class: whoosh.fields.TEXT
     args:
       analyzer:
       phrase: true
@@ -78,7 +78,7 @@ field_types:
       vector: null
       spelling_prefix: spell_
   int:
-    class: "whoosh.fields.NUMERIC"
+    class: whoosh.fields.NUMERIC
     args:
       numtype: int
       bits: 32
@@ -91,18 +91,18 @@ field_types:
       sortable: false
       default: null
   datetime:
-    class: "whoosh.fields.DATETIME"
+    class: whoosh.fields.DATETIME
     args:
       stored: false
       unique: false
       sortable: false
   boolean:
-    class: "whoosh.fields.BOOLEAN"
+    class: whoosh.fields.BOOLEAN
     args:
       stored: false
       field_boost: 1.0
   ngram:
-    class: "whoosh.fields.NGRAM"
+    class: whoosh.fields.NGRAM
     args:
       minsize: 2
       maxsize: 4
@@ -112,7 +112,7 @@ field_types:
       phrase: false
       sortable: false
   ngramwords:
-    class: "whoosh.fields.NGRAMWORDS"
+    class: whoosh.fields.NGRAMWORDS
     args:
       minsize: 2
       maxsize: 4
@@ -123,7 +123,7 @@ field_types:
       queryor: false
       sortable: false
   text_janome:
-    class: "whoosh.fields.TEXT"
+    class: whoosh.fields.TEXT
     args:
       analyzer: janome
       phrase: true
@@ -142,26 +142,26 @@ field_types:
 #
 analyzers:
   id:
-    class: "whoosh.analysis.IDAnalyzer"
+    class: whoosh.analysis.IDAnalyzer
     args:
       lowercase: false
   keyword:
-    class: "whoosh.analysis.KeywordAnalyzer"
+    class: whoosh.analysis.KeywordAnalyzer
     args:
       lowercase: false
       commas: false
   regex:
-    class: "whoosh.analysis.RegexAnalyzer"
+    class: whoosh.analysis.RegexAnalyzer
     args:
       expression: "\\w+(\\.?\\w+)*"
       gaps: false
   simple:
-    class: "whoosh.analysis.SimpleAnalyzer"
+    class: whoosh.analysis.SimpleAnalyzer
     args:
       expression: "\\w+(\\.?\\w+)*"
       gaps: false
   standard:
-    class: "whoosh.analysis.StandardAnalyzer"
+    class: whoosh.analysis.StandardAnalyzer
     attributes:
       expression: "\\w+(\\.?\\w+)*"
       stoplist:
@@ -203,7 +203,7 @@ analyzers:
       maxsize: null
       gaps: false
   stemming:
-    class: "whoosh.analysis.StemmingAnalyzer"
+    class: whoosh.analysis.StemmingAnalyzer
     args:
       expression: "\\w+(\\.?\\w+)*"
       stoplist:
@@ -247,7 +247,7 @@ analyzers:
       ignore: null
       cachesize: 50000
   fancy:
-    class: "whoosh.analysis.FancyAnalyzer"
+    class: whoosh.analysis.FancyAnalyzer
     args:
       expression: "\\s+"
       stoplist:
@@ -293,7 +293,7 @@ analyzers:
       mergewords: false
       mergenums: false
   language:
-    class: "whoosh.analysis.LanguageAnalyzer"
+    class: whoosh.analysis.LanguageAnalyzer
     args:
       lang: en
       expression: "\\w+(\\.?\\w+)*"
@@ -318,27 +318,27 @@ analyzers:
 #
 tokenizers:
   id:
-    class: "whoosh.analysis.IDTokenizer"
+    class: whoosh.analysis.IDTokenizer
   regex:
-    class: "whoosh.analysis.RegexTokenizer"
+    class: whoosh.analysis.RegexTokenizer
     args:
       expression: "\\w+(\\.?\\w+)*"
       gaps: false
   space:
-    class: "whoosh.analysis.SpaceSeparatedTokenizer"
+    class: whoosh.analysis.SpaceSeparatedTokenizer
   comma:
-    class: "whoosh.analysis.CommaSeparatedTokenizer"
+    class: whoosh.analysis.CommaSeparatedTokenizer
   path:
-    class: "whoosh.analysis.PathTokenizer"
+    class: whoosh.analysis.PathTokenizer
     args:
       expression: "[^/]+"
   ngram:
-    class: "whoosh.analysis.NgramTokenizer"
+    class: whoosh.analysis.NgramTokenizer
     args:
       minsize: 2
       maxsize: null
   janome:
-    class: "cockatrice.analysis.JanomeTokenizer"
+    class: cockatrice.analysis.JanomeTokenizer
     args:
       udic: ""
       udic_enc: "utf-8"
@@ -352,13 +352,13 @@ tokenizers:
 #
 filters:
   reversetext:
-    class: "whoosh.analysis.ReverseTextFilter"
+    class: whoosh.analysis.ReverseTextFilter
   lowercase:
-    class: "whoosh.analysis.LowercaseFilter"
+    class: whoosh.analysis.LowercaseFilter
   strip:
-    class: "whoosh.analysis.StripFilter"
+    class: whoosh.analysis.StripFilter
   stop:
-    class: "whoosh.analysis.StopFilter"
+    class: whoosh.analysis.StopFilter
     args:
       stoplist:
         - and
@@ -400,27 +400,27 @@ filters:
       renumber: true
       lang: null
   stem:
-    class: "whoosh.analysis.StemFilter"
+    class: whoosh.analysis.StemFilter
     args:
       lang: en
       ignore: null
       cachesize: 50000
   ngram:
-    class: "whoosh.analysis.NgramFilter"
+    class: whoosh.analysis.NgramFilter
     args:
       minsize: 2
       maxsize: null
       at: null
   intraword:
-    class: "whoosh.analysis.IntraWordFilter"
+    class: whoosh.analysis.IntraWordFilter
     args:
-      delims: "-_'\"()!@#$%^&*[]{}<>\|;:, ./?`~=+"
+      delims: -_'"()!@#$%^&*[]{}<>\|;:, ./?`~=+
       splitwords: true
       splitnums: true
       mergewords: false
       mergenums: false
   shingle:
-    class: "whoosh.analysis.ShingleFilter"
+    class: whoosh.analysis.ShingleFilter
     args:
       size: 2
       sep: "-"

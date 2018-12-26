@@ -10,19 +10,19 @@ If you already created an index named ``myindex``, indexing a document by the fo
 
 .. code-block:: bash
 
-    $ curl -s -X PUT -H "Content-Type:application/json" http://localhost:8080/indices/myindex/documents/1 -d @./example/doc1.json | jq .
+    $ curl -s -X PUT -H "Content-Type:application/json" http://localhost:8080/indices/myindex/documents/1 --data-binary @./example/doc1.json
 
 You can see the result in JSON format. The result of the above command is:
 
 .. code-block:: json
 
     {
+      "time": 0.0008089542388916016,
       "status": {
         "code": 202,
-        "description": "Request accepted, processing continues off-line",
-        "phrase": "Accepted"
-      },
-      "time": 0.0008370876312255859
+        "phrase": "Accepted",
+        "description": "Request accepted, processing continues off-line"
+      }
     }
 
 
@@ -33,28 +33,26 @@ If you already indexed a document ID ``1`` in ``myindex``, getting a document th
 
 .. code-block:: bash
 
-    $ curl -s -X GET http://localhost:8080/indices/myindex/documents/1 | jq .
+    $ curl -s -X GET http://localhost:8080/indices/myindex/documents/1
 
 You can see the result in JSON format. The result of the above command is:
 
 .. code-block:: json
 
     {
-      "doc": {
-        "fields": {
-          "contributor": "43.225.167.166",
-          "id": "1",
-          "text": "A search engine is an information retrieval system designed to help find information stored on a computer system. The search results are usually presented in a list and are commonly called hits. Search engines help to minimize the time required to find information and the amount of information which must be consulted, akin to other techniques for managing information overload.\nThe most public, visible form of a search engine is a Web search engine which searches for information on the World Wide Web.",
-          "timestamp": "20180704054100",
-          "title": "Search engine (computing)"
-        }
+      "fields": {
+        "contributor": "43.225.167.166",
+        "id": "1",
+        "text": "A search engine is an information retrieval system designed to help find information stored on a computer system. The search results are usually presented in a list and are commonly called hits. Search engines help to minimize the time required to find information and the amount of information which must be consulted, akin to other techniques for managing information overload.\nThe most public, visible form of a search engine is a Web search engine which searches for information on the World Wide Web.",
+        "timestamp": "20180704054100",
+        "title": "Search engine (computing)"
       },
+      "time": 0.014967918395996094,
       "status": {
         "code": 200,
-        "description": "Request fulfilled, document follows",
-        "phrase": "OK"
-      },
-      "time": 0.03580117225646973
+        "phrase": "OK",
+        "description": "Request fulfilled, document follows"
+      }
     }
 
 
@@ -65,19 +63,19 @@ Deleting a document from ``myindex`` by the following command:
 
 .. code-block:: bash
 
-    $ curl -s -X DELETE http://localhost:8080/indices/myindex/documents/1 | jq .
+    $ curl -s -X DELETE http://localhost:8080/indices/myindex/documents/1
 
 You can see the result in JSON format. The result of the above command is:
 
 .. code-block:: json
 
     {
+      "time": 0.00019788742065429688,
       "status": {
         "code": 202,
-        "description": "Request accepted, processing continues off-line",
-        "phrase": "Accepted"
-      },
-      "time": 0.0005609989166259766
+        "phrase": "Accepted",
+        "description": "Request accepted, processing continues off-line"
+      }
     }
 
 
@@ -88,19 +86,19 @@ Indexing documents in bulk by the following command:
 
 .. code-block:: bash
 
-    $ curl -s -X PUT -H "Content-Type:application/json" http://localhost:8080/indices/myindex/documents -d @./example/bulk_index.json | jq .
+    $ curl -s -X PUT -H "Content-Type:application/json" http://localhost:8080/indices/myindex/documents --data-binary @./example/bulk_index.json
 
 You can see the result in JSON format. The result of the above command is:
 
 .. code-block:: json
 
     {
+      "time": 0.05237007141113281,
       "status": {
         "code": 202,
-        "description": "Request accepted, processing continues off-line",
-        "phrase": "Accepted"
-      },
-      "time": 0.0008728504180908203
+        "phrase": "Accepted",
+        "description": "Request accepted, processing continues off-line"
+      }
     }
 
 
@@ -111,7 +109,7 @@ Deleting documents in bulk by the following command:
 
 .. code-block:: bash
 
-    $ curl -s -X DELETE -H "Content-Type:application/json" http://localhost:8080/indices/myindex/documents -d @./example/bulk_delete.json | jq .
+    $ curl -s -X DELETE -H "Content-Type:application/json" http://localhost:8080/indices/myindex/documents --data-binary @./example/bulk_delete.json
 
 You can see the result in JSON format. The result of the above command is:
 

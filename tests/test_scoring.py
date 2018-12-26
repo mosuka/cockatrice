@@ -22,19 +22,17 @@ from cockatrice.scoring import MultiWeighting
 
 class TestMultiWeighting(unittest.TestCase):
     def setUp(self):
-        conf_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '../conf'))
-
-        weighting_file = conf_dir + '/weighting.yaml'
-
-        with open(weighting_file, 'r', encoding='utf-8') as file_obj:
-            self.weighting_yaml = file_obj.read()
+        self.example_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '../example'))
 
     def tearDown(self):
         pass
 
     def test_create_weighting(self):
-        weighting = MultiWeighting(self.weighting_yaml)
+        weighting_file = self.example_dir + '/weighting.yaml'
 
-        print(weighting)
+        with open(weighting_file, 'r', encoding='utf-8') as file_obj:
+            weighting_yaml = file_obj.read()
+
+        weighting = MultiWeighting(weighting_yaml)
 
         self.assertIsNotNone(weighting)

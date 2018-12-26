@@ -25,39 +25,46 @@ You can check the cluster with the following command:
 
 .. code-block:: bash
 
-    $ cockatrice status --bind-addr=127.0.0.1:7070 | jq .
+    $ curl -s -X GET http://localhost:8080/cluster
 
 You can see the result in JSON format. The result of the above command is:
 
 .. code-block:: json
 
     {
-      "version": "0.3.4",
-      "revision": "2c8a3263d0dbe3f8d7b8a03e93e86d385c1de558",
-      "self": "127.0.0.1:7070",
-      "state": 2,
-      "leader": "127.0.0.1:7070",
-      "partner_nodes_count": 2,
-      "partner_node_status_server_127.0.0.1:7071": 2,
-      "partner_node_status_server_127.0.0.1:7072": 2,
-      "readonly_nodes_count": 0,
-      "unknown_connections_count": 1,
-      "log_len": 4,
-      "last_applied": 4,
-      "commit_idx": 4,
-      "raft_term": 1,
-      "next_node_idx_count": 2,
-      "next_node_idx_server_127.0.0.1:7071": 5,
-      "next_node_idx_server_127.0.0.1:7072": 5,
-      "match_idx_count": 2,
-      "match_idx_server_127.0.0.1:7071": 4,
-      "match_idx_server_127.0.0.1:7072": 4,
-      "leader_commit_idx": 4,
-      "uptime": 281,
-      "self_code_version": 0,
-      "enabled_code_version": 0
+      "cluster": {
+        "version": "0.3.4",
+        "revision": "2c8a3263d0dbe3f8d7b8a03e93e86d385c1de558",
+        "self": "localhost:7070",
+        "state": 2,
+        "leader": "localhost:7070",
+        "partner_nodes_count": 2,
+        "partner_node_status_server_localhost:7071": 2,
+        "partner_node_status_server_localhost:7072": 2,
+        "readonly_nodes_count": 0,
+        "unknown_connections_count": 0,
+        "log_len": 4,
+        "last_applied": 4,
+        "commit_idx": 4,
+        "raft_term": 1,
+        "next_node_idx_count": 2,
+        "next_node_idx_server_localhost:7071": 5,
+        "next_node_idx_server_localhost:7072": 5,
+        "match_idx_count": 2,
+        "match_idx_server_localhost:7071": 4,
+        "match_idx_server_localhost:7072": 4,
+        "leader_commit_idx": 4,
+        "uptime": 29,
+        "self_code_version": 0,
+        "enabled_code_version": 0
+      },
+      "time": 5.91278076171875e-05,
+      "status": {
+        "code": 200,
+        "phrase": "OK",
+        "description": "Request fulfilled, document follows"
+      }
     }
-
 
 
 Recommend 3 or more odd number of nodes in the cluster. In failure scenarios, data loss is inevitable, so avoid deploying single nodes.

@@ -39,7 +39,7 @@
       "args": {
         "stored": false,
         "unique": false,
-        "field_boost": 1,
+        "field_boost": 1.0,
         "sortable": false,
         "analyzer": null
       }
@@ -50,7 +50,7 @@
         "stored": false,
         "unique": false,
         "expression": null,
-        "field_boost": 1
+        "field_boost": 1.0
       }
     },
     "stored": {
@@ -64,7 +64,7 @@
         "commas": false,
         "scorable": false,
         "unique": false,
-        "field_boost": 1,
+        "field_boost": 1.0,
         "sortable": false,
         "vector": null,
         "analyzer": null
@@ -77,7 +77,7 @@
         "phrase": true,
         "chars": false,
         "stored": false,
-        "field_boost": 1,
+        "field_boost": 1.0,
         "multitoken_query": "default",
         "spelling": false,
         "sortable": false,
@@ -93,7 +93,7 @@
         "bits": 32,
         "stored": false,
         "unique": false,
-        "field_boost": 1,
+        "field_boost": 1.0,
         "decimal_places": 0,
         "shift_step": 4,
         "signed": true,
@@ -113,7 +113,7 @@
       "class": "whoosh.fields.BOOLEAN",
       "args": {
         "stored": false,
-        "field_boost": 1
+        "field_boost": 1.0
       }
     },
     "ngram": {
@@ -122,7 +122,7 @@
         "minsize": 2,
         "maxsize": 4,
         "stored": false,
-        "field_boost": 1,
+        "field_boost": 1.0,
         "queryor": false,
         "phrase": false,
         "sortable": false
@@ -134,7 +134,7 @@
         "minsize": 2,
         "maxsize": 4,
         "stored": false,
-        "field_boost": 1,
+        "field_boost": 1.0,
         "tokenizer": null,
         "at": null,
         "queryor": false,
@@ -148,7 +148,7 @@
         "phrase": true,
         "chars": false,
         "stored": false,
-        "field_boost": 1,
+        "field_boost": 1.0,
         "multitoken_query": "default",
         "spelling": false,
         "sortable": false,

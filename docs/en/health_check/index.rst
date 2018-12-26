@@ -11,7 +11,7 @@ To get the current liveness probe is following:
 
 .. code-block:: bash
 
-    $ curl -s -X GET http://localhost:8080/health/liveness | jq .
+    $ curl -s -X GET http://localhost:8080/health/liveness
 
 You can see the result in JSON format. The result of the above command is:
 
@@ -19,12 +19,12 @@ You can see the result in JSON format. The result of the above command is:
 
     {
       "liveness": true,
+      "time": 7.152557373046875e-06,
       "status": {
         "code": 200,
-        "description": "Request fulfilled, document follows",
-        "phrase": "OK"
-      },
-      "time": 3.123283386230469e-05
+        "phrase": "OK",
+        "description": "Request fulfilled, document follows"
+      }
     }
 
 
@@ -35,7 +35,7 @@ To get the current readiness probe is following:
 
 .. code-block:: bash
 
-    $ curl -s -X GET http://localhost:8080/health/readiness | jq .
+    $ curl -s -X GET http://localhost:8080/health/readiness
 
 You can see the result in JSON format. The result of the above command is:
 
@@ -43,10 +43,10 @@ You can see the result in JSON format. The result of the above command is:
 
     {
       "readiness": true,
+      "time": 1.6927719116210938e-05,
       "status": {
         "code": 200,
-        "description": "Request fulfilled, document follows",
-        "phrase": "OK"
-      },
-      "time": 4.124641418457031e-05
+        "phrase": "OK",
+        "description": "Request fulfilled, document follows"
+      }
     }

@@ -11,7 +11,7 @@ Searching documents by the following command:
 
 .. code-block:: bash
 
-    $ curl -s -X GET http://localhost:8080/indices/myindex/search?query=search | jq .
+    $ curl -s -X GET http://localhost:8080/indices/myindex/search?query=search
 
 You can see the result in JSON format. The result of the above command is:
 
@@ -19,20 +19,25 @@ You can see the result in JSON format. The result of the above command is:
 
     {
       "results": {
+        "is_last_page": true,
+        "page_count": 1,
+        "page_len": 5,
+        "page_num": 1,
+        "total": 5,
         "hits": [
           {
             "doc": {
               "fields": {
                 "contributor": "KolbertBot",
                 "id": "3",
-                "text": "Enterprise search is the practice of making content from multiple enterprise-type sources, such as databases and intranets, searchable to a defined audience. \"Enterprise search\" is used to describe the software of search information within an enterprise (though the search function and its results may still be public). Enterprise search can be contrasted with web search, which applies search technology to documents on the open web, and desktop search, which applies search technology to the content on a single computer. Enterprise search systems index data and documents from a variety of sources such as: file systems, intranets, document management systems, e-mail, and databases. Many enterprise search systems integrate structured and unstructured data in their collections.[3] Enterprise search systems also use access controls to enforce a security policy on their users. Enterprise search can be seen as a type of vertical search of an enterprise.",
+                "text": "Enterprise search is the practice of making content from multiple enterprise-type sources, such as databases and intranets, searchable to a defined audience.\n\"Enterprise search\" is used to describe the software of search information within an enterprise (though the search function and its results may still be public). Enterprise search can be contrasted with web search, which applies search technology to documents on the open web, and desktop search, which applies search technology to the content on a single computer.\nEnterprise search systems index data and documents from a variety of sources such as: file systems, intranets, document management systems, e-mail, and databases. Many enterprise search systems integrate structured and unstructured data in their collections.[3] Enterprise search systems also use access controls to enforce a security policy on their users.\nEnterprise search can be seen as a type of vertical search of an enterprise.",
                 "timestamp": "20180129125400",
                 "title": "Enterprise search"
               }
             },
-            "pos": 0,
+            "score": 1.8455226333928205,
             "rank": 0,
-            "score": 1.7928099079920008
+            "pos": 0
           },
           {
             "doc": {
@@ -44,9 +49,9 @@ You can see the result in JSON format. The result of the above command is:
                 "title": "Federated search"
               }
             },
-            "pos": 1,
+            "score": 1.8252014574100586,
             "rank": 1,
-            "score": 1.7730448689827392
+            "pos": 1
           },
           {
             "doc": {
@@ -58,23 +63,23 @@ You can see the result in JSON format. The result of the above command is:
                 "title": "Web search engine"
               }
             },
-            "pos": 2,
+            "score": 1.7381779253336536,
             "rank": 2,
-            "score": 1.6882037387583286
+            "pos": 2
           },
           {
             "doc": {
               "fields": {
                 "contributor": "43.225.167.166",
                 "id": "1",
-                "text": "A search engine is an information retrieval system designed to help find information stored on a computer system. The search results are usually presented in a list and are commonly called hits. Search engines help to minimize the time required to find information and the amount of information which must be consulted, akin to other techniques for managing information overload. The most public, visible form of a search engine is a Web search engine which searches for information on the World Wide Web.",
+                "text": "A search engine is an information retrieval system designed to help find information stored on a computer system. The search results are usually presented in a list and are commonly called hits. Search engines help to minimize the time required to find information and the amount of information which must be consulted, akin to other techniques for managing information overload.\nThe most public, visible form of a search engine is a Web search engine which searches for information on the World Wide Web.",
                 "timestamp": "20180704054100",
                 "title": "Search engine (computing)"
               }
             },
-            "pos": 3,
+            "score": 1.7118135656658342,
             "rank": 3,
-            "score": 1.6626056232111253
+            "pos": 3
           },
           {
             "doc": {
@@ -86,23 +91,18 @@ You can see the result in JSON format. The result of the above command is:
                 "title": "Distributed search engine"
               }
             },
-            "pos": 4,
+            "score": 1.635459291513833,
             "rank": 4,
-            "score": 1.5883802067794877
+            "pos": 4
           }
-        ],
-        "is_last_page": true,
-        "page_count": 1,
-        "page_len": 5,
-        "page_num": 1,
-        "total": 5
+        ]
       },
+      "time": 0.015053987503051758,
       "status": {
         "code": 200,
-        "description": "Request fulfilled, document follows",
-        "phrase": "OK"
-      },
-      "time": 0.021579980850219727
+        "phrase": "OK",
+        "description": "Request fulfilled, document follows"
+      }
     }
 
 
@@ -113,7 +113,7 @@ You can specify the weighting model for scoring. Searching documents by the foll
 
 .. code-block:: bash
 
-    $ curl -s -X POST -H "Content-type: text/x-yaml" --data-binary @./conf/weighting.yaml http://localhost:8080/indices/myindex/search?query=search | jq .
+    $ curl -s -X POST -H "Content-type: application/yaml" --data-binary @./example/weighting.yaml http://localhost:8080/indices/myindex/search?query=search
 
 
 You can see the result in JSON format. The result of the above command is:
@@ -122,6 +122,11 @@ You can see the result in JSON format. The result of the above command is:
 
     {
       "results": {
+        "is_last_page": true,
+        "page_count": 1,
+        "page_len": 5,
+        "page_num": 1,
+        "total": 5,
         "hits": [
           {
             "doc": {
@@ -133,23 +138,23 @@ You can see the result in JSON format. The result of the above command is:
                 "title": "Distributed search engine"
               }
             },
-            "pos": 0,
+            "score": 1.2593559704393607,
             "rank": 0,
-            "score": 1.245740159716303
+            "pos": 0
           },
           {
             "doc": {
               "fields": {
                 "contributor": "43.225.167.166",
                 "id": "1",
-                "text": "A search engine is an information retrieval system designed to help find information stored on a computer system. The search results are usually presented in a list and are commonly called hits. Search engines help to minimize the time required to find information and the amount of information which must be consulted, akin to other techniques for managing information overload. The most public, visible form of a search engine is a Web search engine which searches for information on the World Wide Web.",
+                "text": "A search engine is an information retrieval system designed to help find information stored on a computer system. The search results are usually presented in a list and are commonly called hits. Search engines help to minimize the time required to find information and the amount of information which must be consulted, akin to other techniques for managing information overload.\nThe most public, visible form of a search engine is a Web search engine which searches for information on the World Wide Web.",
                 "timestamp": "20180704054100",
                 "title": "Search engine (computing)"
               }
             },
-            "pos": 1,
+            "score": 0.8549746180097756,
             "rank": 1,
-            "score": 0.8458503364028286
+            "pos": 1
           },
           {
             "doc": {
@@ -161,9 +166,9 @@ You can see the result in JSON format. The result of the above command is:
                 "title": "Web search engine"
               }
             },
-            "pos": 2,
+            "score": 0.715387103404354,
             "rank": 2,
-            "score": 0.7080130633767222
+            "pos": 2
           },
           {
             "doc": {
@@ -175,35 +180,30 @@ You can see the result in JSON format. The result of the above command is:
                 "title": "Federated search"
               }
             },
-            "pos": 3,
+            "score": 0.34750237609370616,
             "rank": 3,
-            "score": 0.34399698713879023
+            "pos": 3
           },
           {
             "doc": {
               "fields": {
                 "contributor": "KolbertBot",
                 "id": "3",
-                "text": "Enterprise search is the practice of making content from multiple enterprise-type sources, such as databases and intranets, searchable to a defined audience. \"Enterprise search\" is used to describe the software of search information within an enterprise (though the search function and its results may still be public). Enterprise search can be contrasted with web search, which applies search technology to documents on the open web, and desktop search, which applies search technology to the content on a single computer. Enterprise search systems index data and documents from a variety of sources such as: file systems, intranets, document management systems, e-mail, and databases. Many enterprise search systems integrate structured and unstructured data in their collections.[3] Enterprise search systems also use access controls to enforce a security policy on their users. Enterprise search can be seen as a type of vertical search of an enterprise.",
+                "text": "Enterprise search is the practice of making content from multiple enterprise-type sources, such as databases and intranets, searchable to a defined audience.\n\"Enterprise search\" is used to describe the software of search information within an enterprise (though the search function and its results may still be public). Enterprise search can be contrasted with web search, which applies search technology to documents on the open web, and desktop search, which applies search technology to the content on a single computer.\nEnterprise search systems index data and documents from a variety of sources such as: file systems, intranets, document management systems, e-mail, and databases. Many enterprise search systems integrate structured and unstructured data in their collections.[3] Enterprise search systems also use access controls to enforce a security policy on their users.\nEnterprise search can be seen as a type of vertical search of an enterprise.",
                 "timestamp": "20180129125400",
                 "title": "Enterprise search"
               }
             },
-            "pos": 4,
+            "score": 0.2707206302805044,
             "rank": 4,
-            "score": 0.2683300227447003
+            "pos": 4
           }
-        ],
-        "is_last_page": true,
-        "page_count": 1,
-        "page_len": 5,
-        "page_num": 1,
-        "total": 5
+        ]
       },
+      "time": 0.029244184494018555,
       "status": {
         "code": 200,
-        "description": "Request fulfilled, document follows",
-        "phrase": "OK"
-      },
-      "time": 0.043231964111328125
+        "phrase": "OK",
+        "description": "Request fulfilled, document follows"
+      }
     }

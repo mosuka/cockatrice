@@ -4,15 +4,15 @@ Index APIs
 The Index API is used to manage individual indices.
 
 
-Create Index API
-----------------
+Put Index API
+-------------
 
 The Create Index API is used to manually create an index in Cockatrice.
 The most basic usage is the following:
 
 .. code-block:: text
 
-    PUT /indices/<INDEX_NAME>?sync=<SYNC>
+    PUT /indices/<INDEX_NAME>?sync=<SYNC>&output=<OUTPUT>
     ---
     schema:
       id:
@@ -24,7 +24,8 @@ The most basic usage is the following:
 
 * ``<INDEX_NAME>``: The index name.
 * ``<SYNC>``: Specifies whether to execute the command synchronously or asynchronously. If ``True`` is specified, command will execute synchronously. Default is ``False``, command will execute asynchronously.
-* Request Body: YAML formatted schema definition.
+* ``<OUTPUT>``: The output format. ``json`` or ``yaml``. Default is ``json``.
+* Request Body: JSON or YAML formatted schema definition.
 
 
 Get Index API
@@ -35,9 +36,10 @@ The most basic usage is the following:
 
 .. code-block:: text
 
-    GET /indices/<INDEX_NAME>
+    GET /indices/<INDEX_NAME>?output=<OUTPUT>
 
 * ``<INDEX_NAME>``: The index name.
+* ``<OUTPUT>``: The output format. ``json`` or ``yaml``. Default is ``json``.
 
 
 Delete Index API
@@ -48,7 +50,8 @@ The most basic usage is the following:
 
 .. code-block:: text
 
-    DELETE /indices/<INDEX_NAME>?sync=<SYNC>
+    DELETE /indices/<INDEX_NAME>?sync=<SYNC>&output=<OUTPUT>
 
 * ``<INDEX_NAME>``: The index name.
 * ``<SYNC>``: Specifies whether to execute the command synchronously or asynchronously. If ``True`` is specified, command will execute synchronously. Default is ``False``, command will execute asynchronously.
+* ``<OUTPUT>``: The output format. ``json`` or ``yaml``. Default is ``json``.

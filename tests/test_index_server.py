@@ -20,6 +20,7 @@ import unittest
 from logging import DEBUG, Formatter, getLogger, INFO, StreamHandler
 from tempfile import TemporaryDirectory
 
+import yaml
 from pysyncobj import SyncObjConf
 from whoosh.filedb.filestore import FileStorage
 
@@ -31,7 +32,6 @@ from cockatrice.schema import Schema
 class TestIndexServer(unittest.TestCase):
     def setUp(self):
         self.temp_dir = TemporaryDirectory()
-        self.conf_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '../conf'))
         self.example_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '../example'))
 
         host = '0.0.0.0'
@@ -61,19 +61,38 @@ class TestIndexServer(unittest.TestCase):
         self.index_server.stop()
         self.temp_dir.cleanup()
 
-    def test_create_index(self):
-        with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            schema_yaml = file_obj.read()
+    def test_create_index_from_yaml(self):
+        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
+            __dict = yaml.safe_load(file_obj.read())
+        schema = Schema(__dict)
 
         # create index
         index_name = 'test_file_index'
-        schema = Schema(schema_yaml)
         index = self.index_server.create_index(index_name, schema, sync=True)
         self.assertTrue(isinstance(index.storage, FileStorage))
 
         # create index
         index_name = 'test2_file_index'
-        schema = Schema(schema_yaml)
+        index = self.index_server.create_index(index_name, schema, sync=True)
+        self.assertTrue(isinstance(index.storage, FileStorage))
+
+        # check the number of file file indices
+        expected_file_count = 2
+        actual_file_count = len(self.index_server.get_file_storage().list())
+        self.assertEqual(expected_file_count, actual_file_count)
+
+    def test_create_index_from_json(self):
+        with open(self.example_dir + '/schema.json', 'r', encoding='utf-8') as file_obj:
+            __dict = json.loads(file_obj.read())
+        schema = Schema(__dict)
+
+        # create index
+        index_name = 'test_file_index'
+        index = self.index_server.create_index(index_name, schema, sync=True)
+        self.assertTrue(isinstance(index.storage, FileStorage))
+
+        # create index
+        index_name = 'test2_file_index'
         index = self.index_server.create_index(index_name, schema, sync=True)
         self.assertTrue(isinstance(index.storage, FileStorage))
 
@@ -83,18 +102,17 @@ class TestIndexServer(unittest.TestCase):
         self.assertEqual(expected_file_count, actual_file_count)
 
     def test_delete_index(self):
-        with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            schema_yaml = file_obj.read()
+        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
+            __dict = yaml.safe_load(file_obj.read())
+        schema = Schema(__dict)
 
         # create index
         index_name = 'test_file_index'
-        schema = Schema(schema_yaml)
         index = self.index_server.create_index(index_name, schema, sync=True)
         self.assertTrue(isinstance(index.storage, FileStorage))
 
         # create index
         index_name = 'test2_file_index'
-        schema = Schema(schema_yaml)
         index = self.index_server.create_index(index_name, schema, sync=True)
         self.assertTrue(isinstance(index.storage, FileStorage))
 
@@ -108,12 +126,12 @@ class TestIndexServer(unittest.TestCase):
         self.assertEqual(expected_file_count, actual_file_count)
 
     def test_get_index(self):
-        with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            schema_yaml = file_obj.read()
+        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
+            __dict = yaml.safe_load(file_obj.read())
+        schema = Schema(__dict)
 
         # create index
         index_name = 'test_file_index'
-        schema = Schema(schema_yaml)
         index = self.index_server.create_index(index_name, schema, sync=True)
         self.assertTrue(isinstance(index.storage, FileStorage))
 
@@ -121,12 +139,12 @@ class TestIndexServer(unittest.TestCase):
         self.assertTrue(isinstance(i.storage, FileStorage))
 
     def test_index_document(self):
-        with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            schema_yaml = file_obj.read()
+        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
+            __dict = yaml.safe_load(file_obj.read())
+        schema = Schema(__dict)
 
         # create index
         index_name = 'test_file_index'
-        schema = Schema(schema_yaml)
         self.index_server.create_index(index_name, schema, sync=True)
 
         test_doc_id = '1'
@@ -144,12 +162,12 @@ class TestIndexServer(unittest.TestCase):
         self.assertEqual(expected_count, actual_count)
 
     def test_delete(self):
-        with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            schema_yaml = file_obj.read()
+        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
+            __dict = yaml.safe_load(file_obj.read())
+        schema = Schema(__dict)
 
         # create index
         index_name = 'test_file_index'
-        schema = Schema(schema_yaml)
         self.index_server.create_index(index_name, schema, sync=True)
 
         test_doc_id = '1'
@@ -175,12 +193,12 @@ class TestIndexServer(unittest.TestCase):
         self.assertEqual(expected_count, actual_count)
 
     def test_index_documents(self):
-        with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            schema_yaml = file_obj.read()
+        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
+            __dict = yaml.safe_load(file_obj.read())
+        schema = Schema(__dict)
 
         # create index
         index_name = 'test_file_index'
-        schema = Schema(schema_yaml)
         self.index_server.create_index(index_name, schema, sync=True)
 
         with open(self.example_dir + '/bulk_index.json', 'r', encoding='utf-8') as file_obj:
@@ -215,12 +233,12 @@ class TestIndexServer(unittest.TestCase):
         self.assertEqual(expected_count, actual_count)
 
     def test_delete_documents(self):
-        with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            schema_yaml = file_obj.read()
+        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
+            __dict = yaml.safe_load(file_obj.read())
+        schema = Schema(__dict)
 
         # create index
         index_name = 'test_file_index'
-        schema = Schema(schema_yaml)
         self.index_server.create_index(index_name, schema, sync=True)
 
         with open(self.example_dir + '/bulk_index.json', 'r', encoding='utf-8') as file_obj:
@@ -286,12 +304,12 @@ class TestIndexServer(unittest.TestCase):
         self.assertEqual(expected_count, actual_count)
 
     def test_get_document(self):
-        with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            schema_yaml = file_obj.read()
+        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
+            __dict = yaml.safe_load(file_obj.read())
+        schema = Schema(__dict)
 
         # create index
         index_name = 'test_file_index'
-        schema = Schema(schema_yaml)
         self.index_server.create_index(index_name, schema, sync=True)
 
         test_doc_id = '1'
@@ -309,12 +327,12 @@ class TestIndexServer(unittest.TestCase):
         self.assertEqual(expected_count, actual_count)
 
     def test_search_documents(self):
-        with open(self.conf_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            schema_yaml = file_obj.read()
+        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
+            __dict = yaml.safe_load(file_obj.read())
+        schema = Schema(__dict)
 
         # create file index
         index_name = 'test_file_index'
-        schema = Schema(schema_yaml)
         self.index_server.create_index(index_name, schema, sync=True)
 
         with open(self.example_dir + '/bulk_index.json', 'r', encoding='utf-8') as file_obj:

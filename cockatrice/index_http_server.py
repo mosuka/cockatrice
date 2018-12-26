@@ -20,7 +20,8 @@ from http import HTTPStatus
 from logging import getLogger
 from threading import Thread
 
-from flask import after_this_request, Flask, jsonify, request, Response
+import yaml
+from flask import after_this_request, Flask, request, Response
 from prometheus_client.core import CollectorRegistry, Counter, Gauge, Histogram
 from prometheus_client.exposition import CONTENT_TYPE_LATEST, generate_latest
 from werkzeug.serving import make_server
@@ -280,8 +281,10 @@ class IndexHTTPServer:
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
 
+        output = request.args.get('output', default='json', type=str).lower()
+
         # make response
-        resp = jsonify(data)
+        resp = make_response(data, output)
         resp.status_code = status_code
 
         return resp
@@ -303,7 +306,17 @@ class IndexHTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            index = self.__index_server.create_index(index_name, Schema(request.data), sync=sync)
+            try:
+                if 'application/yaml' in request.headers.get('Content-Type'):
+                    schema = Schema(yaml.safe_load(request.data.decode("utf-8")))
+                elif 'application/json' in request.headers.get('Content-Type'):
+                    schema = Schema(json.loads(request.data.decode("utf-8")))
+                else:
+                    raise ValueError('unsupported Content-Type')
+            except Exception as ex:
+                raise ex
+
+            index = self.__index_server.create_index(index_name, schema, sync=sync)
 
             if sync:
                 if index is None:
@@ -312,7 +325,7 @@ class IndexHTTPServer:
                     status_code = HTTPStatus.CREATED
             else:
                 status_code = HTTPStatus.ACCEPTED
-        except json.decoder.JSONDecodeError as ex:
+        except (json.decoder.JSONDecodeError, ValueError) as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.BAD_REQUEST
             self.__logger.error(ex)
@@ -325,8 +338,10 @@ class IndexHTTPServer:
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
 
+        output = request.args.get('output', default='json', type=str).lower()
+
         # make response
-        resp = jsonify(data)
+        resp = make_response(data, output)
         resp.status_code = status_code
 
         return resp
@@ -362,8 +377,10 @@ class IndexHTTPServer:
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
 
+        output = request.args.get('output', default='json', type=str).lower()
+
         # make response
-        resp = jsonify(data)
+        resp = make_response(data, output)
         resp.status_code = status_code
 
         return resp
@@ -399,8 +416,10 @@ class IndexHTTPServer:
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
 
+        output = request.args.get('output', default='json', type=str).lower()
+
         # make response
-        resp = jsonify(data)
+        resp = make_response(data, output)
         resp.status_code = status_code
 
         return resp
@@ -422,14 +441,11 @@ class IndexHTTPServer:
             if results_page.total <= 0:
                 raise KeyError('{0} does not exist in {1}'.format(doc_id, index_name))
 
-            fields = {}
-
             hit = results_page.results[0]
+            fields = {}
             for i in hit.iteritems():
                 fields[i[0]] = i[1]
-
-            doc = {'fields': fields}
-            data['doc'] = doc
+            data['fields'] = fields
 
             status_code = HTTPStatus.OK
         except KeyError as ex:
@@ -445,8 +461,10 @@ class IndexHTTPServer:
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
 
+        output = request.args.get('output', default='json', type=str).lower()
+
         # make response
-        resp = jsonify(data)
+        resp = make_response(data, output)
         resp.status_code = status_code
 
         return resp
@@ -467,7 +485,18 @@ class IndexHTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            self.__index_server.put_document(index_name, doc_id, json.loads(request.data, encoding='utf-8'), sync=sync)
+            try:
+                if 'application/yaml' in request.headers.get('Content-Type'):
+                    print(request.get_data(as_text=False, parse_form_data=True))
+                    doc = yaml.safe_load(request.data.decode("utf-8"))
+                elif 'application/json' in request.headers.get('Content-Type'):
+                    doc = json.loads(request.data.decode("utf-8"))
+                else:
+                    raise ValueError('unsupported Content-Type')
+            except Exception as ex:
+                raise ex
+
+            self.__index_server.put_document(index_name, doc_id, doc, sync=sync)
 
             if sync:
                 status_code = HTTPStatus.CREATED
@@ -486,8 +515,10 @@ class IndexHTTPServer:
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
 
+        output = request.args.get('output', default='json', type=str).lower()
+
         # make response
-        resp = jsonify(data)
+        resp = make_response(data, output)
         resp.status_code = status_code
 
         return resp
@@ -527,8 +558,10 @@ class IndexHTTPServer:
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
 
+        output = request.args.get('output', default='json', type=str).lower()
+
         # make response
-        resp = jsonify(data)
+        resp = make_response(data, output)
         resp.status_code = status_code
 
         return resp
@@ -549,7 +582,17 @@ class IndexHTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            cnt = self.__index_server.put_documents(index_name, json.loads(request.data), sync=sync)
+            try:
+                if 'application/yaml' in request.headers.get('Content-Type'):
+                    docs = yaml.safe_load(request.data)
+                elif 'application/json' in request.headers.get('Content-Type'):
+                    docs = json.loads(request.data)
+                else:
+                    raise ValueError('unsupported Content-Type')
+            except Exception as ex:
+                raise ex
+
+            cnt = self.__index_server.put_documents(index_name, docs, sync=sync)
             if cnt is not None:
                 data['count'] = cnt
 
@@ -570,8 +613,10 @@ class IndexHTTPServer:
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
 
+        output = request.args.get('output', default='json', type=str).lower()
+
         # make response
-        resp = jsonify(data)
+        resp = make_response(data, output)
         resp.status_code = status_code
 
         return resp
@@ -592,7 +637,17 @@ class IndexHTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            cnt = self.__index_server.delete_documents(index_name, json.loads(request.data), sync=sync)
+            try:
+                if 'application/yaml' in request.headers.get('Content-Type'):
+                    doc_ids = yaml.safe_load(request.data)
+                elif 'application/json' in request.headers.get('Content-Type'):
+                    doc_ids = json.loads(request.data)
+                else:
+                    raise ValueError('unsupported Content-Type')
+            except Exception as ex:
+                raise ex
+
+            cnt = self.__index_server.delete_documents(index_name, doc_ids, sync=sync)
             if cnt is not None:
                 data['count'] = cnt
 
@@ -613,8 +668,10 @@ class IndexHTTPServer:
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
 
+        output = request.args.get('output', default='json', type=str).lower()
+
         # make response
-        resp = jsonify(data)
+        resp = make_response(data, output)
         resp.status_code = status_code
 
         return resp
@@ -631,19 +688,22 @@ class IndexHTTPServer:
         data = {}
         status_code = None
         try:
-            weighting = BM25F
-            if len(request.data) > 0:
-                try:
-                    weighting = get_multi_weighting(request.data)
-                except Exception as ex:
-                    self.__logger.error('failed to load weighting config: {0}'.format(ex))
-
             query = request.args.get('query', default='', type=str)
-
             search_field = request.args.get('search_field', default=self.__index_server.get_index(
                 index_name).schema.get_default_search_field(), type=str)
             page_num = request.args.get('page_num', default=1, type=int)
             page_len = request.args.get('page_len', default=10, type=int)
+            weighting = BM25F
+            if len(request.data) > 0:
+                try:
+                    if 'application/yaml' in request.headers.get('Content-Type'):
+                        weighting = get_multi_weighting(yaml.safe_load(request.data))
+                    elif 'application/json' in request.headers.get('Content-Type'):
+                        weighting = get_multi_weighting(json.loads(request.data))
+                    else:
+                        raise ValueError('unsupported Content-Type')
+                except Exception as ex:
+                    self.__logger.error('failed to load weighting config: {0}'.format(ex))
 
             results_page = self.__index_server.search_documents(index_name, query, search_field, page_num,
                                                                 page_len=page_len, weighting=weighting)
@@ -686,8 +746,10 @@ class IndexHTTPServer:
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
 
+        output = request.args.get('output', default='json', type=str).lower()
+
         # make response
-        resp = jsonify(data)
+        resp = make_response(data, output)
         resp.status_code = status_code
 
         return resp
@@ -715,8 +777,10 @@ class IndexHTTPServer:
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
 
+        output = request.args.get('output', default='json', type=str).lower()
+
         # make response
-        resp = jsonify(data)
+        resp = make_response(data, output)
         resp.status_code = status_code
 
         return resp
@@ -733,7 +797,7 @@ class IndexHTTPServer:
         data = {}
         status_code = None
         try:
-            data['node_status'] = self.__index_server.getStatus()
+            data['cluster'] = self.__index_server.getStatus()
             status_code = HTTPStatus.OK
         except Exception as ex:
             data['error'] = '{0}'.format(ex.args[0])
@@ -744,8 +808,10 @@ class IndexHTTPServer:
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
 
+        output = request.args.get('output', default='json', type=str).lower()
+
         # make response
-        resp = jsonify(data)
+        resp = make_response(data, output)
         resp.status_code = status_code
 
         return resp
@@ -774,8 +840,10 @@ class IndexHTTPServer:
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
 
+        output = request.args.get('output', default='json', type=str).lower()
+
         # make response
-        resp = jsonify(data)
+        resp = make_response(data, output)
         resp.status_code = status_code
 
         return resp
@@ -794,7 +862,7 @@ class IndexHTTPServer:
         try:
             self.__index_server.removeNodeFromCluster(node_name)
 
-            data['cluster_status'] = self.__index_server.getStatus()
+            data['cluster'] = self.__index_server.getStatus()
 
             status_code = HTTPStatus.OK
         except Exception as ex:
@@ -806,8 +874,10 @@ class IndexHTTPServer:
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
 
+        output = request.args.get('output', default='json', type=str).lower()
+
         # make response
-        resp = jsonify(data)
+        resp = make_response(data, output)
         resp.status_code = status_code
 
         return resp
@@ -862,8 +932,10 @@ class IndexHTTPServer:
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
 
+        output = request.args.get('output', default='json', type=str).lower()
+
         # make response
-        resp = jsonify(data)
+        resp = make_response(data, output)
         resp.status_code = status_code
 
         return resp
@@ -895,8 +967,10 @@ class IndexHTTPServer:
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
 
+        output = request.args.get('output', default='json', type=str).lower()
+
         # make response
-        resp = jsonify(data)
+        resp = make_response(data, output)
         resp.status_code = status_code
 
         return resp
@@ -954,11 +1028,26 @@ class IndexHTTPServer:
             data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
                               'description': status_code.description}
 
+        output = request.args.get('output', default='json', type=str).lower()
+
         # make response
-        resp = jsonify(data)
+        resp = make_response(data, output)
         resp.status_code = status_code
 
         return resp
 
     def get_test_client(self, ues_cookies=True, **kwargs):
         return self.__app.test_client(ues_cookies, **kwargs)
+
+
+def make_response(data, output='json'):
+    resp = Response()
+
+    if output == 'json':
+        resp.data = json.dumps(data, indent=2)
+        resp.content_type = 'application/json; charset="UTF-8"'
+    elif output == 'yaml':
+        resp.data = yaml.safe_dump(data, default_flow_style=False, indent=2)
+        resp.content_type = 'application/yaml; charset="UTF-8"'
+
+    return resp
