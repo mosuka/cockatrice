@@ -4,6 +4,7 @@ Cockatrice Change Log
 
 December 25, 2018
 
+* Support JSON and YAML
 * Add --log-file-max-bytes, --log-file-backup-count, --http-log-file-max-bytes, --http-log-file-backup-count flags
 
 
