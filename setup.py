@@ -70,7 +70,7 @@ setup(
         'prometheus_client==0.3.1',
         'whoosh==2.7.4',
         'pyyaml==3.13',
-        'janome==0.3.6',
+        'janome==0.3.7',
         'werkzeug==0.14.1'
     ],
     entry_points={
