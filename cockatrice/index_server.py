@@ -57,23 +57,24 @@ class IndexServer(SyncObj):
 
         self.__logger.info('index server started')
 
-        # waiting for the preparation to be completed
-        while not self.isReady():
-            self.__logger.info('waiting for the cluster to be ready')
-            time.sleep(1)
-        self.__logger.info('the index server is ready')
-
         # open existing indices on startup
         self.__logger.info('opening existing indices')
         self.__open_existing_indices()
         self.__logger.info('existing indices opened')
 
+        # waiting for the preparation to be completed
+        while not self.isReady():
+            # recovering data
+            self.__logger.info('waiting for the cluster to be ready')
+            time.sleep(1)
+        self.__logger.info('the index server is ready')
+
     def stop(self):
         self.__logger.info('stopping index server')
         for index_name in self.__indices.keys():
             self.close_index(index_name)
-
         self.destroy()
+        self.__logger.info('index server stopped')
 
     def destroy(self):
         super().destroy()
@@ -109,22 +110,22 @@ class IndexServer(SyncObj):
             return True
 
     def __serialize(self, filename, raft_data):
-        self.__logger.info('serializing data')
+        self.__logger.info('creating snapshot file: {0}'.format(filename))
         try:
             with self.__lock:
-                self.__logger.info('creating {0}'.format(filename))
                 with zipfile.ZipFile(filename, 'w', zipfile.ZIP_DEFLATED) as f:
                     for index_filename in self.__file_storage:
                         abs_index_path = os.path.join(self.__file_storage.folder, index_filename)
-                        self.__logger.info('storing {0}'.format(abs_index_path))
+                        self.__logger.info('storing index file: {0}'.format(abs_index_path))
                         f.write(abs_index_path, index_filename)
-                    self.__logger.info('storing Raft data')
+                    self.__logger.info('storing raft transaction log')
                     f.writestr('raft.bin', pickle.dumps(raft_data))
+                self.__logger.info('snapshot file created: {0}'.format(filename))
         except Exception as ex:
             self.__logger.error(ex)
 
     def __deserialize(self, filename):
-        self.__logger.info('deserializing data')
+        self.__logger.info('restoring from snapshot: {0}'.format(self.__conf.fullDumpFile))
         try:
             with self.__lock:
                 self.__logger.info('cleaning {0}'.format(self.__file_storage.folder))
@@ -155,41 +156,52 @@ class IndexServer(SyncObj):
         for filename in self.__file_storage:
             match = pattern_toc.search(filename)
             if match:
+                self.__logger.debug(
+                    '{0} found in file storage on {1}'.format(match.group(1), self.__file_storage.folder))
                 index_names.append(match.group(1))
 
         return index_names
 
     def __open_existing_indices(self):
         for index_name in self.__get_existing_index_names():
-            self.open_index(index_name, schema=None)
+            self.open_index(index_name, schema=None, _doApply=False)
 
+    @replicated
     def open_index(self, index_name, schema=None):
         index = None
 
         try:
-            if self.__file_storage.index_exists(indexname=index_name):
-                self.__logger.info('opening {0} in file storage on {1}'.format(index_name, self.__file_storage.folder))
-                index = self.__file_storage.open_index(indexname=index_name, schema=schema)
+            self.__logger.info('opening {0} in file storage on {1}'.format(index_name, self.__file_storage.folder))
+            if not self.__index_exists(index_name):
+                raise KeyError(
+                    '{0} does not exist in file storage on {1}'.format(index_name, self.__file_storage.folder))
+            if index_name in self.__indices:
+                index = self.__indices[index_name]
+                self.__logger.info(
+                    '{0} in file storage on {1} already opened'.format(index_name, self.__file_storage.folder))
             else:
-                raise KeyError('{0} does not exist on {1}'.format(index_name, self.__file_storage.folder))
-            self.__indices[index_name] = index
+                index = self.__file_storage.open_index(indexname=index_name, schema=schema)
+                self.__indices[index_name] = index
+                self.__logger.info('{0} in file storage on {1} opened'.format(index_name, self.__file_storage.folder))
         except Exception as ex:
-            self.__logger.error('failed to open {0}: {1}'.format(index_name, ex))
+            self.__logger.info(
+                'failed to open {0} in file storage on {1}: {2}'.format(index_name, self.__file_storage.folder, ex))
 
         return index
 
     @replicated
     def close_index(self, index_name):
-        index = self.__indices.pop(index_name)
-
-        if index is None:
-            self.__logger.info('{0} already closed'.format(index_name))
-        else:
-            if index.storage.folder == '':
-                self.__logger.info('closing {0} in ram storage on memory'.format(index_name))
+        try:
+            index = self.__indices.pop(index_name)
+            self.__logger.info('closing {0} in file storage on {1}'.format(index_name, index.storage.folder))
+            if index is None:
+                raise KeyError('{0} in file storage on {1} already closed'.format(index_name, index.storage.folder))
             else:
-                self.__logger.info('closing {0} in file storage on {1}'.format(index_name, index.storage.folder))
-            index.close()
+                index.close()
+            self.__logger.info('{0} in file storage on {1} closed'.format(index_name, index.storage.folder))
+        except Exception as ex:
+            self.__logger.error(
+                'failed to close {0} in file storage on {1}: {2}'.format(index_name, index.storage.folder, ex))
 
         return index
 
@@ -199,13 +211,15 @@ class IndexServer(SyncObj):
 
         try:
             if self.__index_exists(index_name):
-                raise KeyError('index already exists')
-
-            self.__logger.info('creating {0} in file storage on {1}'.format(index_name, self.__file_storage.folder))
-            self.__indices[index_name] = self.__file_storage.create_index(schema, indexname=index_name)
-            index = self.__indices[index_name]
+                self.open_index(index_name, schema=schema, _doApply=True)
+            else:
+                self.__logger.info('creating {0} in file storage on {1}'.format(index_name, self.__file_storage.folder))
+                self.__indices[index_name] = self.__file_storage.create_index(schema, indexname=index_name)
+                index = self.__indices[index_name]
+                self.__logger.info('{0} in file storage on {1} created'.format(index_name, self.__file_storage.folder))
         except Exception as ex:
-            self.__logger.error('failed to create {0}: {1}'.format(index_name, ex))
+            self.__logger.error(
+                'failed to close {0} in file storage on {1}: {2}'.format(index_name, self.__file_storage.folder, ex))
 
         return index
 
@@ -219,7 +233,6 @@ class IndexServer(SyncObj):
         # delete index files
         try:
             self.__logger.info('deleting {0} in file storage on {1}'.format(index_name, self.__file_storage.folder))
-
             pattern_toc = re.compile('^_{0}_(\\d+)\\.toc$'.format(index_name))
             for filename in self.__file_storage:
                 if re.match(pattern_toc, filename):
@@ -235,10 +248,11 @@ class IndexServer(SyncObj):
                 if re.match(pattern_lock, filename):
                     self.__logger.info('deleting {0}'.format(os.path.join(self.__file_storage.folder, filename)))
                     self.__file_storage.delete_file(filename)
-
             success = True
+            self.__logger.info('{0} in file storage on {1} deleted'.format(index_name, self.__file_storage.folder))
         except Exception as ex:
-            self.__logger.error('failed to delete {0}: {1}'.format(index_name, ex))
+            self.__logger.error(
+                'failed to delete {0} in file storage on {1}: {2}'.format(index_name, self.__file_storage.folder, ex))
 
         return success
 
@@ -259,12 +273,10 @@ class IndexServer(SyncObj):
 
         try:
             index = self.get_index(index_name)
-            if index.storage.folder == '':
-                self.__logger.info('optimizing {0} in ram storage on memory'.format(index_name))
-            else:
-                self.__logger.info('optimizing {0} in file storage on {1}'.format(index_name, index.storage.folder))
+            self.__logger.info('optimizing {0} in file storage on {1}'.format(index_name, index.storage.folder))
             index.optimize()
             success = True
+            self.__logger.info('{0} in file storage on {1} optimized'.format(index_name, index.storage.folder))
         except Exception as ex:
             self.__logger.error('failed to optimize {0}: {1}'.format(index_name, ex))
 
@@ -314,17 +326,18 @@ class IndexServer(SyncObj):
         success = False
 
         try:
+            self.__logger.debug('putting document in {0}: {1} {2}'.format(index_name, doc_id, fields))
+
             writer = self.get_writer(index_name)
             doc = {
                 self.get_schema(index_name).get_unique_field(): doc_id
             }
             doc.update(fields)
             try:
-                self.__logger.debug('indexing document in {0}: {1}'.format(index_name, doc))
                 writer.update_document(**doc)
                 success = True
             except Exception as ex:
-                self.__logger.error('failed to index document in {0}: {1}'.format(index_name, doc))
+                self.__logger.error('failed to put document in {0}: {1}'.format(index_name, doc))
                 raise ex
             finally:
                 if success:
@@ -341,10 +354,11 @@ class IndexServer(SyncObj):
         success = False
 
         try:
-            writer = self.get_writer(index_name)
+            self.__logger.debug('deleting document in {0}: {1}'.format(index_name, doc_id))
+
             unique_field = self.get_schema(index_name).get_unique_field()
+            writer = self.get_writer(index_name)
             try:
-                self.__logger.debug('deleting document in {0}: {1}:{2}'.format(index_name, unique_field, doc_id))
                 writer.delete_by_term(unique_field, doc_id)
                 success = True
             except Exception as ex:
