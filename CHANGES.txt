@@ -1,5 +1,11 @@
 Cockatrice Change Log
 
+==================== Cockatrice 0.6.3 ====================
+
+December 27, 2018
+
+* Bump up version
+
 ==================== Cockatrice 0.6.2 ====================
 
 December 27, 2018

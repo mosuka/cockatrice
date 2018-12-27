@@ -15,4 +15,4 @@
 # limitations under the License.
 
 NAME = 'cockatrice'
-VERSION = '0.6.2'
+VERSION = '0.6.3'
