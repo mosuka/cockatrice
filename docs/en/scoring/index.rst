@@ -109,8 +109,8 @@ Example
 
 Refer to the example for how to define schema.
 
-YAML example: https://github.com/mosuka/cockatrice/blob/master/example/weighting.yaml
-JSON example: https://github.com/mosuka/cockatrice/blob/master/example/weighting.json
+* YAML example: https://github.com/mosuka/cockatrice/blob/master/example/weighting.yaml
+* JSON example: https://github.com/mosuka/cockatrice/blob/master/example/weighting.json
 
 
 More information

@@ -399,8 +399,8 @@ Example
 
 Refer to the example for how to define schema.
 
-YAML example: https://github.com/mosuka/cockatrice/blob/master/example/schema.yaml
-JSON example: https://github.com/mosuka/cockatrice/blob/master/example/schema.json
+* YAML example: https://github.com/mosuka/cockatrice/blob/master/example/schema.yaml
+* JSON example: https://github.com/mosuka/cockatrice/blob/master/example/schema.json
 
 More information
 ----------------
