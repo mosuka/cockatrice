@@ -1,7 +1,7 @@
 Health check
 ============
 
-Cockatrice provides a health endpoint which returns 200 if Cockatrice is live or ready to response to queries.
+Cockatrice provides a health check endpoint which returns 200 if Cockatrice is live or ready to response to queries.
 
 
 Liveness probe

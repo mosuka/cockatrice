@@ -1,13 +1,13 @@
-Monitoring Cockatrice
+Monitoring
 =====================
 
-The ``/-/_metrics`` endpoint provides access to all the metrics. Cockatrice outputs metrics in `Prometheus <https://prometheus.io>`_ exposition format.
+The ``/metrics`` endpoint provides access to all the metrics. Cockatrice outputs metrics in `Prometheus exposition format <https://prometheus.io/docs/instrumenting/exposition_formats/>`_.
 
 
 Get metrics
 -----------
 
-If you already started a cockatrice, you can get metrics by the following command:
+You can get metrics by the following command:
 
 .. code-block:: bash
 

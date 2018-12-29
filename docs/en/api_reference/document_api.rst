@@ -1,7 +1,6 @@
 Document APIs
 =============
 
-
 Get Document API
 ----------------
 
