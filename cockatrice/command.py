@@ -96,3 +96,11 @@ def delete_node(node_name, bind_addr='127.0.0.1:7070', password=None, timeout=1)
 
 def get_snapshot(bind_addr='127.0.0.1:7070', password=None, timeout=1):
     return execute('get_snapshot', args=None, bind_addr=bind_addr, password=password, timeout=timeout)
+
+
+def is_alive(bind_addr='127.0.0.1:7070', password=None, timeout=1):
+    return execute('is_alive', args=None, bind_addr=bind_addr, password=password, timeout=timeout) == 'True'
+
+
+def is_ready(bind_addr='127.0.0.1:7070', password=None, timeout=1):
+    return execute('is_ready', args=None, bind_addr=bind_addr, password=password, timeout=timeout) == 'True'

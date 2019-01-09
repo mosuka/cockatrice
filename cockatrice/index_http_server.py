@@ -14,22 +14,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import _pickle as pickle
 import json
 import time
 from http import HTTPStatus
 from logging import getLogger
 from threading import Thread
 
+import grpc
+import mimeparse
 import yaml
 from flask import after_this_request, Flask, request, Response
 from prometheus_client.core import CollectorRegistry, Counter, Gauge, Histogram
 from prometheus_client.exposition import CONTENT_TYPE_LATEST, generate_latest
 from werkzeug.serving import make_server
-from whoosh.scoring import BM25F
+from yaml.constructor import ConstructorError
 
 from cockatrice import NAME, VERSION
-from cockatrice.schema import Schema
-from cockatrice.scoring import get_multi_weighting
+from cockatrice.protobuf.index_pb2 import CreateIndexRequest, CreateSnapshotRequest, DeleteDocumentRequest, \
+    DeleteDocumentsRequest, DeleteIndexRequest, DeleteNodeRequest, GetDocumentRequest, GetIndexRequest, GetNodeRequest, \
+    GetSnapshotRequest, IsAliveRequest, IsReadyRequest, OptimizeIndexRequest, PutDocumentRequest, PutDocumentsRequest, \
+    PutNodeRequest, SearchDocumentsRequest, SnapshotExistsRequest
+from cockatrice.protobuf.index_pb2_grpc import IndexStub
 
 TRUE_STRINGS = ['true', 'yes', 'on', 't', 'y', '1']
 
@@ -37,7 +43,6 @@ TRUE_STRINGS = ['true', 'yes', 'on', 't', 'y', '1']
 class ServerThread(Thread):
     def __init__(self, host, port, app, logger=getLogger()):
         self.__logger = logger
-        self.__logger.info('creating server thread')
 
         Thread.__init__(self)
         self.srv = make_server(host, port, app)
@@ -45,26 +50,23 @@ class ServerThread(Thread):
         self.ctx.push()
 
     def run(self):
-        self.__logger.info('starting server thread')
         self.srv.serve_forever()
 
     def shutdown(self):
-        self.__logger.info('stopping server thread')
         self.srv.shutdown()
 
 
 class IndexHTTPServer:
-    def __init__(self, index_server, host='localhost', port=8080, logger=getLogger(), http_logger=getLogger(),
+    def __init__(self, grpc_port=5050, host='localhost', port=8080, logger=getLogger(),
+                 http_logger=getLogger(),
                  metrics_registry=CollectorRegistry()):
         self.__logger = logger
         self.__http_logger = http_logger
         self.__metrics_registry = metrics_registry
 
+        self.__grpc_port = grpc_port
         self.__host = host
         self.__port = port
-        self.__index_server = index_server
-
-        self.__logger.info('starting index http server: {0}'.format(self.__port))
 
         self.__app = Flask('index_http_server')
         self.__app.add_url_rule('/', endpoint='root', view_func=self.__root, methods=['GET'])
@@ -88,15 +90,15 @@ class IndexHTTPServer:
                                 view_func=self.__search_documents, methods=['GET', 'POST'])
         self.__app.add_url_rule('/indices/<index_name>/optimize', endpoint='optimize_index',
                                 view_func=self.__optimize_index, methods=['GET'])
-        self.__app.add_url_rule('/cluster', endpoint='get_cluster', view_func=self.__get_cluster, methods=['GET'])
-        self.__app.add_url_rule('/cluster/<node_name>', endpoint='put_node', view_func=self.__put_node, methods=['PUT'])
-        self.__app.add_url_rule('/cluster/<node_name>', endpoint='delete_node', view_func=self.__delete_node,
+        self.__app.add_url_rule('/nodes', endpoint='get_node', view_func=self.__get_node, methods=['GET'])
+        self.__app.add_url_rule('/nodes/<node_name>', endpoint='put_node', view_func=self.__put_node, methods=['PUT'])
+        self.__app.add_url_rule('/nodes/<node_name>', endpoint='delete_node', view_func=self.__delete_node,
                                 methods=['DELETE'])
+        self.__app.add_url_rule('/snapshot', endpoint='get_snapshot', view_func=self.__get_snapshot, methods=['GET'])
+        self.__app.add_url_rule('/snapshot', endpoint='put_snapshot', view_func=self.__put_snapshot, methods=['PUT'])
         self.__app.add_url_rule('/metrics', endpoint='metrics', view_func=self.__metrics, methods=['GET'])
         self.__app.add_url_rule('/health/liveness', endpoint='liveness', view_func=self.__liveness, methods=['GET'])
         self.__app.add_url_rule('/health/readiness', endpoint='readiness', view_func=self.__readiness, methods=['GET'])
-        self.__app.add_url_rule('/snapshot', endpoint='get_snapshot', view_func=self.__get_snapshot, methods=['GET'])
-        self.__app.add_url_rule('/snapshot', endpoint='put_snapshot', view_func=self.__put_snapshot, methods=['PUT'])
 
         # disable Flask default logger
         self.__app.logger.disabled = True
@@ -149,18 +151,22 @@ class IndexHTTPServer:
             registry=self.__metrics_registry
         )
 
+        self.__grpc_channel = grpc.insecure_channel('{0}:{1}'.format(self.__host, self.__grpc_port))
+        self.__index_stub = IndexStub(self.__grpc_channel)
+
         self.__server_thread = None
         try:
             # run server
             self.__server_thread = ServerThread(self.__host, self.__port, self.__app, logger=self.__logger)
             self.__server_thread.start()
-            self.__logger.info('index http server started')
+            self.__logger.info('HTTP server started')
         except Exception as ex:
             self.__logger.critical(ex)
 
     def stop(self):
-        self.__logger.info('stopping index http server')
         self.__server_thread.shutdown()
+
+        self.__grpc_channel.close()
 
     def __record_http_log(self, req, resp):
         log_message = '{0} - {1} [{2}] "{3} {4} {5}" {6} {7} "{8}" "{9}"'.format(
@@ -203,18 +209,18 @@ class IndexHTTPServer:
 
         return
 
-    def __record_index_metrics(self, index_name):
-        doc_count = self.__index_server.get_doc_count(index_name)
-        if doc_count is not None:
-            self.__metrics_index_documents.labels(
-                index_name=index_name,
-            ).set(doc_count)
-        else:
-            self.__metrics_index_documents.labels(
-                index_name=index_name,
-            ).set(0)
-
-        return
+    # def __record_index_metrics(self, index_name):
+    #     doc_count = self.__index_server.get_doc_count(index_name)
+    #     if doc_count is not None:
+    #         self.__metrics_index_documents.labels(
+    #             index_name=index_name,
+    #         ).set(doc_count)
+    #     else:
+    #         self.__metrics_index_documents.labels(
+    #             index_name=index_name,
+    #         ).set(0)
+    #
+    #     return
 
     def __root(self):
         start_time = time.time()
@@ -226,6 +232,7 @@ class IndexHTTPServer:
             return response
 
         resp = Response()
+
         try:
             resp.status_code = HTTPStatus.OK
             resp.content_type = 'text/plain; charset="UTF-8"'
@@ -238,7 +245,7 @@ class IndexHTTPServer:
 
         return resp
 
-    def __get_index(self, index_name):
+    def __create_index(self, index_name):
         start_time = time.time()
 
         @after_this_request
@@ -249,28 +256,42 @@ class IndexHTTPServer:
 
         data = {}
         status_code = None
-        try:
-            index = self.__index_server.get_index(index_name)
-            if index is None:
-                raise KeyError('index does not exist')
 
-            data['index'] = {}
-            data['index']['name'] = index_name
-            data['index']['doc_count'] = index.doc_count()
-            data['index']['doc_count_all'] = index.doc_count_all()
-            data['index']['last_modified'] = index.last_modified()
-            data['index']['latest_generation'] = index.latest_generation()
-            data['index']['version'] = index.version
-            data['index']['storage'] = {
-                'folder': index.storage.folder,
-                'supports_mmap': index.storage.supports_mmap,
-                'readonly': index.storage.readonly,
-                'files': index.storage.list()
-            }
-            status_code = HTTPStatus.OK
-        except KeyError as ex:
+        try:
+            mime = mimeparse.parse_mime_type(request.headers.get('Content-Type'))
+            charset = 'utf-8' if mime[2].get('charset') is None else mime[2].get('charset')
+            if mime[1] == 'yaml':
+                schema_dict = yaml.safe_load(request.data.decode(charset))
+            elif mime[1] in ['application/json']:
+                schema_dict = json.loads(request.data.decode(charset))
+            else:
+                raise ValueError('unsupported format')
+
+            if schema_dict is None:
+                raise ValueError('schema is None')
+
+            sync = False
+            if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
+                sync = True
+
+            rpc_req = CreateIndexRequest()
+            rpc_req.index_name = index_name
+            rpc_req.schema = pickle.dumps(schema_dict)
+            rpc_req.sync = sync
+
+            rpc_resp = self.__index_stub.CreateIndex(rpc_req)
+
+            if sync:
+                if rpc_resp.status.success:
+                    status_code = HTTPStatus.CREATED
+                else:
+                    data['error'] = '{0}'.format(rpc_resp.status.message)
+                    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            else:
+                status_code = HTTPStatus.ACCEPTED
+        except (yaml.constructor.ConstructorError, json.decoder.JSONDecodeError, ValueError) as ex:
             data['error'] = '{0}'.format(ex.args[0])
-            status_code = HTTPStatus.NOT_FOUND
+            status_code = HTTPStatus.BAD_REQUEST
             self.__logger.error(ex)
         except Exception as ex:
             data['error'] = '{0}'.format(ex.args[0])
@@ -289,11 +310,8 @@ class IndexHTTPServer:
 
         return resp
 
-    def __create_index(self, index_name):
+    def __get_index(self, index_name):
         start_time = time.time()
-
-        data = {}
-        status_code = None
 
         @after_this_request
         def to_do_after_this_request(response):
@@ -301,34 +319,37 @@ class IndexHTTPServer:
             self.__record_http_metrics(start_time, request, response)
             return response
 
+        data = {}
+        status_code = None
+
         try:
-            sync = False
-            if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
-                sync = True
+            rpc_req = GetIndexRequest()
+            rpc_req.index_name = index_name
 
-            try:
-                if 'application/yaml' in request.headers.get('Content-Type'):
-                    schema = Schema(yaml.safe_load(request.data.decode("utf-8")))
-                elif 'application/json' in request.headers.get('Content-Type'):
-                    schema = Schema(json.loads(request.data.decode("utf-8")))
-                else:
-                    raise ValueError('unsupported Content-Type')
-            except Exception as ex:
-                raise ex
+            rpc_resp = self.__index_stub.GetIndex(rpc_req)
 
-            index = self.__index_server.create_index(index_name, schema, sync=sync)
-
-            if sync:
-                if index is None:
-                    raise ValueError('failed to create index')
-                else:
-                    status_code = HTTPStatus.CREATED
+            if rpc_resp.status.success:
+                data['index_stats'] = {
+                    'name': rpc_resp.index_stats.name,
+                    'doc_count': rpc_resp.index_stats.doc_count,
+                    'doc_count_all': rpc_resp.index_stats.doc_count_all,
+                    'last_modified': rpc_resp.index_stats.last_modified,
+                    'latest_generation': rpc_resp.index_stats.latest_generation,
+                    'version': rpc_resp.index_stats.version,
+                    'storage': {
+                        'folder': rpc_resp.index_stats.storage.folder,
+                        'supports_mmap': rpc_resp.index_stats.storage.supports_mmap,
+                        'readonly': rpc_resp.index_stats.storage.readonly,
+                        'files': [file for file in rpc_resp.index_stats.storage.files]
+                    }
+                }
+                status_code = HTTPStatus.OK
             else:
-                status_code = HTTPStatus.ACCEPTED
-        except (json.decoder.JSONDecodeError, ValueError) as ex:
-            data['error'] = '{0}'.format(ex.args[0])
-            status_code = HTTPStatus.BAD_REQUEST
-            self.__logger.error(ex)
+                data['error'] = '{0}'.format(rpc_resp.status.message)
+                if '{0} does not exist'.format(rpc_req.index_name) == rpc_resp.status.message:
+                    status_code = HTTPStatus.NOT_FOUND
+                else:
+                    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
         except Exception as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.INTERNAL_SERVER_ERROR
@@ -357,15 +378,24 @@ class IndexHTTPServer:
 
         data = {}
         status_code = None
+
         try:
             sync = False
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            self.__index_server.delete_index(index_name, sync=sync)
+            rpc_req = DeleteIndexRequest()
+            rpc_req.index_name = index_name
+            rpc_req.sync = sync
+
+            rpc_resp = self.__index_stub.DeleteIndex(rpc_req)
 
             if sync:
-                status_code = HTTPStatus.OK
+                if rpc_resp.status.success:
+                    status_code = HTTPStatus.OK
+                else:
+                    data['error'] = '{0}'.format(rpc_resp.status.message)
+                    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
             else:
                 status_code = HTTPStatus.ACCEPTED
         except Exception as ex:
@@ -396,62 +426,26 @@ class IndexHTTPServer:
 
         data = {}
         status_code = None
+
         try:
             sync = False
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            self.__index_server.optimize_index(index_name, sync=sync)
+            rpc_req = OptimizeIndexRequest()
+            rpc_req.index_name = index_name
+            rpc_req.sync = sync
+
+            rpc_resp = self.__index_stub.OptimizeIndex(rpc_req)
 
             if sync:
-                status_code = HTTPStatus.OK
+                if rpc_resp.status.success:
+                    status_code = HTTPStatus.OK
+                else:
+                    data['error'] = '{0}'.format(rpc_resp.status.message)
+                    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
             else:
                 status_code = HTTPStatus.ACCEPTED
-        except Exception as ex:
-            data['error'] = '{0}'.format(ex.args[0])
-            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
-            self.__logger.error(ex)
-        finally:
-            data['time'] = time.time() - start_time
-            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
-                              'description': status_code.description}
-
-        output = request.args.get('output', default='json', type=str).lower()
-
-        # make response
-        resp = make_response(data, output)
-        resp.status_code = status_code
-
-        return resp
-
-    def __get_document(self, index_name, doc_id):
-        start_time = time.time()
-
-        @after_this_request
-        def to_do_after_this_request(response):
-            self.__record_http_log(request, response)
-            self.__record_http_metrics(start_time, request, response)
-            return response
-
-        data = {}
-        status_code = None
-        try:
-            results_page = self.__index_server.get_document(index_name, doc_id)
-
-            if results_page.total <= 0:
-                raise KeyError('{0} does not exist in {1}'.format(doc_id, index_name))
-
-            hit = results_page.results[0]
-            fields = {}
-            for i in hit.iteritems():
-                fields[i[0]] = i[1]
-            data['fields'] = fields
-
-            status_code = HTTPStatus.OK
-        except KeyError as ex:
-            data['error'] = '{0}'.format(ex.args[0])
-            status_code = HTTPStatus.NOT_FOUND
-            self.__logger.error(ex)
         except Exception as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.INTERNAL_SERVER_ERROR
@@ -480,32 +474,89 @@ class IndexHTTPServer:
 
         data = {}
         status_code = None
+
         try:
+            mime = mimeparse.parse_mime_type(request.headers.get('Content-Type'))
+            charset = 'utf-8' if mime[2].get('charset') is None else mime[2].get('charset')
+            if mime[1] == 'yaml':
+                fields_dict = yaml.safe_load(request.data.decode(charset))
+            elif mime[1] == 'json':
+                fields_dict = json.loads(request.data.decode(charset))
+            else:
+                raise ValueError('unsupported format')
+
+            if fields_dict is None:
+                raise ValueError('fields are None')
+
             sync = False
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            try:
-                if 'application/yaml' in request.headers.get('Content-Type'):
-                    print(request.get_data(as_text=False, parse_form_data=True))
-                    doc = yaml.safe_load(request.data.decode("utf-8"))
-                elif 'application/json' in request.headers.get('Content-Type'):
-                    doc = json.loads(request.data.decode("utf-8"))
-                else:
-                    raise ValueError('unsupported Content-Type')
-            except Exception as ex:
-                raise ex
+            rpc_req = PutDocumentRequest()
+            rpc_req.index_name = index_name
+            rpc_req.doc_id = doc_id
+            rpc_req.fields = pickle.dumps(fields_dict)
+            rpc_req.sync = sync
 
-            self.__index_server.put_document(index_name, doc_id, doc, sync=sync)
+            rpc_resp = self.__index_stub.PutDocument(rpc_req)
 
             if sync:
-                status_code = HTTPStatus.CREATED
+                if rpc_resp.status.success:
+                    status_code = HTTPStatus.CREATED
+                else:
+                    data['error'] = '{0}'.format(rpc_resp.status.message)
+                    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
             else:
                 status_code = HTTPStatus.ACCEPTED
-        except json.decoder.JSONDecodeError as ex:
+        except (yaml.constructor.ConstructorError, json.decoder.JSONDecodeError, ValueError) as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.BAD_REQUEST
             self.__logger.error(ex)
+        except Exception as ex:
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            self.__logger.error(ex)
+        finally:
+            data['time'] = time.time() - start_time
+            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+                              'description': status_code.description}
+
+        output = request.args.get('output', default='json', type=str).lower()
+
+        # make response
+        resp = make_response(data, output)
+        resp.status_code = status_code
+
+        return resp
+
+    def __get_document(self, index_name, doc_id):
+        start_time = time.time()
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            self.__record_http_log(request, response)
+            self.__record_http_metrics(start_time, request, response)
+            return response
+
+        data = {}
+        status_code = None
+
+        try:
+            rpc_req = GetDocumentRequest()
+            rpc_req.index_name = index_name
+            rpc_req.doc_id = doc_id
+
+            rpc_resp = self.__index_stub.GetDocument(rpc_req)
+
+            if rpc_resp.status.success:
+                data['fields'] = pickle.loads(rpc_resp.fields)
+                status_code = HTTPStatus.OK
+            else:
+                data['error'] = '{0}'.format(rpc_resp.status.message)
+                if '{0} does not exist in {1}'.format(rpc_req.doc_id, rpc_req.index_name) == rpc_resp.status.message:
+                    status_code = HTTPStatus.NOT_FOUND
+                else:
+                    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
         except Exception as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.INTERNAL_SERVER_ERROR
@@ -534,21 +585,31 @@ class IndexHTTPServer:
 
         data = {}
         status_code = None
+
         try:
             sync = False
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            self.__index_server.delete_document(index_name, doc_id, sync=sync)
+            rpc_req = DeleteDocumentRequest()
+            rpc_req.index_name = index_name
+            rpc_req.doc_id = doc_id
+            rpc_req.sync = sync
+
+            rpc_resp = self.__index_stub.DeleteDocument(rpc_req)
 
             if sync:
-                status_code = HTTPStatus.OK
+                if rpc_resp.status.success:
+                    status_code = HTTPStatus.OK
+                else:
+                    data['error'] = '{0}'.format(rpc_resp.status.message)
+                    if '{0} does not exist in {1}'.format(rpc_req.doc_id,
+                                                          rpc_req.index_name) == rpc_resp.status.message:
+                        status_code = HTTPStatus.NOT_FOUND
+                    else:
+                        status_code = HTTPStatus.INTERNAL_SERVER_ERROR
             else:
                 status_code = HTTPStatus.ACCEPTED
-        except KeyError as ex:
-            data['error'] = '{0}'.format(ex.args[0])
-            status_code = HTTPStatus.NOT_FOUND
-            self.__logger.error(ex)
         except Exception as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.INTERNAL_SERVER_ERROR
@@ -577,30 +638,38 @@ class IndexHTTPServer:
 
         data = {}
         status_code = None
+
         try:
+            mime = mimeparse.parse_mime_type(request.headers.get('Content-Type'))
+            charset = 'utf-8' if mime[2].get('charset') is None else mime[2].get('charset')
+            if mime[1] == 'yaml':
+                docs_dict = yaml.safe_load(request.data.decode(charset))
+            elif mime[1] == 'json':
+                docs_dict = json.loads(request.data.decode(charset))
+            else:
+                raise ValueError('unsupported format')
+
             sync = False
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            try:
-                if 'application/yaml' in request.headers.get('Content-Type'):
-                    docs = yaml.safe_load(request.data)
-                elif 'application/json' in request.headers.get('Content-Type'):
-                    docs = json.loads(request.data)
-                else:
-                    raise ValueError('unsupported Content-Type')
-            except Exception as ex:
-                raise ex
+            rpc_req = PutDocumentsRequest()
+            rpc_req.index_name = index_name
+            rpc_req.docs = pickle.dumps(docs_dict)
+            rpc_req.sync = sync
 
-            cnt = self.__index_server.put_documents(index_name, docs, sync=sync)
-            if cnt is not None:
-                data['count'] = cnt
+            rpc_resp = self.__index_stub.PutDocuments(rpc_req)
 
             if sync:
-                status_code = HTTPStatus.CREATED
+                if rpc_resp.status.success:
+                    data['count'] = rpc_resp.count
+                    status_code = HTTPStatus.CREATED
+                else:
+                    data['error'] = '{0}'.format(rpc_resp.status.message)
+                    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
             else:
                 status_code = HTTPStatus.ACCEPTED
-        except json.decoder.JSONDecodeError as ex:
+        except (yaml.constructor.ConstructorError, json.decoder.JSONDecodeError, ValueError) as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.BAD_REQUEST
             self.__logger.error(ex)
@@ -632,32 +701,40 @@ class IndexHTTPServer:
 
         data = {}
         status_code = None
+
         try:
+            mime = mimeparse.parse_mime_type(request.headers.get('Content-Type'))
+            charset = 'utf-8' if mime[2].get('charset') is None else mime[2].get('charset')
+            if mime[1] == 'yaml':
+                doc_ids_list = yaml.safe_load(request.data.decode(charset))
+            elif mime[1] == 'json':
+                doc_ids_list = json.loads(request.data.decode(charset))
+            else:
+                raise ValueError('unsupported format')
+
             sync = False
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            try:
-                if 'application/yaml' in request.headers.get('Content-Type'):
-                    doc_ids = yaml.safe_load(request.data)
-                elif 'application/json' in request.headers.get('Content-Type'):
-                    doc_ids = json.loads(request.data)
-                else:
-                    raise ValueError('unsupported Content-Type')
-            except Exception as ex:
-                raise ex
+            rpc_req = DeleteDocumentsRequest()
+            rpc_req.index_name = index_name
+            rpc_req.doc_ids = pickle.dumps(doc_ids_list)
+            rpc_req.sync = True
 
-            cnt = self.__index_server.delete_documents(index_name, doc_ids, sync=sync)
-            if cnt is not None:
-                data['count'] = cnt
+            rpc_resp = self.__index_stub.DeleteDocuments(rpc_req)
 
             if sync:
-                status_code = HTTPStatus.OK
+                if rpc_resp.status.success:
+                    data['count'] = rpc_resp.count
+                    status_code = HTTPStatus.OK
+                else:
+                    data['error'] = '{0}'.format(rpc_resp.status.message)
+                    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
             else:
                 status_code = HTTPStatus.ACCEPTED
-        except KeyError as ex:
+        except (yaml.constructor.ConstructorError, json.decoder.JSONDecodeError, ValueError) as ex:
             data['error'] = '{0}'.format(ex.args[0])
-            status_code = HTTPStatus.NOT_FOUND
+            status_code = HTTPStatus.BAD_REQUEST
             self.__logger.error(ex)
         except Exception as ex:
             data['error'] = '{0}'.format(ex.args[0])
@@ -687,118 +764,36 @@ class IndexHTTPServer:
 
         data = {}
         status_code = None
+
         try:
-            query = request.args.get('query', default='', type=str)
-            search_field = request.args.get('search_field', default=self.__index_server.get_index(
-                index_name).schema.get_default_search_field(), type=str)
-            page_num = request.args.get('page_num', default=1, type=int)
-            page_len = request.args.get('page_len', default=10, type=int)
-            weighting = BM25F
+            rpc_req = SearchDocumentsRequest()
+            rpc_req.index_name = index_name
+            rpc_req.query = request.args.get('query', default='', type=str)
+            rpc_req.search_field = request.args.get('search_field', default='', type=str)
+            rpc_req.page_num = request.args.get('page_num', default=1, type=int)
+            rpc_req.page_len = request.args.get('page_len', default=10, type=int)
             if len(request.data) > 0:
-                try:
-                    if 'application/yaml' in request.headers.get('Content-Type'):
-                        weighting = get_multi_weighting(yaml.safe_load(request.data))
-                    elif 'application/json' in request.headers.get('Content-Type'):
-                        weighting = get_multi_weighting(json.loads(request.data))
-                    else:
-                        raise ValueError('unsupported Content-Type')
-                except Exception as ex:
-                    self.__logger.error('failed to load weighting config: {0}'.format(ex))
+                mime = mimeparse.parse_mime_type(request.headers.get('Content-Type'))
+                charset = 'utf-8' if mime[2].get('charset') is None else mime[2].get('charset')
+                if mime[1] == 'yaml':
+                    rpc_req.weighting = pickle.dumps(yaml.safe_load(request.data.decode(charset)))
+                elif mime[1] == 'json':
+                    rpc_req.weighting = pickle.dumps(json.loads(request.data.decode(charset)))
+                else:
+                    raise ValueError('unsupported format')
 
-            results_page = self.__index_server.search_documents(index_name, query, search_field, page_num,
-                                                                page_len=page_len, weighting=weighting)
+            rpc_resp = self.__index_stub.SearchDocuments(rpc_req)
 
-            data['results'] = {
-                'is_last_page': results_page.is_last_page(),
-                'page_count': results_page.pagecount,
-                'page_len': results_page.pagelen,
-                'page_num': results_page.pagenum,
-                'total': results_page.total
-            }
-            if results_page.pagecount >= page_num or results_page.total <= 0:
-                hits = []
-                for result in results_page.results[results_page.offset:]:
-                    doc = {'fields': {}}
-                    for item in result.iteritems():
-                        doc['fields'][item[0]] = item[1]
-                    hit = {
-                        'doc': doc,
-                        'score': result.score,
-                        'rank': result.rank,
-                        'pos': result.pos
-                    }
-                    hits.append(hit)
-                data['results']['hits'] = hits
+            if rpc_resp.status.success:
+                data['results'] = pickle.loads(rpc_resp.results)
+                status_code = HTTPStatus.OK
             else:
-                raise ValueError('page_num must be <= {0}'.format(results_page.pagecount))
-
-            status_code = HTTPStatus.OK
-        except ValueError as ex:
+                data['error'] = '{0}'.format(rpc_resp.status.message)
+                status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+        except (yaml.constructor.ConstructorError, json.decoder.JSONDecodeError, ValueError) as ex:
             data['error'] = '{0}'.format(ex.args[0])
-            status_code = HTTPStatus.MISDIRECTED_REQUEST
+            status_code = HTTPStatus.BAD_REQUEST
             self.__logger.error(ex)
-        except Exception as ex:
-            data['error'] = '{0}'.format(ex.args[0])
-            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
-            self.__logger.error(ex)
-        finally:
-            data['time'] = time.time() - start_time
-            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
-                              'description': status_code.description}
-
-        output = request.args.get('output', default='json', type=str).lower()
-
-        # make response
-        resp = make_response(data, output)
-        resp.status_code = status_code
-
-        return resp
-
-    def __get_node(self):
-        start_time = time.time()
-
-        @after_this_request
-        def to_do_after_this_request(response):
-            self.__record_http_log(request, resp)
-            self.__record_http_metrics(start_time, request, resp)
-            return response
-
-        data = {}
-        status_code = None
-        try:
-            data['node'] = self.__index_server.getStatus()
-            status_code = HTTPStatus.OK
-        except Exception as ex:
-            data['error'] = '{0}'.format(ex.args[0])
-            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
-            self.__logger.error(ex)
-        finally:
-            data['time'] = time.time() - start_time
-            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
-                              'description': status_code.description}
-
-        output = request.args.get('output', default='json', type=str).lower()
-
-        # make response
-        resp = make_response(data, output)
-        resp.status_code = status_code
-
-        return resp
-
-    def __get_cluster(self):
-        start_time = time.time()
-
-        @after_this_request
-        def to_do_after_this_request(response):
-            self.__record_http_log(request, resp)
-            self.__record_http_metrics(start_time, request, resp)
-            return response
-
-        data = {}
-        status_code = None
-        try:
-            data['cluster'] = self.__index_server.getStatus()
-            status_code = HTTPStatus.OK
         except Exception as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.INTERNAL_SERVER_ERROR
@@ -828,9 +823,54 @@ class IndexHTTPServer:
         data = {}
         status_code = None
         try:
-            self.__index_server.addNodeToCluster(node_name)
+            rpc_req = PutNodeRequest()
+            rpc_req.node_name = node_name
 
-            status_code = HTTPStatus.OK
+            rpc_resp = self.__index_stub.PutNode(rpc_req)
+
+            if rpc_resp.status.success:
+                status_code = HTTPStatus.OK
+            else:
+                data['error'] = '{0}'.format(rpc_resp.status.message)
+                status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+        except Exception as ex:
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            self.__logger.error(ex)
+        finally:
+            data['time'] = time.time() - start_time
+            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+                              'description': status_code.description}
+
+        output = request.args.get('output', default='json', type=str).lower()
+
+        # make response
+        resp = make_response(data, output)
+        resp.status_code = status_code
+
+        return resp
+
+    def __get_node(self):
+        start_time = time.time()
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            self.__record_http_log(request, resp)
+            self.__record_http_metrics(start_time, request, resp)
+            return response
+
+        data = {}
+        status_code = None
+
+        try:
+            rpc_resp = self.__index_stub.GetNode(GetNodeRequest())
+
+            if rpc_resp.status.success:
+                data['node_status'] = pickle.loads(rpc_resp.node_status)
+                status_code = HTTPStatus.OK
+            else:
+                data['error'] = '{0}'.format(rpc_resp.status.message)
+                status_code = HTTPStatus.INTERNAL_SERVER_ERROR
         except Exception as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.INTERNAL_SERVER_ERROR
@@ -859,12 +899,18 @@ class IndexHTTPServer:
 
         data = {}
         status_code = None
+
         try:
-            self.__index_server.removeNodeFromCluster(node_name)
+            rpc_req = DeleteNodeRequest()
+            rpc_req.node_name = node_name
 
-            data['cluster'] = self.__index_server.getStatus()
+            rpc_resp = self.__index_stub.DeleteNode(rpc_req)
 
-            status_code = HTTPStatus.OK
+            if rpc_resp.status.success:
+                status_code = HTTPStatus.OK
+            else:
+                data['error'] = '{0}'.format(rpc_resp.status.message)
+                status_code = HTTPStatus.INTERNAL_SERVER_ERROR
         except Exception as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.INTERNAL_SERVER_ERROR
@@ -882,7 +928,46 @@ class IndexHTTPServer:
 
         return resp
 
-    def __metrics(self):
+    def __put_snapshot(self):
+        start_time = time.time()
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            self.__record_http_log(request, resp)
+            self.__record_http_metrics(start_time, request, resp)
+            return response
+
+        data = {}
+        status_code = None
+
+        try:
+            rpc_req = CreateSnapshotRequest()
+
+            rpc_resp = self.__index_stub.CreateSnapshot(rpc_req)
+
+            if rpc_resp.status.success:
+                status_code = HTTPStatus.ACCEPTED
+            else:
+                data['error'] = '{0}'.format(rpc_resp.status.message)
+                status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+        except Exception as ex:
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            self.__logger.error(ex)
+        finally:
+            data['time'] = time.time() - start_time
+            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+                              'description': status_code.description}
+
+        output = request.args.get('output', default='json', type=str).lower()
+
+        # make response
+        resp = make_response(data, output)
+        resp.status_code = status_code
+
+        return resp
+
+    def __get_snapshot(self):
         start_time = time.time()
 
         @after_this_request
@@ -891,19 +976,30 @@ class IndexHTTPServer:
             self.__record_http_metrics(start_time, request, response)
             return response
 
-        # index metrics
-        for index_name in self.__index_server.get_indices().keys():
-            self.__record_index_metrics(index_name)
-
-        resp = Response()
         try:
-            resp.status_code = HTTPStatus.OK
-            resp.content_type = CONTENT_TYPE_LATEST
-            resp.data = generate_latest(self.__metrics_registry)
+            rpc_req = SnapshotExistsRequest()
+            rpc_resp = self.__index_stub.SnapshotExists(rpc_req)
+
+            if rpc_resp.status.success:
+                if rpc_resp.exist:
+                    rpc_req = GetSnapshotRequest()
+                    rpc_req.chunk_size = 1024
+
+                    rpc_resp = self.__index_stub.GetSnapshot(rpc_req)
+
+                    def generate():
+                        for snapshot in rpc_resp:
+                            yield snapshot.chunk
+
+                    resp = Response(generate(), status=HTTPStatus.OK, mimetype='application/zip', headers={
+                        "Content-Disposition": 'attachment; filename=snapshot.zip'
+                    })
+                else:
+                    resp = Response(status=HTTPStatus.NOT_FOUND)
+            else:
+                resp = Response(status=HTTPStatus.INTERNAL_SERVER_ERROR)
         except Exception as ex:
-            resp.status_code = HTTPStatus.INTERNAL_SERVER_ERROR
-            resp.content_type = 'text/plain; charset="UTF-8"'
-            resp.data = '{0}\n{1}'.format(resp.status_code.phrase, resp.status_code.description)
+            resp = Response(status=HTTPStatus.INTERNAL_SERVER_ERROR)
             self.__logger.error(ex)
 
         return resp
@@ -919,9 +1015,22 @@ class IndexHTTPServer:
 
         data = {}
         status_code = None
+
         try:
-            data['liveness'] = True
-            status_code = HTTPStatus.OK
+            rpc_req = IsAliveRequest()
+
+            rpc_resp = self.__index_stub.IsAlive(rpc_req)
+
+            if rpc_resp.status.success:
+                data['liveness'] = rpc_resp.alive
+                if rpc_resp.alive:
+                    status_code = HTTPStatus.OK
+                else:
+                    status_code = HTTPStatus.SERVICE_UNAVAILABLE
+                    data['error'] = '{0}'.format(rpc_resp.status.message)
+            else:
+                data['error'] = '{0}'.format(rpc_resp.status.message)
+                status_code = HTTPStatus.INTERNAL_SERVER_ERROR
         except Exception as ex:
             data['liveness'] = False
             data['error'] = '{0}'.format(ex.args[0])
@@ -951,12 +1060,22 @@ class IndexHTTPServer:
 
         data = {}
         status_code = None
+
         try:
-            if self.__index_server.isReady():
-                data['readiness'] = True
-                status_code = HTTPStatus.OK
+            rpc_req = IsReadyRequest()
+
+            rpc_resp = self.__index_stub.IsReady(rpc_req)
+
+            if rpc_resp.status.success:
+                data['readiness'] = rpc_resp.ready
+                if rpc_resp.ready:
+                    status_code = HTTPStatus.OK
+                else:
+                    status_code = HTTPStatus.SERVICE_UNAVAILABLE
+                    data['error'] = '{0}'.format(rpc_resp.status.message)
             else:
-                raise Exception('index server is not ready')
+                data['error'] = '{0}'.format(rpc_resp.status.message)
+                status_code = HTTPStatus.INTERNAL_SERVER_ERROR
         except Exception as ex:
             data['readiness'] = False
             data['error'] = '{0}'.format(ex.args[0])
@@ -975,7 +1094,7 @@ class IndexHTTPServer:
 
         return resp
 
-    def __get_snapshot(self):
+    def __metrics(self):
         start_time = time.time()
 
         @after_this_request
@@ -984,55 +1103,20 @@ class IndexHTTPServer:
             self.__record_http_metrics(start_time, request, response)
             return response
 
+        # # index metrics
+        # for index_name in self.__index_server.get_indices().keys():
+        #     self.__record_index_metrics(index_name)
+
         resp = Response()
         try:
             resp.status_code = HTTPStatus.OK
-            resp.headers['Content-Type'] = 'application/zip'
-            with self.__index_server.open_snapshot_file() as f:
-                resp.headers['Content-Disposition'] = 'attachment; filename=' + f.name
-                resp.data = f.read()
-        except FileNotFoundError as ex:
-            resp.status_code = HTTPStatus.NOT_FOUND
-            resp.content_type = 'text/plain; charset="UTF-8"'
-            resp.data = '{0}\n{1}'.format(resp.status_code.phrase, resp.status_code.description)
-            self.__logger.error(ex)
+            resp.content_type = CONTENT_TYPE_LATEST
+            resp.data = generate_latest(self.__metrics_registry)
         except Exception as ex:
             resp.status_code = HTTPStatus.INTERNAL_SERVER_ERROR
             resp.content_type = 'text/plain; charset="UTF-8"'
             resp.data = '{0}\n{1}'.format(resp.status_code.phrase, resp.status_code.description)
             self.__logger.error(ex)
-
-        return resp
-
-    def __put_snapshot(self):
-        start_time = time.time()
-
-        @after_this_request
-        def to_do_after_this_request(response):
-            self.__record_http_log(request, resp)
-            self.__record_http_metrics(start_time, request, resp)
-            return response
-
-        data = {}
-        status_code = None
-        try:
-            self.__index_server.forceLogCompaction()
-
-            status_code = HTTPStatus.ACCEPTED
-        except Exception as ex:
-            data['error'] = '{0}'.format(ex.args[0])
-            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
-            self.__logger.error(ex)
-        finally:
-            data['time'] = time.time() - start_time
-            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
-                              'description': status_code.description}
-
-        output = request.args.get('output', default='json', type=str).lower()
-
-        # make response
-        resp = make_response(data, output)
-        resp.status_code = status_code
 
         return resp
 

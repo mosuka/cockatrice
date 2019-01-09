@@ -69,9 +69,13 @@ setup(
         'flask==1.0.2',
         'prometheus_client==0.3.1',
         'whoosh==2.7.4',
-        'pyyaml==3.13',
+        'pyyaml==4.2b1',
         'janome==0.3.7',
-        'werkzeug==0.14.1'
+        'werkzeug==0.14.1',
+        'grpcio==1.17.1',
+        'grpcio-tools==1.17.1',
+        'protobuf==3.6.1',
+        'python-mimeparse==1.6.0'
     ],
     entry_points={
         'console_scripts': [

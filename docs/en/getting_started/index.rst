@@ -134,7 +134,7 @@ The result of the above command can be seen in the JSON format as follows:
     }
 
 
-Index a document
+Put a document
 ----------------
 
 Indexing a document needs to put a document in the request that contains fields and its values. The following command indexes the document that id is ``1`` to the index named ``myindex``:
@@ -217,7 +217,7 @@ Include multiple documents in the request, you can index documents at once. The 
 
 .. code-block:: bash
 
-    $ curl -s -X PUT -H "Content-Type:application/json" http://localhost:8080/indices/myindex/documents --data-binary @./example/bulk_index.json
+    $ curl -s -X PUT -H "Content-Type:application/json" http://localhost:8080/indices/myindex/documents --data-binary @./example/bulk_put.json
 
 The result of the above command can be seen in the JSON format as follows:
 

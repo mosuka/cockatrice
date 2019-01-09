@@ -14,12 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import socket
-from contextlib import closing
+from grpc_tools import protoc
 
-
-def get_free_port():
-    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-        s.bind(('localhost', 0))
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        return s.getsockname()[1]
+protoc.main(
+    (
+        '',
+        '-I.',
+        '--python_out=.',
+        '--grpc_python_out=.',
+        './cockatrice/protobuf/index.proto',
+    )
+)

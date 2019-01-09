@@ -28,7 +28,7 @@ from prometheus_client.core import CollectorRegistry
 from pysyncobj import SyncObjConf
 
 from cockatrice import NAME, VERSION
-from cockatrice.command import add_node, delete_node, get_snapshot, get_status
+from cockatrice.command import add_node, delete_node, get_snapshot, get_status, is_alive, is_ready
 from cockatrice.index_node import IndexNode
 
 
@@ -111,7 +111,8 @@ def server_handler(args):
     index_node = None
     try:
         index_node = IndexNode(host=args.host, port=args.port, seed_addr=args.seed_addr, conf=conf,
-                               index_dir=args.index_dir, http_port=args.http_port, logger=logger,
+                               index_dir=args.index_dir, grpc_port=args.grpc_port,
+                               grpc_max_workers=args.grpc_max_workers, http_port=args.http_port, logger=logger,
                                http_logger=http_logger, metrics_registry=metrics_registry)
         while True:
             signal.pause()
@@ -124,6 +125,14 @@ def server_handler(args):
 
 def status_handler(args):
     print(json.dumps(get_status(bind_addr=args.bind_addr, timeout=0.5)))
+
+
+def is_alive_handler(args):
+    print(is_alive(bind_addr=args.bind_addr, timeout=0.5))
+
+
+def is_ready_handler(args):
+    print(is_ready(bind_addr=args.bind_addr, timeout=0.5))
 
 
 def join_handler(args):
@@ -172,6 +181,10 @@ def main():
                                help='log-compaction interval min time in seconds')
     parser_server.add_argument('--index-dir', dest='index_dir', default='/tmp/cockatrice/index', metavar='INDEX_DIR',
                                type=str, help='index dir')
+    parser_server.add_argument('--grpc-port', dest='grpc_port', default=5050,
+                               metavar='GRPC_PORT', type=int, help='the port to listen on for gRPC traffic')
+    parser_server.add_argument('--grpc-max-workers', dest='grpc_max_workers', default=10,
+                               metavar='GRPC_MAX_WORKERS', type=int, help='the number of workers for gRPC server')
     parser_server.add_argument('--http-port', dest='http_port', default=8080,
                                metavar='HTTP_PORT', type=int, help='the port to listen on for HTTP traffic')
     parser_server.add_argument('--log-level', dest='log_level', default='DEBUG', metavar='LOG_LEVEL', type=str,
@@ -196,6 +209,20 @@ def main():
     parser_status.add_argument('--bind-addr', dest='bind_addr', default='localhost:7070', metavar='BIND_ADDR', type=str,
                                help='the address to listen on for peer traffic')
     parser_status.set_defaults(handler=status_handler)
+
+    # is_alive
+    parser_is_alive = subparsers.add_parser('is_alive', help='see `status --help`',
+                                            formatter_class=ArgumentDefaultsHelpFormatter)
+    parser_is_alive.add_argument('--bind-addr', dest='bind_addr', default='localhost:7070', metavar='BIND_ADDR',
+                                 type=str, help='the address to listen on for peer traffic')
+    parser_is_alive.set_defaults(handler=is_alive_handler)
+
+    # is_ready
+    parser_is_ready = subparsers.add_parser('is_ready', help='see `status --help`',
+                                            formatter_class=ArgumentDefaultsHelpFormatter)
+    parser_is_ready.add_argument('--bind-addr', dest='bind_addr', default='localhost:7070', metavar='BIND_ADDR',
+                                 type=str, help='the address to listen on for peer traffic')
+    parser_is_ready.set_defaults(handler=is_ready_handler)
 
     # join
     parser_join = subparsers.add_parser('join', help='see `join --help`', formatter_class=ArgumentDefaultsHelpFormatter)

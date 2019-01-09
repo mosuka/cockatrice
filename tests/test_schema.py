@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import json
 import os
 import unittest
@@ -36,27 +37,27 @@ class TestSchema(unittest.TestCase):
     def test_yaml(self):
         schema_file = self.example_dir + '/schema.yaml'
         with open(schema_file, 'r', encoding='utf-8') as file_obj:
-            __dict = yaml.safe_load(file_obj.read())
+            schema_dict = yaml.safe_load(file_obj.read())
 
-        schema = Schema(__dict)
+        schema = Schema(schema_dict)
 
         self.assertIsNotNone(schema)
 
     def test_json(self):
         schema_file = self.example_dir + '/schema.json'
         with open(schema_file, 'r', encoding='utf-8') as file_obj:
-            __dict = json.loads(file_obj.read())
+            schema_dict = json.loads(file_obj.read())
 
-        schema = Schema(__dict)
+        schema = Schema(schema_dict)
 
         self.assertIsNotNone(schema)
 
     def test_yaml_create_index(self):
         schema_file = self.example_dir + '/schema.yaml'
         with open(schema_file, 'r', encoding='utf-8') as file_obj:
-            __dict = yaml.safe_load(file_obj.read())
+            schema_dict = yaml.safe_load(file_obj.read())
 
-        schema = Schema(__dict)
+        schema = Schema(schema_dict)
 
         if self.index_dir is not None:
             os.makedirs(self.index_dir, exist_ok=True)
@@ -68,9 +69,9 @@ class TestSchema(unittest.TestCase):
     def test_json_create_index(self):
         schema_file = self.example_dir + '/schema.json'
         with open(schema_file, 'r', encoding='utf-8') as file_obj:
-            __dict = json.loads(file_obj.read())
+            schema_dict = json.loads(file_obj.read())
 
-        schema = Schema(__dict)
+        schema = Schema(schema_dict)
 
         if self.index_dir is not None:
             os.makedirs(self.index_dir, exist_ok=True)
@@ -82,33 +83,33 @@ class TestSchema(unittest.TestCase):
     def test_yaml_get_unique_field(self):
         schema_file = self.example_dir + '/schema.yaml'
         with open(schema_file, 'r', encoding='utf-8') as file_obj:
-            __dict = yaml.safe_load(file_obj.read())
+            schema_dict = yaml.safe_load(file_obj.read())
 
-        schema = Schema(__dict)
+        schema = Schema(schema_dict)
 
         expected = 'id'
-        actual = schema.get_unique_field()
+        actual = schema.get_doc_id_field()
 
         self.assertEqual(expected, actual)
 
     def test_json_get_unique_field(self):
         schema_file = self.example_dir + '/schema.json'
         with open(schema_file, 'r', encoding='utf-8') as file_obj:
-            __dict = json.loads(file_obj.read())
+            schema_dict = json.loads(file_obj.read())
 
-        schema = Schema(__dict)
+        schema = Schema(schema_dict)
 
         expected = 'id'
-        actual = schema.get_unique_field()
+        actual = schema.get_doc_id_field()
 
         self.assertEqual(expected, actual)
 
     def test_yaml_get_default_search_field(self):
         schema_file = self.example_dir + '/schema.yaml'
         with open(schema_file, 'r', encoding='utf-8') as file_obj:
-            __dict = yaml.safe_load(file_obj.read())
+            schema_dict = yaml.safe_load(file_obj.read())
 
-        schema = Schema(__dict)
+        schema = Schema(schema_dict)
 
         expected = 'text'
         actual = schema.get_default_search_field()
@@ -118,9 +119,9 @@ class TestSchema(unittest.TestCase):
     def test_json_get_default_search_field(self):
         schema_file = self.example_dir + '/schema.json'
         with open(schema_file, 'r', encoding='utf-8') as file_obj:
-            __dict = json.loads(file_obj.read())
+            schema_dict = json.loads(file_obj.read())
 
-        schema = Schema(__dict)
+        schema = Schema(schema_dict)
 
         expected = 'text'
         actual = schema.get_default_search_field()

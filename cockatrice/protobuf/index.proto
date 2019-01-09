@@ -1,0 +1,251 @@
+//  Copyright (c) 2018 Minoru Osuka
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// 		http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package protobuf;
+
+service Index {
+    rpc CreateIndex (CreateIndexRequest) returns (CreateIndexResponse) {}
+    rpc GetIndex (GetIndexRequest) returns (GetIndexResponse) {}
+    rpc DeleteIndex (DeleteIndexRequest) returns (DeleteIndexResponse) {}
+    rpc OpenIndex (OpenIndexRequest) returns (OpenIndexResponse) {}
+    rpc CloseIndex (CloseIndexRequest) returns (CloseIndexResponse) {}
+    rpc OptimizeIndex (OptimizeIndexRequest) returns (OptimizeIndexResponse) {}
+    rpc PutDocument (PutDocumentRequest) returns (PutDocumentResponse) {}
+    rpc GetDocument (GetDocumentRequest) returns (GetDocumentResponse) {}
+    rpc DeleteDocument (DeleteDocumentRequest) returns (DeleteDocumentResponse) {}
+    rpc PutDocuments (PutDocumentsRequest) returns (PutDocumentsResponse) {}
+    rpc DeleteDocuments (DeleteDocumentsRequest) returns (DeleteDocumentsResponse) {}
+    rpc SearchDocuments (SearchDocumentsRequest) returns (SearchDocumentsResponse) {}
+    rpc PutNode (PutNodeRequest) returns (PutNodeResponse) {}
+    rpc GetNode (GetNodeRequest) returns (GetNodeResponse) {}
+    rpc DeleteNode (DeleteNodeRequest) returns (DeleteNodeResponse) {}
+    rpc SnapshotExists (SnapshotExistsRequest) returns (SnapshotExistsResponse) {}
+    rpc CreateSnapshot (CreateSnapshotRequest) returns (CreateSnapshotResponse) {}
+    rpc GetSnapshot (GetSnapshotRequest) returns (stream GetSnapshotResponse) {}
+    rpc IsReady (IsReadyRequest) returns (IsReadyResponse) {}
+    rpc IsAlive (IsAliveRequest) returns (IsAliveResponse) {}
+}
+
+message Status {
+    bool success = 1;
+    string message = 2;
+}
+
+message IndexStats {
+    message Storage {
+        string folder = 1;
+        bool supports_mmap = 2;
+        bool readonly = 3;
+        repeated string files = 4;
+    }
+    string name = 1;
+    int64 doc_count = 2;
+    int64 doc_count_all = 3;
+    double last_modified = 4;
+    int64 latest_generation = 5;
+    int64 version = 6;
+    Storage storage = 7;
+}
+
+message CreateIndexRequest {
+    string index_name = 1;
+    bytes schema = 2;
+    bool sync = 3;
+}
+
+message CreateIndexResponse {
+    IndexStats index_stats = 1;
+    Status status = 2;
+}
+
+message GetIndexRequest {
+    string index_name = 1;
+}
+
+message GetIndexResponse {
+    IndexStats index_stats = 1;
+    Status status = 2;
+}
+
+message DeleteIndexRequest {
+    string index_name = 1;
+    bool sync = 2;
+}
+
+message DeleteIndexResponse {
+    IndexStats index_stats = 1;
+    Status status = 2;
+}
+
+message OpenIndexRequest {
+    string index_name = 1;
+    bytes schema = 2;
+    bool sync = 3;
+}
+
+message OpenIndexResponse {
+    IndexStats index_stats = 1;
+    Status status = 2;
+}
+
+message CloseIndexRequest {
+    string index_name = 1;
+    bool sync = 2;
+}
+
+message CloseIndexResponse {
+    IndexStats index_stats = 1;
+    Status status = 2;
+}
+
+message OptimizeIndexRequest {
+    string index_name = 1;
+    bool sync = 2;
+}
+
+message OptimizeIndexResponse {
+    IndexStats index_stats = 1;
+    Status status = 2;
+}
+
+message PutDocumentRequest {
+    string index_name = 1;
+    string doc_id = 2;
+    bytes fields = 3;
+    bool sync = 4;
+}
+
+message PutDocumentResponse {
+    int64 count = 1;
+    Status status = 2;
+}
+
+message GetDocumentRequest {
+    string index_name = 1;
+    string doc_id = 2;
+}
+
+message GetDocumentResponse {
+    bytes fields = 1;
+    Status status = 2;
+}
+
+message DeleteDocumentRequest {
+    string index_name = 1;
+    string doc_id = 2;
+    bool sync = 3;
+}
+
+message DeleteDocumentResponse {
+    int64 count = 1;
+    Status status = 2;
+}
+
+message PutDocumentsRequest {
+    string index_name = 1;
+    bytes docs = 2;
+    bool sync = 3;
+}
+
+message PutDocumentsResponse {
+    int64 count = 1;
+    Status status = 2;
+}
+
+message DeleteDocumentsRequest {
+    string index_name = 1;
+    bytes doc_ids = 2;
+    bool sync = 3;
+}
+
+message DeleteDocumentsResponse {
+    int64 count = 1;
+    Status status = 2;
+}
+
+message SearchDocumentsRequest {
+    string index_name = 1;
+    string query = 2;
+    string search_field = 3;
+    int64 page_num = 4;
+    int64 page_len = 5;
+    bytes weighting = 6;
+}
+
+message SearchDocumentsResponse {
+    bytes results = 1;
+    Status status = 2;
+}
+
+message PutNodeRequest {
+    string node_name = 1;
+}
+
+message PutNodeResponse {
+    Status status = 1;
+}
+
+message GetNodeRequest {}
+
+message GetNodeResponse {
+    bytes node_status = 1;
+    Status status = 2;
+}
+
+message DeleteNodeRequest {
+    string node_name = 1;
+}
+
+message DeleteNodeResponse {
+    Status status = 1;
+}
+
+message SnapshotExistsRequest {}
+
+message SnapshotExistsResponse {
+    bool exist = 1;
+    Status status = 2;
+}
+
+message CreateSnapshotRequest {}
+
+message CreateSnapshotResponse {
+    Status status = 1;
+}
+
+message GetSnapshotRequest {
+    int64 chunk_size = 1;
+}
+
+message GetSnapshotResponse {
+    string name = 1;
+    bytes chunk = 2;
+    Status status = 3;
+}
+
+message IsReadyRequest {}
+
+message IsReadyResponse {
+    bool ready = 1;
+    Status status = 2;
+}
+
+message IsAliveRequest {}
+
+message IsAliveResponse {
+    bool alive = 1;
+    Status status = 2;
+}

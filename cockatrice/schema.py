@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from copy import deepcopy
 
 from whoosh.fields import Schema as WhooshSchema
@@ -32,6 +33,9 @@ class Schema(WhooshSchema):
                 for arg in self.__schema_dict['schema'][field_name]['args'].keys():
                     setattr(field_type, arg, self.__schema_dict['schema'][field_name]['args'][arg])
                 self.add(field_name, field_type, glob=False)
+
+            if not self.__validate():
+                raise ValueError('invalid schema')
         except Exception as ex:
             raise ex
 
@@ -88,12 +92,19 @@ class Schema(WhooshSchema):
 
         return instance
 
-    def get_unique_field(self):
-        for name, obj in self.items():
-            if obj.unique:
-                return name
+    def __get_unique_fields(self):
+        return [name for name, field in self.items() if field.unique]
 
-        return None
+    def __validate(self):
+        valid = False
+
+        if len(self.__get_unique_fields()) == 1:
+            valid = True
+
+        return valid
+
+    def get_doc_id_field(self):
+        return self.__get_unique_fields()[0]
 
     def get_default_search_field(self):
         return self.__schema_dict['default_search_field']
