@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018 Minoru Osuka
+# Copyright (c) 2019 Minoru Osuka
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,28 +16,63 @@
 
 import copy
 import functools
+import inspect
 import os
 import re
+import socket
 import threading
 import time
 import zipfile
+from contextlib import closing
 from logging import getLogger
 
 import pysyncobj.pickle as pickle
+from prometheus_client.core import CollectorRegistry, Counter, Gauge, Histogram
 from pysyncobj import replicated, SyncObj, SyncObjConf
 from whoosh.filedb.filestore import FileStorage
 from whoosh.qparser import QueryParser
 
+from cockatrice import NAME
+from cockatrice.util.resolver import parse_addr
+from cockatrice.util.timer import RepeatedTimer
+
 
 class IndexServer(SyncObj):
-    def __init__(self, host='localhost', port=7070, peer_addrs=[], conf=SyncObjConf(),
-                 index_dir='/tmp/cockatrice/index', logger=getLogger()):
+    def __init__(self, host='localhost', port=7070, peer_addrs=None, conf=SyncObjConf(),
+                 index_dir='/tmp/cockatrice/index', logger=getLogger(), metrics_registry=CollectorRegistry()):
         self.__logger = logger
+        self.__metrics_registry = metrics_registry
+
+        # metrics
+        self.__metrics_core_documents = Gauge(
+            '{0}_index_core_documents'.format(NAME),
+            'The number of documents.',
+            [
+                'index_name',
+            ],
+            registry=self.__metrics_registry
+        )
+        self.__metrics_core_requests_total = Counter(
+            '{0}_index_core_requests_total'.format(NAME),
+            'The number of requests.',
+            [
+                'func'
+            ],
+            registry=self.__metrics_registry
+        )
+        self.__metrics_core_requests_duration_seconds = Histogram(
+            '{0}_index_core_requests_duration_seconds'.format(NAME),
+            'The invocation duration in seconds.',
+            [
+                'func'
+            ],
+            registry=self.__metrics_registry
+        )
 
         self.__lock = threading.RLock()
 
         self.__bind_addr = '{0}:{1}'.format(host, port)
-        self.__peer_addrs = peer_addrs
+        self.__peer_addrs = [] if peer_addrs is None else peer_addrs
         self.__index_dir = index_dir
         self.__conf = conf
         self.__conf.serializer = self.__serialize
@@ -63,7 +98,12 @@ class IndexServer(SyncObj):
             time.sleep(1)
         self.__logger.info('Server ready')
 
+        self.repeated_timer = RepeatedTimer(1, self.__record_metrics)
+        self.repeated_timer.start()
+
     def stop(self):
+        self.repeated_timer.cancel()
+
         for index_name in self.__indices.keys():
             self.close_index(index_name)
         self.destroy()
@@ -71,13 +111,37 @@ class IndexServer(SyncObj):
     def destroy(self):
         super().destroy()
 
-    def isAlive(self):
-        # TODO:　think about it later
-        return True
+    def __record_metrics(self):
+        for index_name in self.get_indices().keys():
+            try:
+                self.__metrics_core_documents.labels(index_name=index_name).set(self.get_doc_count(index_name))
+            except Exception as ex:
+                self.__logger.error(ex)
+
+    def __record_core_metrics(self, start_time, func_name):
+        self.__metrics_core_requests_total.labels(
+            func=func_name
+        ).inc()
+
+        self.__metrics_core_requests_duration_seconds.labels(
+            func=func_name
+        ).observe(time.time() - start_time)
+
+        return
+
+    def is_alive(self):
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
+            alive = sock.connect_ex(parse_addr(self.__bind_addr)) == 0
+
+        return alive
+
+    def is_ready(self):
+        return self.isReady()
 
     def get_addr(self):
         return self.__bind_addr
 
+    # override SyncObj.__onUtilityMessage
     def _SyncObj__onUtilityMessage(self, conn, message):
         try:
             if message[0] == 'status':
@@ -105,7 +169,7 @@ class IndexServer(SyncObj):
                     conn.send(f.read())
                 return True
             elif message[0] == 'is_alive':
-                conn.send(str(self.isAlive()))
+                conn.send(str(self.is_alive()))
                 return True
             elif message[0] == 'is_ready':
                 conn.send(str(self.isReady()))
@@ -162,6 +226,8 @@ class IndexServer(SyncObj):
 
     @replicated
     def open_index(self, index_name, schema=None):
+        start_time = time.time()
+
         index = None
 
         try:
@@ -173,11 +239,15 @@ class IndexServer(SyncObj):
         except Exception as ex:
             self.__logger.info(
                 'failed to open {0} in file storage on {1}: {2}'.format(index_name, self.__file_storage.folder, ex))
+        finally:
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return index
 
     @replicated
     def close_index(self, index_name):
+        start_time = time.time()
+
         index = None
 
         try:
@@ -187,11 +257,15 @@ class IndexServer(SyncObj):
             self.__logger.error('{0} does not exist'.format(ex.args[0]))
         except Exception as ex:
             self.__logger.error('failed to close {0}: {1}'.format(index_name, ex))
+        finally:
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return index
 
     @replicated
     def create_index(self, index_name, schema):
+        start_time = time.time()
+
         index = None
 
         try:
@@ -203,11 +277,15 @@ class IndexServer(SyncObj):
         except Exception as ex:
             self.__logger.error(
                 'failed to close {0} in file storage on {1}: {2}'.format(index_name, self.__file_storage.folder, ex))
+        finally:
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return index
 
     @replicated
     def delete_index(self, index_name):
+        start_time = time.time()
+
         # close index
         index = self.close_index(index_name, _doApply=True)
 
@@ -228,13 +306,17 @@ class IndexServer(SyncObj):
         except Exception as ex:
             self.__logger.error(
                 'failed to delete {0} in file storage on {1}: {2}'.format(index_name, self.__file_storage.folder, ex))
+        finally:
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return index
 
     def get_indices(self):
+        self.__record_core_metrics(time.time(), inspect.getframeinfo(inspect.currentframe())[2])
         return self.__indices
 
     def get_index(self, index_name):
+        start_time = time.time()
 
         try:
             index = self.__indices[index_name]
@@ -242,11 +324,15 @@ class IndexServer(SyncObj):
             raise KeyError('{0} does not exist'.format(ex.args[0]))
         except Exception as ex:
             raise ex
+        finally:
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return index
 
     @replicated
     def optimize_index(self, index_name):
+        start_time = time.time()
+
         index = None
 
         try:
@@ -254,6 +340,8 @@ class IndexServer(SyncObj):
             index.optimize()
         except Exception as ex:
             self.__logger.error('failed to optimize {0}: {1}'.format(index_name, ex))
+        finally:
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return index
 
@@ -294,6 +382,8 @@ class IndexServer(SyncObj):
 
     @replicated
     def put_document(self, index_name, doc_id, fields):
+        start_time = time.time()
+
         count = 0
         success = False
         writer = None
@@ -315,20 +405,27 @@ class IndexServer(SyncObj):
                     writer.commit()
                 else:
                     writer.cancel()
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return count
 
     def get_document(self, index_name, doc_id):
+        start_time = time.time()
+
         try:
             results_page = self.search_documents(index_name, doc_id, self.get_schema(index_name).get_doc_id_field(), 1,
                                                  page_len=1)
         except Exception as ex:
             raise ex
+        finally:
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return results_page
 
     @replicated
     def delete_document(self, index_name, doc_id):
+        start_time = time.time()
+
         count = 0
         success = False
         writer = None
@@ -346,11 +443,14 @@ class IndexServer(SyncObj):
                     writer.commit()
                 else:
                     writer.cancel()
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return count
 
     @replicated
     def put_documents(self, index_name, docs):
+        start_time = time.time()
+
         count = 0
         success = False
         writer = None
@@ -370,11 +470,14 @@ class IndexServer(SyncObj):
                     writer.commit()
                 else:
                     writer.cancel()
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return count
 
     @replicated
     def delete_documents(self, index_name, doc_ids):
+        start_time = time.time()
+
         count = 0
         success = False
         writer = None
@@ -393,10 +496,13 @@ class IndexServer(SyncObj):
                     writer.commit()
                 else:
                     writer.cancel()
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return count
 
     def search_documents(self, index_name, query, search_field, page_num, page_len=10, weighting=None, **kwargs):
+        start_time = time.time()
+
         try:
             searcher = self.get_searcher(index_name, weighting=weighting)
             query_parser = QueryParser(search_field, self.get_schema(index_name))
@@ -404,6 +510,8 @@ class IndexServer(SyncObj):
             results_page = searcher.search_page(query_obj, page_num, pagelen=page_len, **kwargs)
         except Exception as ex:
             raise ex
+        finally:
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return results_page
 

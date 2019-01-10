@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018 Minoru Osuka
+# Copyright (c) 2019 Minoru Osuka
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import grpc
 import mimeparse
 import yaml
 from flask import after_this_request, Flask, request, Response
-from prometheus_client.core import CollectorRegistry, Counter, Gauge, Histogram
+from prometheus_client.core import CollectorRegistry, Counter, Histogram
 from prometheus_client.exposition import CONTENT_TYPE_LATEST, generate_latest
 from werkzeug.serving import make_server
 from yaml.constructor import ConstructorError
@@ -57,8 +57,7 @@ class ServerThread(Thread):
 
 
 class IndexHTTPServer:
-    def __init__(self, grpc_port=5050, host='localhost', port=8080, logger=getLogger(),
-                 http_logger=getLogger(),
+    def __init__(self, grpc_port=5050, host='localhost', port=8080, logger=getLogger(), http_logger=getLogger(),
                  metrics_registry=CollectorRegistry()):
         self.__logger = logger
         self.__http_logger = http_logger
@@ -106,7 +105,7 @@ class IndexHTTPServer:
 
         # metrics
         self.__metrics_http_requests_total = Counter(
-            '{0}_http_requests_total'.format(NAME),
+            '{0}_index_http_requests_total'.format(NAME),
             'The number of requests.',
             [
                 'method',
@@ -116,7 +115,7 @@ class IndexHTTPServer:
             registry=self.__metrics_registry
         )
         self.__metrics_http_requests_bytes_total = Counter(
-            '{0}_http_requests_bytes_total'.format(NAME),
+            '{0}_index_http_requests_bytes_total'.format(NAME),
             'A summary of the invocation requests bytes.',
             [
                 'method',
@@ -125,7 +124,7 @@ class IndexHTTPServer:
             registry=self.__metrics_registry
         )
         self.__metrics_http_responses_bytes_total = Counter(
-            '{0}_http_responses_bytes_total'.format(NAME),
+            '{0}_index_http_responses_bytes_total'.format(NAME),
             'A summary of the invocation responses bytes.',
             [
                 'method',
@@ -134,19 +133,11 @@ class IndexHTTPServer:
             registry=self.__metrics_registry
         )
         self.__metrics_http_requests_duration_seconds = Histogram(
-            '{0}_http_requests_duration_seconds'.format(NAME),
+            '{0}_index_http_requests_duration_seconds'.format(NAME),
             'The invocation duration in seconds.',
             [
                 'method',
                 'endpoint'
-            ],
-            registry=self.__metrics_registry
-        )
-        self.__metrics_index_documents = Gauge(
-            '{0}_index_documents'.format(NAME),
-            'The number of documents.',
-            [
-                'index_name',
             ],
             registry=self.__metrics_registry
         )
@@ -208,19 +199,6 @@ class IndexHTTPServer:
         ).observe(time.time() - start_time)
 
         return
-
-    # def __record_index_metrics(self, index_name):
-    #     doc_count = self.__index_server.get_doc_count(index_name)
-    #     if doc_count is not None:
-    #         self.__metrics_index_documents.labels(
-    #             index_name=index_name,
-    #         ).set(doc_count)
-    #     else:
-    #         self.__metrics_index_documents.labels(
-    #             index_name=index_name,
-    #         ).set(0)
-    #
-    #     return
 
     def __root(self):
         start_time = time.time()
@@ -1102,10 +1080,6 @@ class IndexHTTPServer:
             self.__record_http_log(request, response)
             self.__record_http_metrics(start_time, request, response)
             return response
-
-        # # index metrics
-        # for index_name in self.__index_server.get_indices().keys():
-        #     self.__record_index_metrics(index_name)
 
         resp = Response()
         try:

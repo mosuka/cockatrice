@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018 Minoru Osuka
+# Copyright (c) 2019 Minoru Osuka
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -84,7 +84,8 @@ class IndexNode:
                 self.__logger.error('failed to get cluster status via {0}'.format(self.__seed_addr))
 
         self.__index_server = IndexServer(host=self.__host, port=self.__port, peer_addrs=self.__peer_addrs,
-                                          conf=self.__conf, index_dir=self.__index_dir, logger=self.__logger)
+                                          conf=self.__conf, index_dir=self.__index_dir, logger=self.__logger,
+                                          metrics_registry=self.__metrics_registry)
         self.__index_grpc_server = IndexGRPCServer(self.__index_server, host=self.__host, port=self.__grpc_port,
                                                    max_workers=grpc_max_workers, logger=self.__logger)
         self.__index_http_server = IndexHTTPServer(self.__grpc_port, host=self.__host, port=self.__http_port,

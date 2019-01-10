@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018 Minoru Osuka
+# Copyright (c) 2019 Minoru Osuka
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 import socket
 
 
@@ -36,3 +37,33 @@ def get_ipv4(host):
         raise ex
 
     return ipv4
+
+
+def parse_addr(addr):
+    regex = re.compile(r'''
+    (                            # first capture group = Addr
+      \[                         # literal open bracket                       IPv6
+        [:a-fA-F0-9]+            # one or more of these characters
+      \]                         # literal close bracket
+      |                          # ALTERNATELY
+      (?:                        #                                            IPv4
+        \d{1,3}\.                # one to three digits followed by a period
+      ){3}                       # ...repeated three times
+      \d{1,3}                    # followed by one to three digits
+      |                          # ALTERNATELY
+      [-a-zA-Z0-9.]+             # one or more hostname chars ([-\w\d\.])     Hostname
+    )                            # end first capture group
+    (?:                          
+      :                          # a literal :
+      (                          # second capture group = PORT
+        \d+                      # one or more digits
+      )                          # end second capture group
+     )?                          # ...or not.''', re.X)
+
+    m = regex.match(addr)
+    host, port = m.group(1, 2)
+    try:
+        return host, int(port)
+    except TypeError:
+        # port is None
+        return host, None

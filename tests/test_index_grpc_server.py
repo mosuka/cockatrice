@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018 Minoru Osuka
+# Copyright (c) 2019 Minoru Osuka
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,12 +18,13 @@ import _pickle as pickle
 import os
 import unittest
 import zipfile
-from logging import DEBUG, Formatter, getLogger, INFO, StreamHandler
+from logging import ERROR, Formatter, getLogger, INFO, StreamHandler
 from tempfile import TemporaryDirectory
 from time import sleep
 
 import grpc
 import yaml
+from prometheus_client.core import CollectorRegistry
 from pysyncobj import SyncObjConf
 
 from cockatrice import NAME
@@ -53,7 +54,7 @@ class TestIndexGRPCServer(unittest.TestCase):
 
         logger = getLogger(NAME)
         log_handler = StreamHandler()
-        logger.setLevel(DEBUG)
+        logger.setLevel(ERROR)
         log_handler.setLevel(INFO)
         log_format = Formatter('%(asctime)s - %(levelname)s - %(pathname)s:%(lineno)d - %(message)s')
         log_handler.setFormatter(log_format)
@@ -67,15 +68,18 @@ class TestIndexGRPCServer(unittest.TestCase):
         http_log_handler.setFormatter(http_log_format)
         http_logger.addHandler(http_log_handler)
 
+        metrics_registry = CollectorRegistry()
+
         conf = SyncObjConf(
             fullDumpFile=snapshot_file,
             logCompactionMinTime=300,
             dynamicMembershipChange=True
         )
 
-        self.index_server = IndexServer(host, port, peer_addrs, conf, index_dir, logger=logger)
+        self.index_server = IndexServer(host=host, port=port, peer_addrs=peer_addrs, conf=conf, index_dir=index_dir,
+                                        logger=logger, metrics_registry=metrics_registry)
         self.index_grpc_server = IndexGRPCServer(self.index_server, host=host, port=grpc_port, max_workers=10,
-                                                 logger=logger)
+                                                 logger=logger, metrics_registry=metrics_registry)
 
         self.channel = grpc.insecure_channel('{0}:{1}'.format(host, grpc_port))
 

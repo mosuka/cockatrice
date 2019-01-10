@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018 Minoru Osuka
+# Copyright (c) 2019 Minoru Osuka
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import os
 import unittest
 import zipfile
 from http import HTTPStatus
-from logging import DEBUG, Formatter, getLogger, INFO, NOTSET, StreamHandler
+from logging import ERROR, Formatter, getLogger, INFO, NOTSET, StreamHandler
 from tempfile import TemporaryDirectory
 from time import sleep
 
@@ -53,7 +53,7 @@ class TestIndexHTTPServer(unittest.TestCase):
 
         logger = getLogger(NAME)
         log_handler = StreamHandler()
-        logger.setLevel(DEBUG)
+        logger.setLevel(ERROR)
         log_handler.setLevel(INFO)
         log_format = Formatter('%(asctime)s - %(levelname)s - %(pathname)s:%(lineno)d - %(message)s')
         log_handler.setFormatter(log_format)
@@ -75,9 +75,11 @@ class TestIndexHTTPServer(unittest.TestCase):
             dynamicMembershipChange=True
         )
 
-        self.index_server = IndexServer(host, port, peer_addrs, conf, index_dir, logger=logger)
+        self.index_server = IndexServer(host=host, port=port, peer_addrs=peer_addrs, conf=conf, index_dir=index_dir,
+                                        logger=logger, metrics_registry=metrics_registry)
         self.index_grpc_server = IndexGRPCServer(self.index_server, host=host, port=grpc_port,
-                                                 max_workers=grpc_max_workers, logger=logger)
+                                                 max_workers=grpc_max_workers, logger=logger,
+                                                 metrics_registry=metrics_registry)
         self.index_http_server = IndexHTTPServer(grpc_port, host, http_port, logger=logger, http_logger=http_logger,
                                                  metrics_registry=metrics_registry)
 

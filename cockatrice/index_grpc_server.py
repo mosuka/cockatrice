@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018 Minoru Osuka
+# Copyright (c) 2019 Minoru Osuka
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,12 +15,16 @@
 # limitations under the License.
 
 import _pickle as pickle
+import inspect
+import time
 from concurrent import futures
 from logging import getLogger
 
 import grpc
+from prometheus_client.core import CollectorRegistry, Counter, Histogram
 from whoosh.scoring import BM25F
 
+from cockatrice import NAME
 from cockatrice.protobuf.index_pb2 import CloseIndexResponse, CreateIndexResponse, CreateSnapshotResponse, \
     DeleteDocumentResponse, DeleteDocumentsResponse, DeleteIndexResponse, DeleteNodeResponse, GetDocumentResponse, \
     GetIndexResponse, GetNodeResponse, GetSnapshotResponse, IsAliveResponse, IsReadyResponse, OpenIndexResponse, \
@@ -32,10 +36,43 @@ from cockatrice.scoring import get_multi_weighting
 
 
 class IndexServicer(IndexServicerImpl):
-    def __init__(self, index_server):
+    def __init__(self, index_server, logger=getLogger(), metrics_registry=CollectorRegistry()):
         self.__index_server = index_server
+        self.__logger = logger
+        self.__metrics_registry = metrics_registry
+
+        # metrics
+        self.__metrics_grpc_requests_total = Counter(
+            '{0}_index_grpc_requests_total'.format(NAME),
+            'The number of requests.',
+            [
+                'func'
+            ],
+            registry=self.__metrics_registry
+        )
+        self.__metrics_grpc_requests_duration_seconds = Histogram(
+            '{0}_index_grpc_requests_duration_seconds'.format(NAME),
+            'The invocation duration in seconds.',
+            [
+                'func'
+            ],
+            registry=self.__metrics_registry
+        )
+
+    def __record_grpc_metrics(self, start_time, func_name):
+        self.__metrics_grpc_requests_total.labels(
+            func=func_name
+        ).inc()
+
+        self.__metrics_grpc_requests_duration_seconds.labels(
+            func=func_name
+        ).observe(time.time() - start_time)
+
+        return
 
     def CreateIndex(self, request, context):
+        start_time = time.time()
+
         response = CreateIndexResponse()
 
         try:
@@ -65,10 +102,14 @@ class IndexServicer(IndexServicerImpl):
         except Exception as ex:
             response.status.success = False
             response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return response
 
     def GetIndex(self, request, context):
+        start_time = time.time()
+
         response = GetIndexResponse()
 
         try:
@@ -89,10 +130,14 @@ class IndexServicer(IndexServicerImpl):
         except Exception as ex:
             response.status.success = False
             response.status.message = ex.args[0]
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return response
 
     def DeleteIndex(self, request, context):
+        start_time = time.time()
+
         response = DeleteIndexResponse()
 
         try:
@@ -121,10 +166,14 @@ class IndexServicer(IndexServicerImpl):
         except Exception as ex:
             response.status.success = False
             response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return response
 
     def OpenIndex(self, request, context):
+        start_time = time.time()
+
         response = OpenIndexResponse()
 
         try:
@@ -154,10 +203,14 @@ class IndexServicer(IndexServicerImpl):
         except Exception as ex:
             response.status.success = False
             response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return response
 
     def CloseIndex(self, request, context):
+        start_time = time.time()
+
         response = CloseIndexResponse()
 
         try:
@@ -186,10 +239,14 @@ class IndexServicer(IndexServicerImpl):
         except Exception as ex:
             response.status.success = False
             response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return response
 
     def OptimizeIndex(self, request, context):
+        start_time = time.time()
+
         response = OptimizeIndexResponse()
 
         try:
@@ -218,10 +275,14 @@ class IndexServicer(IndexServicerImpl):
         except Exception as ex:
             response.status.success = False
             response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return response
 
     def PutDocument(self, request, context):
+        start_time = time.time()
+
         response = PutDocumentResponse()
 
         try:
@@ -243,10 +304,14 @@ class IndexServicer(IndexServicerImpl):
         except Exception as ex:
             response.status.success = False
             response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return response
 
     def GetDocument(self, request, context):
+        start_time = time.time()
+
         response = GetDocumentResponse()
 
         try:
@@ -266,10 +331,14 @@ class IndexServicer(IndexServicerImpl):
         except Exception as ex:
             response.status.success = False
             response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return response
 
     def DeleteDocument(self, request, context):
+        start_time = time.time()
+
         response = DeleteDocumentResponse()
 
         try:
@@ -295,10 +364,14 @@ class IndexServicer(IndexServicerImpl):
         except Exception as ex:
             response.status.success = False
             response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return response
 
     def PutDocuments(self, request, context):
+        start_time = time.time()
+
         response = PutDocumentsResponse()
 
         try:
@@ -320,10 +393,14 @@ class IndexServicer(IndexServicerImpl):
         except Exception as ex:
             response.status.success = False
             response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return response
 
     def DeleteDocuments(self, request, context):
+        start_time = time.time()
+
         response = DeleteDocumentsResponse()
 
         try:
@@ -345,10 +422,14 @@ class IndexServicer(IndexServicerImpl):
         except Exception as ex:
             response.status.success = False
             response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return response
 
     def SearchDocuments(self, request, context):
+        start_time = time.time()
+
         response = SearchDocumentsResponse()
 
         try:
@@ -395,10 +476,14 @@ class IndexServicer(IndexServicerImpl):
         except Exception as ex:
             response.status.success = False
             response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return response
 
     def PutNode(self, request, context):
+        start_time = time.time()
+
         response = PutNodeResponse()
 
         try:
@@ -409,10 +494,14 @@ class IndexServicer(IndexServicerImpl):
         except Exception as ex:
             response.status.success = False
             response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return response
 
     def GetNode(self, request, context):
+        start_time = time.time()
+
         response = GetNodeResponse()
 
         try:
@@ -423,10 +512,14 @@ class IndexServicer(IndexServicerImpl):
         except Exception as ex:
             response.status.success = False
             response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return response
 
     def DeleteNode(self, request, context):
+        start_time = time.time()
+
         response = DeleteNodeResponse()
 
         try:
@@ -437,10 +530,14 @@ class IndexServicer(IndexServicerImpl):
         except Exception as ex:
             response.status.success = False
             response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return response
 
     def SnapshotExists(self, request, context):
+        start_time = time.time()
+
         response = SnapshotExistsResponse()
 
         try:
@@ -451,10 +548,14 @@ class IndexServicer(IndexServicerImpl):
         except Exception as ex:
             response.status.success = False
             response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return response
 
     def CreateSnapshot(self, request, context):
+        start_time = time.time()
+
         response = CreateSnapshotResponse()
 
         try:
@@ -465,70 +566,89 @@ class IndexServicer(IndexServicerImpl):
         except Exception as ex:
             response.status.success = False
             response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return response
 
     def GetSnapshot(self, request, context):
+        start_time = time.time()
+
+        def get_snapshot_chunks(chunk_size=1024):
+            with self.__index_server.open_snapshot_file() as f:
+                while True:
+                    chunk = f.read(chunk_size)
+                    if len(chunk) == 0:
+                        return
+                    status = Status()
+                    status.success = True
+                    status.message = 'successfully got snapshot chunk'
+                    yield GetSnapshotResponse(name=self.__index_server.get_snapshot_file_name(), chunk=chunk,
+                                              status=status)
+
         try:
-            response = self.__get_snapshot_chunks(chunk_size=request.chunk_size)
+            response = get_snapshot_chunks(chunk_size=request.chunk_size)
         except Exception as ex:
             response = GetSnapshotResponse()
             response.status.success = False
             response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return response
 
-    def __get_snapshot_chunks(self, chunk_size=1024):
-        with self.__index_server.open_snapshot_file() as f:
-            while True:
-                chunk = f.read(chunk_size)
-                if len(chunk) == 0:
-                    return
-                status = Status()
-                status.success = True
-                status.message = 'successfully got snapshot chunk'
-                yield GetSnapshotResponse(name=self.__index_server.get_snapshot_file_name(), chunk=chunk, status=status)
-
     def IsAlive(self, request, context):
+        start_time = time.time()
+
         response = IsAliveResponse()
 
         try:
-            response.alive = self.__index_server.isAlive()
+            response.alive = self.__index_server.is_alive()
 
             response.status.success = True
             response.status.message = 'node is alive' if response.alive else 'node is dead'
         except Exception as ex:
             response.status.success = False
             response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return response
 
     def IsReady(self, request, context):
+        start_time = time.time()
+
         response = IsReadyResponse()
 
         try:
-            response.ready = self.__index_server.isReady()
+            response.ready = self.__index_server.is_ready()
 
             response.status.success = True
             response.status.message = 'cluster is ready' if response.ready else 'cluster not ready'
         except Exception as ex:
             response.status.success = False
             response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return response
 
 
 class IndexGRPCServer:
-    def __init__(self, index_server, host='localhost', port=5050, max_workers=10, logger=getLogger()):
+    def __init__(self, index_server, host='localhost', port=5050, max_workers=10, logger=getLogger(),
+                 metrics_registry=CollectorRegistry()):
         self.__index_server = index_server
         self.__host = host
         self.__port = port
         self.__max_workers = max_workers
         self.__logger = logger
+        self.__metrics_registry = metrics_registry
 
         self.__grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=self.__max_workers))
 
-        add_IndexServicer_to_server(IndexServicer(self.__index_server), self.__grpc_server)
+        add_IndexServicer_to_server(
+            IndexServicer(self.__index_server, logger=self.__logger, metrics_registry=self.__metrics_registry),
+            self.__grpc_server)
         self.__grpc_server.add_insecure_port('{0}:{1}'.format(self.__host, self.__port))
 
         self.__grpc_server.start()

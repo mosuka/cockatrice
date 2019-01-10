@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018 Minoru Osuka
+# Copyright (c) 2019 Minoru Osuka
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,11 +18,12 @@ import json
 import os
 import unittest
 import zipfile
-from logging import DEBUG, Formatter, getLogger, INFO, StreamHandler
+from logging import ERROR, Formatter, getLogger, INFO, StreamHandler
 from tempfile import TemporaryDirectory
 from time import sleep
 
 import yaml
+from prometheus_client.core import CollectorRegistry
 from pysyncobj import SyncObjConf
 from whoosh.filedb.filestore import FileStorage
 
@@ -46,11 +47,13 @@ class TestIndexServer(unittest.TestCase):
 
         logger = getLogger(cockatrice.NAME)
         log_handler = StreamHandler()
-        logger.setLevel(DEBUG)
+        logger.setLevel(ERROR)
         log_handler.setLevel(INFO)
         log_format = Formatter('%(asctime)s - %(levelname)s - %(pathname)s:%(lineno)d - %(message)s')
         log_handler.setFormatter(log_format)
         logger.addHandler(log_handler)
+
+        metrics_registry = CollectorRegistry()
 
         conf = SyncObjConf(
             fullDumpFile=dump_file,
@@ -58,7 +61,8 @@ class TestIndexServer(unittest.TestCase):
             dynamicMembershipChange=True
         )
 
-        self.index_server = IndexServer(host, port, peer_addrs, conf, index_dir, logger=logger)
+        self.index_server = IndexServer(host=host, port=port, peer_addrs=peer_addrs, conf=conf, index_dir=index_dir,
+                                        logger=logger, metrics_registry=metrics_registry)
 
     def tearDown(self):
         self.index_server.stop()

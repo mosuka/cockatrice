@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018 Minoru Osuka
+# Copyright (c) 2019 Minoru Osuka
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ from pysyncobj.encryptor import getEncryptor
 from pysyncobj.poller import createPoller
 from pysyncobj.tcp_connection import TcpConnection
 
-from cockatrice.util.resolver import get_ipv4
+from cockatrice.util.resolver import get_ipv4, parse_addr
 
 
 class Executor:
@@ -32,7 +32,7 @@ class Executor:
             if args is not None:
                 self.__request.extend(args)
 
-            host, port = bind_addr.split(":", 1)
+            host, port = parse_addr(bind_addr)
 
             self.__host = get_ipv4(host)
             self.__port = int(port)
