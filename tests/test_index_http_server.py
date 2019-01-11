@@ -28,9 +28,9 @@ from prometheus_client.core import CollectorRegistry
 from pysyncobj import SyncObjConf
 
 from cockatrice import NAME
+from cockatrice.index_core import IndexCore
 from cockatrice.index_grpc_server import IndexGRPCServer
 from cockatrice.index_http_server import IndexHTTPServer
-from cockatrice.index_server import IndexServer
 from tests import get_free_port
 
 
@@ -75,9 +75,9 @@ class TestIndexHTTPServer(unittest.TestCase):
             dynamicMembershipChange=True
         )
 
-        self.index_server = IndexServer(host=host, port=port, peer_addrs=peer_addrs, conf=conf, index_dir=index_dir,
-                                        logger=logger, metrics_registry=metrics_registry)
-        self.index_grpc_server = IndexGRPCServer(self.index_server, host=host, port=grpc_port,
+        self.index_core = IndexCore(host=host, port=port, peer_addrs=peer_addrs, conf=conf, index_dir=index_dir,
+                                    logger=logger, metrics_registry=metrics_registry)
+        self.index_grpc_server = IndexGRPCServer(self.index_core, host=host, port=grpc_port,
                                                  max_workers=grpc_max_workers, logger=logger,
                                                  metrics_registry=metrics_registry)
         self.index_http_server = IndexHTTPServer(grpc_port, host, http_port, logger=logger, http_logger=http_logger,
@@ -86,7 +86,7 @@ class TestIndexHTTPServer(unittest.TestCase):
         self.test_client = self.index_http_server.get_test_client()
 
     def tearDown(self):
-        self.index_server.stop()
+        self.index_core.stop()
         self.index_http_server.stop()
         self.temp_dir.cleanup()
 

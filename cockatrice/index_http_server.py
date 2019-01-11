@@ -40,20 +40,20 @@ from cockatrice.protobuf.index_pb2_grpc import IndexStub
 TRUE_STRINGS = ['true', 'yes', 'on', 't', 'y', '1']
 
 
-class ServerThread(Thread):
+class IndexHTTPServerThread(Thread):
     def __init__(self, host, port, app, logger=getLogger()):
         self.__logger = logger
 
         Thread.__init__(self)
-        self.srv = make_server(host, port, app)
-        self.ctx = app.app_context()
-        self.ctx.push()
+        self.server = make_server(host, port, app)
+        self.context = app.app_context()
+        self.context.push()
 
     def run(self):
-        self.srv.serve_forever()
+        self.server.serve_forever()
 
     def shutdown(self):
-        self.srv.shutdown()
+        self.server.shutdown()
 
 
 class IndexHTTPServer:
@@ -145,17 +145,18 @@ class IndexHTTPServer:
         self.__grpc_channel = grpc.insecure_channel('{0}:{1}'.format(self.__host, self.__grpc_port))
         self.__index_stub = IndexStub(self.__grpc_channel)
 
-        self.__server_thread = None
+        self.__http_server_thread = None
         try:
             # run server
-            self.__server_thread = ServerThread(self.__host, self.__port, self.__app, logger=self.__logger)
-            self.__server_thread.start()
+            self.__http_server_thread = IndexHTTPServerThread(self.__host, self.__port, self.__app,
+                                                              logger=self.__logger)
+            self.__http_server_thread.start()
             self.__logger.info('HTTP server started')
         except Exception as ex:
             self.__logger.critical(ex)
 
     def stop(self):
-        self.__server_thread.shutdown()
+        self.__http_server_thread.shutdown()
 
         self.__grpc_channel.close()
 

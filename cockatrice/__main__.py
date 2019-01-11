@@ -2,7 +2,7 @@
 
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2018 Minoru Osuka
+# Copyright (c) 2019 Minoru Osuka
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ from pysyncobj import SyncObjConf
 
 from cockatrice import NAME, VERSION
 from cockatrice.command import add_node, delete_node, get_snapshot, get_status, is_alive, is_ready
-from cockatrice.index_node import IndexNode
+from cockatrice.indexer import Indexer
 
 
 def signal_handler(signal, frame):
@@ -108,19 +108,19 @@ def server_handler(args):
     conf.dynamicMembershipChange = True
     conf.validate()
 
-    index_node = None
+    indexer = None
     try:
-        index_node = IndexNode(host=args.host, port=args.port, seed_addr=args.seed_addr, conf=conf,
-                               index_dir=args.index_dir, grpc_port=args.grpc_port,
-                               grpc_max_workers=args.grpc_max_workers, http_port=args.http_port, logger=logger,
-                               http_logger=http_logger, metrics_registry=metrics_registry)
+        indexer = Indexer(host=args.host, port=args.port, seed_addr=args.seed_addr, conf=conf,
+                          index_dir=args.index_dir, grpc_port=args.grpc_port,
+                          grpc_max_workers=args.grpc_max_workers, http_port=args.http_port, logger=logger,
+                          http_logger=http_logger, metrics_registry=metrics_registry)
         while True:
             signal.pause()
     except Exception as ex:
         print(ex)
     finally:
-        if index_node is not None:
-            index_node.stop()
+        if indexer is not None:
+            indexer.stop()
 
 
 def status_handler(args):

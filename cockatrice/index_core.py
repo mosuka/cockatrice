@@ -37,7 +37,7 @@ from cockatrice.util.resolver import parse_addr
 from cockatrice.util.timer import RepeatedTimer
 
 
-class IndexServer(SyncObj):
+class IndexCore(SyncObj):
     def __init__(self, host='localhost', port=7070, peer_addrs=None, conf=SyncObjConf(),
                  index_dir='/tmp/cockatrice/index', logger=getLogger(), metrics_registry=CollectorRegistry()):
         self.__logger = logger
@@ -86,7 +86,7 @@ class IndexServer(SyncObj):
         os.makedirs(self.__index_dir, exist_ok=True)
         self.__file_storage = FileStorage(self.__index_dir, supports_mmap=True, readonly=False, debug=False)
 
-        super(IndexServer, self).__init__(self.__bind_addr, self.__peer_addrs, conf=self.__conf)
+        super(IndexCore, self).__init__(self.__bind_addr, self.__peer_addrs, conf=self.__conf)
         self.__logger.info('Server started')
 
         # open existing indices on startup

@@ -28,8 +28,8 @@ from prometheus_client.core import CollectorRegistry
 from pysyncobj import SyncObjConf
 
 from cockatrice import NAME
+from cockatrice.index_core import IndexCore
 from cockatrice.index_grpc_server import IndexGRPCServer
-from cockatrice.index_server import IndexServer
 from cockatrice.protobuf.index_pb2 import CloseIndexRequest, CreateIndexRequest, CreateSnapshotRequest, \
     DeleteDocumentRequest, DeleteDocumentsRequest, DeleteIndexRequest, DeleteNodeRequest, GetDocumentRequest, \
     GetIndexRequest, GetNodeRequest, GetSnapshotRequest, IsAliveRequest, IsReadyRequest, OpenIndexRequest, \
@@ -76,9 +76,9 @@ class TestIndexGRPCServer(unittest.TestCase):
             dynamicMembershipChange=True
         )
 
-        self.index_server = IndexServer(host=host, port=port, peer_addrs=peer_addrs, conf=conf, index_dir=index_dir,
-                                        logger=logger, metrics_registry=metrics_registry)
-        self.index_grpc_server = IndexGRPCServer(self.index_server, host=host, port=grpc_port, max_workers=10,
+        self.index_core = IndexCore(host=host, port=port, peer_addrs=peer_addrs, conf=conf, index_dir=index_dir,
+                                    logger=logger, metrics_registry=metrics_registry)
+        self.index_grpc_server = IndexGRPCServer(self.index_core, host=host, port=grpc_port, max_workers=10,
                                                  logger=logger, metrics_registry=metrics_registry)
 
         self.channel = grpc.insecure_channel('{0}:{1}'.format(host, grpc_port))
@@ -86,7 +86,7 @@ class TestIndexGRPCServer(unittest.TestCase):
     def tearDown(self):
         self.channel.close()
 
-        self.index_server.stop()
+        self.index_core.stop()
         self.index_grpc_server.stop()
         self.temp_dir.cleanup()
 
@@ -719,7 +719,7 @@ class TestIndexGRPCServer(unittest.TestCase):
         response = stub.CreateSnapshot(request)
         sleep(1)  # wait for snapshot file to be created
         self.assertEqual(True, response.status.success)
-        self.assertEqual(True, os.path.exists(self.index_server.get_snapshot_file_name()))
+        self.assertEqual(True, os.path.exists(self.index_core.get_snapshot_file_name()))
 
         # snapshot exists
         request = SnapshotExistsRequest()
@@ -730,16 +730,16 @@ class TestIndexGRPCServer(unittest.TestCase):
     def test_create_snapshot(self):
         stub = IndexStub(self.channel)
 
-        self.assertEqual(False, os.path.exists(self.index_server.get_snapshot_file_name()))
+        self.assertEqual(False, os.path.exists(self.index_core.get_snapshot_file_name()))
 
         # create snapshot
         request = CreateSnapshotRequest()
         response = stub.CreateSnapshot(request)
         sleep(1)  # wait for snapshot file to be created
         self.assertEqual(True, response.status.success)
-        self.assertEqual(True, os.path.exists(self.index_server.get_snapshot_file_name()))
+        self.assertEqual(True, os.path.exists(self.index_core.get_snapshot_file_name()))
 
-        with zipfile.ZipFile(self.index_server.get_snapshot_file_name()) as f:
+        with zipfile.ZipFile(self.index_core.get_snapshot_file_name()) as f:
             self.assertEqual(['raft.bin'], f.namelist())
 
     def test_get_snapshot(self):
@@ -750,9 +750,9 @@ class TestIndexGRPCServer(unittest.TestCase):
         response = stub.CreateSnapshot(request)
         sleep(1)  # wait for snapshot file to be created
         self.assertEqual(True, response.status.success)
-        self.assertEqual(True, os.path.exists(self.index_server.get_snapshot_file_name()))
+        self.assertEqual(True, os.path.exists(self.index_core.get_snapshot_file_name()))
 
-        with zipfile.ZipFile(self.index_server.get_snapshot_file_name()) as f:
+        with zipfile.ZipFile(self.index_core.get_snapshot_file_name()) as f:
             self.assertEqual(['raft.bin'], f.namelist())
 
         # get snapshot

@@ -22,12 +22,12 @@ from prometheus_client.core import CollectorRegistry
 from pysyncobj import SyncObjConf
 
 from cockatrice.command import add_node, get_snapshot, get_status
+from cockatrice.index_core import IndexCore
 from cockatrice.index_grpc_server import IndexGRPCServer
 from cockatrice.index_http_server import IndexHTTPServer
-from cockatrice.index_server import IndexServer
 
 
-class IndexNode:
+class Indexer:
     def __init__(self, host='localhost', port=7070, seed_addr=None, conf=SyncObjConf(),
                  index_dir='/tmp/cockatrice/index', grpc_port=5050, grpc_max_workers=10, http_port=8080,
                  logger=getLogger(), http_logger=getLogger(), metrics_registry=CollectorRegistry()):
@@ -83,10 +83,10 @@ class IndexNode:
             else:
                 self.__logger.error('failed to get cluster status via {0}'.format(self.__seed_addr))
 
-        self.__index_server = IndexServer(host=self.__host, port=self.__port, peer_addrs=self.__peer_addrs,
-                                          conf=self.__conf, index_dir=self.__index_dir, logger=self.__logger,
-                                          metrics_registry=self.__metrics_registry)
-        self.__index_grpc_server = IndexGRPCServer(self.__index_server, host=self.__host, port=self.__grpc_port,
+        self.__index_core = IndexCore(host=self.__host, port=self.__port, peer_addrs=self.__peer_addrs,
+                                      conf=self.__conf, index_dir=self.__index_dir, logger=self.__logger,
+                                      metrics_registry=self.__metrics_registry)
+        self.__index_grpc_server = IndexGRPCServer(self.__index_core, host=self.__host, port=self.__grpc_port,
                                                    max_workers=grpc_max_workers, logger=self.__logger)
         self.__index_http_server = IndexHTTPServer(self.__grpc_port, host=self.__host, port=self.__http_port,
                                                    logger=self.__logger, http_logger=self.__http_logger,
@@ -94,4 +94,4 @@ class IndexNode:
 
     def stop(self):
         self.__index_http_server.stop()
-        self.__index_server.stop()
+        self.__index_core.stop()

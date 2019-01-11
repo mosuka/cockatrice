@@ -28,12 +28,12 @@ from pysyncobj import SyncObjConf
 from whoosh.filedb.filestore import FileStorage
 
 import cockatrice
-from cockatrice.index_server import IndexServer
+from cockatrice.index_core import IndexCore
 from cockatrice.schema import Schema
 from tests import get_free_port
 
 
-class TestIndexServer(unittest.TestCase):
+class TestIndexCore(unittest.TestCase):
     def setUp(self):
         self.temp_dir = TemporaryDirectory()
         self.example_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '../example'))
@@ -61,8 +61,8 @@ class TestIndexServer(unittest.TestCase):
             dynamicMembershipChange=True
         )
 
-        self.index_server = IndexServer(host=host, port=port, peer_addrs=peer_addrs, conf=conf, index_dir=index_dir,
-                                        logger=logger, metrics_registry=metrics_registry)
+        self.index_server = IndexCore(host=host, port=port, peer_addrs=peer_addrs, conf=conf, index_dir=index_dir,
+                                      logger=logger, metrics_registry=metrics_registry)
 
     def tearDown(self):
         self.index_server.stop()
