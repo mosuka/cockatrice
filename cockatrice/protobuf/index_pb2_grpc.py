@@ -79,11 +79,6 @@ class IndexStub(object):
         request_serializer=cockatrice_dot_protobuf_dot_index__pb2.PutNodeRequest.SerializeToString,
         response_deserializer=cockatrice_dot_protobuf_dot_index__pb2.PutNodeResponse.FromString,
         )
-    self.GetNode = channel.unary_unary(
-        '/protobuf.Index/GetNode',
-        request_serializer=cockatrice_dot_protobuf_dot_index__pb2.GetNodeRequest.SerializeToString,
-        response_deserializer=cockatrice_dot_protobuf_dot_index__pb2.GetNodeResponse.FromString,
-        )
     self.DeleteNode = channel.unary_unary(
         '/protobuf.Index/DeleteNode',
         request_serializer=cockatrice_dot_protobuf_dot_index__pb2.DeleteNodeRequest.SerializeToString,
@@ -104,15 +99,25 @@ class IndexStub(object):
         request_serializer=cockatrice_dot_protobuf_dot_index__pb2.GetSnapshotRequest.SerializeToString,
         response_deserializer=cockatrice_dot_protobuf_dot_index__pb2.GetSnapshotResponse.FromString,
         )
-    self.IsReady = channel.unary_unary(
-        '/protobuf.Index/IsReady',
-        request_serializer=cockatrice_dot_protobuf_dot_index__pb2.IsReadyRequest.SerializeToString,
-        response_deserializer=cockatrice_dot_protobuf_dot_index__pb2.IsReadyResponse.FromString,
+    self.IsHealthy = channel.unary_unary(
+        '/protobuf.Index/IsHealthy',
+        request_serializer=cockatrice_dot_protobuf_dot_index__pb2.IsHealthyRequest.SerializeToString,
+        response_deserializer=cockatrice_dot_protobuf_dot_index__pb2.IsHealthyResponse.FromString,
         )
     self.IsAlive = channel.unary_unary(
         '/protobuf.Index/IsAlive',
         request_serializer=cockatrice_dot_protobuf_dot_index__pb2.IsAliveRequest.SerializeToString,
         response_deserializer=cockatrice_dot_protobuf_dot_index__pb2.IsAliveResponse.FromString,
+        )
+    self.IsReady = channel.unary_unary(
+        '/protobuf.Index/IsReady',
+        request_serializer=cockatrice_dot_protobuf_dot_index__pb2.IsReadyRequest.SerializeToString,
+        response_deserializer=cockatrice_dot_protobuf_dot_index__pb2.IsReadyResponse.FromString,
+        )
+    self.GetStatus = channel.unary_unary(
+        '/protobuf.Index/GetStatus',
+        request_serializer=cockatrice_dot_protobuf_dot_index__pb2.GetStatusRequest.SerializeToString,
+        response_deserializer=cockatrice_dot_protobuf_dot_index__pb2.GetStatusResponse.FromString,
         )
 
 
@@ -211,13 +216,6 @@ class IndexServicer(object):
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
 
-  def GetNode(self, request, context):
-    # missing associated documentation comment in .proto file
-    pass
-    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-    context.set_details('Method not implemented!')
-    raise NotImplementedError('Method not implemented!')
-
   def DeleteNode(self, request, context):
     # missing associated documentation comment in .proto file
     pass
@@ -246,7 +244,7 @@ class IndexServicer(object):
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
 
-  def IsReady(self, request, context):
+  def IsHealthy(self, request, context):
     # missing associated documentation comment in .proto file
     pass
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -254,6 +252,20 @@ class IndexServicer(object):
     raise NotImplementedError('Method not implemented!')
 
   def IsAlive(self, request, context):
+    # missing associated documentation comment in .proto file
+    pass
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
+  def IsReady(self, request, context):
+    # missing associated documentation comment in .proto file
+    pass
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
+  def GetStatus(self, request, context):
     # missing associated documentation comment in .proto file
     pass
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -328,11 +340,6 @@ def add_IndexServicer_to_server(servicer, server):
           request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.PutNodeRequest.FromString,
           response_serializer=cockatrice_dot_protobuf_dot_index__pb2.PutNodeResponse.SerializeToString,
       ),
-      'GetNode': grpc.unary_unary_rpc_method_handler(
-          servicer.GetNode,
-          request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.GetNodeRequest.FromString,
-          response_serializer=cockatrice_dot_protobuf_dot_index__pb2.GetNodeResponse.SerializeToString,
-      ),
       'DeleteNode': grpc.unary_unary_rpc_method_handler(
           servicer.DeleteNode,
           request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.DeleteNodeRequest.FromString,
@@ -353,15 +360,25 @@ def add_IndexServicer_to_server(servicer, server):
           request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.GetSnapshotRequest.FromString,
           response_serializer=cockatrice_dot_protobuf_dot_index__pb2.GetSnapshotResponse.SerializeToString,
       ),
-      'IsReady': grpc.unary_unary_rpc_method_handler(
-          servicer.IsReady,
-          request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.IsReadyRequest.FromString,
-          response_serializer=cockatrice_dot_protobuf_dot_index__pb2.IsReadyResponse.SerializeToString,
+      'IsHealthy': grpc.unary_unary_rpc_method_handler(
+          servicer.IsHealthy,
+          request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.IsHealthyRequest.FromString,
+          response_serializer=cockatrice_dot_protobuf_dot_index__pb2.IsHealthyResponse.SerializeToString,
       ),
       'IsAlive': grpc.unary_unary_rpc_method_handler(
           servicer.IsAlive,
           request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.IsAliveRequest.FromString,
           response_serializer=cockatrice_dot_protobuf_dot_index__pb2.IsAliveResponse.SerializeToString,
+      ),
+      'IsReady': grpc.unary_unary_rpc_method_handler(
+          servicer.IsReady,
+          request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.IsReadyRequest.FromString,
+          response_serializer=cockatrice_dot_protobuf_dot_index__pb2.IsReadyResponse.SerializeToString,
+      ),
+      'GetStatus': grpc.unary_unary_rpc_method_handler(
+          servicer.GetStatus,
+          request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.GetStatusRequest.FromString,
+          response_serializer=cockatrice_dot_protobuf_dot_index__pb2.GetStatusResponse.SerializeToString,
       ),
   }
   generic_handler = grpc.method_handlers_generic_handler(

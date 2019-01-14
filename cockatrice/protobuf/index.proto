@@ -1,4 +1,4 @@
-//  Copyright (c) 2018 Minoru Osuka
+//  Copyright (c) 2019 Minoru Osuka
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,13 +30,14 @@ service Index {
     rpc DeleteDocuments (DeleteDocumentsRequest) returns (DeleteDocumentsResponse) {}
     rpc SearchDocuments (SearchDocumentsRequest) returns (SearchDocumentsResponse) {}
     rpc PutNode (PutNodeRequest) returns (PutNodeResponse) {}
-    rpc GetNode (GetNodeRequest) returns (GetNodeResponse) {}
     rpc DeleteNode (DeleteNodeRequest) returns (DeleteNodeResponse) {}
     rpc SnapshotExists (SnapshotExistsRequest) returns (SnapshotExistsResponse) {}
     rpc CreateSnapshot (CreateSnapshotRequest) returns (CreateSnapshotResponse) {}
     rpc GetSnapshot (GetSnapshotRequest) returns (stream GetSnapshotResponse) {}
-    rpc IsReady (IsReadyRequest) returns (IsReadyResponse) {}
+    rpc IsHealthy (IsHealthyRequest) returns (IsHealthyResponse) {}
     rpc IsAlive (IsAliveRequest) returns (IsAliveResponse) {}
+    rpc IsReady (IsReadyRequest) returns (IsReadyResponse) {}
+    rpc GetStatus (GetStatusRequest) returns (GetStatusResponse) {}
 }
 
 message Status {
@@ -198,13 +199,6 @@ message PutNodeResponse {
     Status status = 1;
 }
 
-message GetNodeRequest {}
-
-message GetNodeResponse {
-    bytes node_status = 1;
-    Status status = 2;
-}
-
 message DeleteNodeRequest {
     string node_name = 1;
 }
@@ -236,10 +230,10 @@ message GetSnapshotResponse {
     Status status = 3;
 }
 
-message IsReadyRequest {}
+message IsHealthyRequest {}
 
-message IsReadyResponse {
-    bool ready = 1;
+message IsHealthyResponse {
+    bool healthy = 1;
     Status status = 2;
 }
 
@@ -247,5 +241,19 @@ message IsAliveRequest {}
 
 message IsAliveResponse {
     bool alive = 1;
+    Status status = 2;
+}
+
+message IsReadyRequest {}
+
+message IsReadyResponse {
+    bool ready = 1;
+    Status status = 2;
+}
+
+message GetStatusRequest {}
+
+message GetStatusResponse {
+    bytes node_status = 1;
     Status status = 2;
 }

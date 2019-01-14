@@ -21,8 +21,7 @@ from threading import Thread
 from prometheus_client.core import CollectorRegistry
 from pysyncobj import SyncObjConf
 
-from cockatrice.command import add_node, get_snapshot, get_status
-from cockatrice.index_core import IndexCore
+from cockatrice.index_core import add_node, get_snapshot, get_status, IndexCore
 from cockatrice.index_grpc_server import IndexGRPCServer
 from cockatrice.index_http_server import IndexHTTPServer
 
@@ -75,7 +74,7 @@ class Indexer:
                 if not path.exists(self.__conf.fullDumpFile):
                     try:
                         snapshot = get_snapshot(bind_addr=leader, timeout=0.5)
-                        if snapshot is not None:
+                        if snapshot is not None and len(snapshot) > 0:
                             with open(self.__conf.fullDumpFile, 'wb') as f:
                                 f.write(snapshot)
                     except Exception as ex:

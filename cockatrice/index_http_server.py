@@ -32,9 +32,9 @@ from yaml.constructor import ConstructorError
 
 from cockatrice import NAME, VERSION
 from cockatrice.protobuf.index_pb2 import CreateIndexRequest, CreateSnapshotRequest, DeleteDocumentRequest, \
-    DeleteDocumentsRequest, DeleteIndexRequest, DeleteNodeRequest, GetDocumentRequest, GetIndexRequest, GetNodeRequest, \
-    GetSnapshotRequest, IsAliveRequest, IsReadyRequest, OptimizeIndexRequest, PutDocumentRequest, PutDocumentsRequest, \
-    PutNodeRequest, SearchDocumentsRequest, SnapshotExistsRequest
+    DeleteDocumentsRequest, DeleteIndexRequest, DeleteNodeRequest, GetDocumentRequest, GetIndexRequest, \
+    GetSnapshotRequest, GetStatusRequest, IsAliveRequest, IsHealthyRequest, IsReadyRequest, OptimizeIndexRequest, \
+    PutDocumentRequest, PutDocumentsRequest, PutNodeRequest, SearchDocumentsRequest, SnapshotExistsRequest
 from cockatrice.protobuf.index_pb2_grpc import IndexStub
 
 TRUE_STRINGS = ['true', 'yes', 'on', 't', 'y', '1']
@@ -89,15 +89,16 @@ class IndexHTTPServer:
                                 view_func=self.__search_documents, methods=['GET', 'POST'])
         self.__app.add_url_rule('/indices/<index_name>/optimize', endpoint='optimize_index',
                                 view_func=self.__optimize_index, methods=['GET'])
-        self.__app.add_url_rule('/nodes', endpoint='get_node', view_func=self.__get_node, methods=['GET'])
         self.__app.add_url_rule('/nodes/<node_name>', endpoint='put_node', view_func=self.__put_node, methods=['PUT'])
         self.__app.add_url_rule('/nodes/<node_name>', endpoint='delete_node', view_func=self.__delete_node,
                                 methods=['DELETE'])
         self.__app.add_url_rule('/snapshot', endpoint='get_snapshot', view_func=self.__get_snapshot, methods=['GET'])
         self.__app.add_url_rule('/snapshot', endpoint='put_snapshot', view_func=self.__put_snapshot, methods=['PUT'])
         self.__app.add_url_rule('/metrics', endpoint='metrics', view_func=self.__metrics, methods=['GET'])
-        self.__app.add_url_rule('/health/liveness', endpoint='liveness', view_func=self.__liveness, methods=['GET'])
-        self.__app.add_url_rule('/health/readiness', endpoint='readiness', view_func=self.__readiness, methods=['GET'])
+        self.__app.add_url_rule('/healthiness', endpoint='healthiness', view_func=self.__healthiness, methods=['GET'])
+        self.__app.add_url_rule('/liveness', endpoint='liveness', view_func=self.__liveness, methods=['GET'])
+        self.__app.add_url_rule('/readiness', endpoint='readiness', view_func=self.__readiness, methods=['GET'])
+        self.__app.add_url_rule('/status', endpoint='status', view_func=self.__get_status, methods=['GET'])
 
         # disable Flask default logger
         self.__app.logger.disabled = True
@@ -829,7 +830,7 @@ class IndexHTTPServer:
 
         return resp
 
-    def __get_node(self):
+    def __get_status(self):
         start_time = time.time()
 
         @after_this_request
@@ -842,7 +843,7 @@ class IndexHTTPServer:
         status_code = None
 
         try:
-            rpc_resp = self.__index_stub.GetNode(GetNodeRequest())
+            rpc_resp = self.__index_stub.GetStatus(GetStatusRequest())
 
             if rpc_resp.status.success:
                 data['node_status'] = pickle.loads(rpc_resp.node_status)
@@ -971,7 +972,7 @@ class IndexHTTPServer:
                             yield snapshot.chunk
 
                     resp = Response(generate(), status=HTTPStatus.OK, mimetype='application/zip', headers={
-                        "Content-Disposition": 'attachment; filename=snapshot.zip'
+                        'Content-Disposition': 'attachment; filename=snapshot.zip'
                     })
                 else:
                     resp = Response(status=HTTPStatus.NOT_FOUND)
@@ -980,6 +981,51 @@ class IndexHTTPServer:
         except Exception as ex:
             resp = Response(status=HTTPStatus.INTERNAL_SERVER_ERROR)
             self.__logger.error(ex)
+
+        return resp
+
+    def __healthiness(self):
+        start_time = time.time()
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            self.__record_http_log(request, response)
+            self.__record_http_metrics(start_time, request, response)
+            return response
+
+        data = {}
+        status_code = None
+
+        try:
+            rpc_req = IsHealthyRequest()
+
+            rpc_resp = self.__index_stub.IsHealthy(rpc_req)
+
+            if rpc_resp.status.success:
+                data['healthy'] = rpc_resp.healthy
+                if rpc_resp.healthy:
+                    status_code = HTTPStatus.OK
+                else:
+                    status_code = HTTPStatus.SERVICE_UNAVAILABLE
+                    data['error'] = '{0}'.format(rpc_resp.status.message)
+            else:
+                data['error'] = '{0}'.format(rpc_resp.status.message)
+                status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+        except Exception as ex:
+            data['healthy'] = False
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            self.__logger.error(ex)
+        finally:
+            data['time'] = time.time() - start_time
+            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+                              'description': status_code.description}
+
+        output = request.args.get('output', default='json', type=str).lower()
+
+        # make response
+        resp = make_response(data, output)
+        resp.status_code = status_code
 
         return resp
 

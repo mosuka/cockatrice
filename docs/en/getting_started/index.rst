@@ -21,11 +21,11 @@ Starting Cockatrice
 
 Cockatrice includes a command line interface tool called ``cockatrice``. This tool allows you to start Cockatrice in your system.
 
-You can easily start Cockatrice like the following command:
+You can easily start Cockatrice indexer like the following command:
 
 .. code-block:: bash
 
-    $ cockatrice server
+    $ cockatrice start indexer
 
 The above command starts Cockatrice in the default state. ``cockatrice`` has many startup flags, so please refer to the help for details.
 
@@ -33,9 +33,9 @@ You can display the help by specifying the following:
 
 .. code-block:: bash
 
-    $ cockatrice server --help
+    $ cockatrice start indexer --help
 
-When Cockatrice started, following URL available:
+When Cockatrice indexer started, following URL available:
 
 .. code-block:: bash
 

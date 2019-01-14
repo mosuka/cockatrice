@@ -75,7 +75,8 @@ setup(
         'grpcio==1.17.1',
         'grpcio-tools==1.17.1',
         'protobuf==3.6.1',
-        'python-mimeparse==1.6.0'
+        'python-mimeparse==1.6.0',
+        'requests==2.21.0'
     ],
     entry_points={
         'console_scripts': [

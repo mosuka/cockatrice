@@ -32,7 +32,7 @@ from cockatrice.index_core import IndexCore
 from cockatrice.index_grpc_server import IndexGRPCServer
 from cockatrice.protobuf.index_pb2 import CloseIndexRequest, CreateIndexRequest, CreateSnapshotRequest, \
     DeleteDocumentRequest, DeleteDocumentsRequest, DeleteIndexRequest, DeleteNodeRequest, GetDocumentRequest, \
-    GetIndexRequest, GetNodeRequest, GetSnapshotRequest, IsAliveRequest, IsReadyRequest, OpenIndexRequest, \
+    GetIndexRequest, GetSnapshotRequest, GetStatusRequest, IsAliveRequest, IsReadyRequest, OpenIndexRequest, \
     OptimizeIndexRequest, PutDocumentRequest, PutDocumentsRequest, PutNodeRequest, SearchDocumentsRequest, \
     SnapshotExistsRequest
 from cockatrice.protobuf.index_pb2_grpc import IndexStub
@@ -249,17 +249,13 @@ class TestIndexGRPCServer(unittest.TestCase):
         request.index_name = 'test_index'
         request.schema = pickle.dumps(scheme_dict)
         request.sync = True
-
         response = stub.CreateIndex(request)
-
         self.assertEqual(True, response.status.success)
 
         # get index
         request = GetIndexRequest()
         request.index_name = 'test_index'
-
         response = stub.GetIndex(request)
-
         self.assertEqual(True, response.status.success)
         self.assertEqual('test_index', response.index_stats.name)
 
@@ -267,17 +263,13 @@ class TestIndexGRPCServer(unittest.TestCase):
         request = CloseIndexRequest()
         request.index_name = 'test_index'
         request.sync = True
-
         response = stub.CloseIndex(request)
-
         self.assertEqual(True, response.status.success)
 
         # get index
         request = GetIndexRequest()
         request.index_name = 'test_index'
-
         response = stub.GetIndex(request)
-
         self.assertEqual(False, response.status.success)
 
     def test_optimize_index(self):
@@ -292,17 +284,13 @@ class TestIndexGRPCServer(unittest.TestCase):
         request.index_name = 'test_index'
         request.schema = pickle.dumps(scheme_dict)
         request.sync = True
-
         response = stub.CreateIndex(request)
-
         self.assertEqual(True, response.status.success)
 
         # get index
         request = GetIndexRequest()
         request.index_name = 'test_index'
-
         response = stub.GetIndex(request)
-
         self.assertEqual(True, response.status.success)
         self.assertEqual('test_index', response.index_stats.name)
 
@@ -310,9 +298,7 @@ class TestIndexGRPCServer(unittest.TestCase):
         request = OptimizeIndexRequest()
         request.index_name = 'test_index'
         request.sync = True
-
         response = stub.CloseIndex(request)
-
         self.assertEqual(True, response.status.success)
 
     def test_put_document(self):
@@ -327,17 +313,13 @@ class TestIndexGRPCServer(unittest.TestCase):
         request.index_name = 'test_index'
         request.schema = pickle.dumps(scheme_dict)
         request.sync = True
-
         response = stub.CreateIndex(request)
-
         self.assertEqual(True, response.status.success)
 
         # get index
         request = GetIndexRequest()
         request.index_name = 'test_index'
-
         response = stub.GetIndex(request)
-
         self.assertEqual(True, response.status.success)
         self.assertEqual('test_index', response.index_stats.name)
 
@@ -351,9 +333,7 @@ class TestIndexGRPCServer(unittest.TestCase):
         request.doc_id = '1'
         request.fields = pickle.dumps(fields_dict)
         request.sync = True
-
         response = stub.PutDocument(request)
-
         self.assertEqual(True, response.status.success)
 
     def test_get_document(self):
@@ -368,17 +348,13 @@ class TestIndexGRPCServer(unittest.TestCase):
         request.index_name = 'test_index'
         request.schema = pickle.dumps(scheme_dict)
         request.sync = True
-
         response = stub.CreateIndex(request)
-
         self.assertEqual(True, response.status.success)
 
         # get index
         request = GetIndexRequest()
         request.index_name = 'test_index'
-
         response = stub.GetIndex(request)
-
         self.assertEqual(True, response.status.success)
         self.assertEqual('test_index', response.index_stats.name)
 
@@ -392,9 +368,7 @@ class TestIndexGRPCServer(unittest.TestCase):
         request.doc_id = '1'
         request.fields = pickle.dumps(fields_dict)
         request.sync = True
-
         response = stub.PutDocument(request)
-
         self.assertEqual(1, response.count)
         self.assertEqual(True, response.status.success)
 
@@ -402,7 +376,6 @@ class TestIndexGRPCServer(unittest.TestCase):
         request = GetDocumentRequest()
         request.index_name = 'test_index'
         request.doc_id = '1'
-
         response = stub.GetDocument(request)
 
         self.assertEqual(True, response.status.success)
@@ -421,17 +394,13 @@ class TestIndexGRPCServer(unittest.TestCase):
         request.index_name = 'test_index'
         request.schema = pickle.dumps(scheme_dict)
         request.sync = True
-
         response = stub.CreateIndex(request)
-
         self.assertEqual(True, response.status.success)
 
         # get index
         request = GetIndexRequest()
         request.index_name = 'test_index'
-
         response = stub.GetIndex(request)
-
         self.assertEqual(True, response.status.success)
         self.assertEqual('test_index', response.index_stats.name)
 
@@ -445,9 +414,7 @@ class TestIndexGRPCServer(unittest.TestCase):
         request.doc_id = '1'
         request.fields = pickle.dumps(fields_dict)
         request.sync = True
-
         response = stub.PutDocument(request)
-
         self.assertEqual(1, response.count)
         self.assertEqual(True, response.status.success)
 
@@ -455,9 +422,7 @@ class TestIndexGRPCServer(unittest.TestCase):
         request = GetDocumentRequest()
         request.index_name = 'test_index'
         request.doc_id = '1'
-
         response = stub.GetDocument(request)
-
         self.assertEqual(True, response.status.success)
         self.assertEqual('1', pickle.loads(response.fields)['id'])
         self.assertEqual('Search engine (computing)', pickle.loads(response.fields)['title'])
@@ -467,9 +432,7 @@ class TestIndexGRPCServer(unittest.TestCase):
         request.index_name = 'test_index'
         request.doc_id = '1'
         request.sync = True
-
         response = stub.DeleteDocument(request)
-
         self.assertEqual(1, response.count)
         self.assertEqual(True, response.status.success)
 
@@ -477,9 +440,7 @@ class TestIndexGRPCServer(unittest.TestCase):
         request = GetDocumentRequest()
         request.index_name = 'test_index'
         request.doc_id = '1'
-
         response = stub.GetDocument(request)
-
         self.assertEqual(False, response.status.success)
 
     def test_put_documents(self):
@@ -494,17 +455,13 @@ class TestIndexGRPCServer(unittest.TestCase):
         request.index_name = 'test_index'
         request.schema = pickle.dumps(scheme_dict)
         request.sync = True
-
         response = stub.CreateIndex(request)
-
         self.assertEqual(True, response.status.success)
 
         # get index
         request = GetIndexRequest()
         request.index_name = 'test_index'
-
         response = stub.GetIndex(request)
-
         self.assertEqual(True, response.status.success)
         self.assertEqual('test_index', response.index_stats.name)
 
@@ -517,9 +474,7 @@ class TestIndexGRPCServer(unittest.TestCase):
         request.index_name = 'test_index'
         request.docs = pickle.dumps(docs_dict)
         request.sync = True
-
         response = stub.PutDocuments(request)
-
         self.assertEqual(5, response.count)
         self.assertEqual(True, response.status.success)
 
@@ -535,17 +490,13 @@ class TestIndexGRPCServer(unittest.TestCase):
         request.index_name = 'test_index'
         request.schema = pickle.dumps(scheme_dict)
         request.sync = True
-
         response = stub.CreateIndex(request)
-
         self.assertEqual(True, response.status.success)
 
         # get index
         request = GetIndexRequest()
         request.index_name = 'test_index'
-
         response = stub.GetIndex(request)
-
         self.assertEqual(True, response.status.success)
         self.assertEqual('test_index', response.index_stats.name)
 
@@ -558,9 +509,7 @@ class TestIndexGRPCServer(unittest.TestCase):
         request.index_name = 'test_index'
         request.docs = pickle.dumps(docs_dict)
         request.sync = True
-
         response = stub.PutDocuments(request)
-
         self.assertEqual(5, response.count)
         self.assertEqual(True, response.status.success)
 
@@ -573,9 +522,7 @@ class TestIndexGRPCServer(unittest.TestCase):
         request.index_name = 'test_index'
         request.doc_ids = pickle.dumps(doc_ids_list)
         request.sync = True
-
         response = stub.DeleteDocuments(request)
-
         self.assertEqual(5, response.count)
         self.assertEqual(True, response.status.success)
 
@@ -634,38 +581,22 @@ class TestIndexGRPCServer(unittest.TestCase):
         stub = IndexStub(self.channel)
 
         # get node
-        request = GetNodeRequest()
-
-        response = stub.GetNode(request)
-
+        request = GetStatusRequest()
+        response = stub.GetStatus(request)
         self.assertEqual(0, pickle.loads(response.node_status)['partner_nodes_count'])
         self.assertEqual(True, response.status.success)
 
         # put node
         request = PutNodeRequest()
         request.node_name = 'localhost:{0}'.format(get_free_port())
-
         response = stub.PutNode(request)
         sleep(1)  # wait for node to be added
         self.assertEqual(True, response.status.success)
 
         # get node
-        request = GetNodeRequest()
-
-        response = stub.GetNode(request)
-
+        request = GetStatusRequest()
+        response = stub.GetStatus(request)
         self.assertEqual(1, pickle.loads(response.node_status)['partner_nodes_count'])
-        self.assertEqual(True, response.status.success)
-
-    def test_get_node(self):
-        stub = IndexStub(self.channel)
-
-        # get node
-        request = GetNodeRequest()
-
-        response = stub.GetNode(request)
-
-        self.assertEqual(0, pickle.loads(response.node_status)['partner_nodes_count'])
         self.assertEqual(True, response.status.success)
 
     def test_delete_node(self):
@@ -674,8 +605,8 @@ class TestIndexGRPCServer(unittest.TestCase):
         port = get_free_port()
 
         # get node
-        request = GetNodeRequest()
-        response = stub.GetNode(request)
+        request = GetStatusRequest()
+        response = stub.GetStatus(request)
         self.assertEqual(0, pickle.loads(response.node_status)['partner_nodes_count'])
         self.assertEqual(True, response.status.success)
 
@@ -687,8 +618,8 @@ class TestIndexGRPCServer(unittest.TestCase):
         self.assertEqual(True, response.status.success)
 
         # get node
-        request = GetNodeRequest()
-        response = stub.GetNode(request)
+        request = GetStatusRequest()
+        response = stub.GetStatus(request)
         self.assertEqual(1, pickle.loads(response.node_status)['partner_nodes_count'])
         self.assertEqual(True, response.status.success)
 
@@ -700,8 +631,8 @@ class TestIndexGRPCServer(unittest.TestCase):
         self.assertEqual(True, response.status.success)
 
         # get node
-        request = GetNodeRequest()
-        response = stub.GetNode(request)
+        request = GetStatusRequest()
+        response = stub.GetStatus(request)
         self.assertEqual(0, pickle.loads(response.node_status)['partner_nodes_count'])
         self.assertEqual(True, response.status.success)
 
@@ -788,4 +719,13 @@ class TestIndexGRPCServer(unittest.TestCase):
 
         response = stub.IsReady(request)
 
+        self.assertEqual(True, response.status.success)
+
+    def test_get_status(self):
+        stub = IndexStub(self.channel)
+
+        # get node
+        request = GetStatusRequest()
+        response = stub.GetStatus(request)
+        self.assertEqual(0, pickle.loads(response.node_status)['partner_nodes_count'])
         self.assertEqual(True, response.status.success)

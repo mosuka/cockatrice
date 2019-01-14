@@ -11,7 +11,7 @@ To get the current liveness probe is following:
 
 .. code-block:: bash
 
-    $ curl -s -X GET http://localhost:8080/health/liveness
+    $ curl -s -X GET http://localhost:8080/liveness
 
 You can see the result in JSON format. The result of the above command is:
 
@@ -35,7 +35,7 @@ To get the current readiness probe is following:
 
 .. code-block:: bash
 
-    $ curl -s -X GET http://localhost:8080/health/readiness
+    $ curl -s -X GET http://localhost:8080/readiness
 
 You can see the result in JSON format. The result of the above command is:
 

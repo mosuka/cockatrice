@@ -420,8 +420,8 @@ class TestIndexHTTPServer(unittest.TestCase):
         self.assertEqual(5, data['results']['total'])
 
     def test_put_node(self):
-        # get node
-        response = self.test_client.get('/nodes')
+        # get status
+        response = self.test_client.get('/status')
         self.assertEqual(HTTPStatus.OK, response.status_code)
         data = json.loads(response.data)
         self.assertEqual(0, data['node_status']['partner_nodes_count'])
@@ -433,22 +433,15 @@ class TestIndexHTTPServer(unittest.TestCase):
         sleep(1)  # wait for node to be added
         self.assertEqual(HTTPStatus.OK, response.status_code)
 
-        # get node
-        response = self.test_client.get('/nodes')
+        # get status
+        response = self.test_client.get('/status')
         self.assertEqual(HTTPStatus.OK, response.status_code)
         data = json.loads(response.data)
         self.assertEqual(1, data['node_status']['partner_nodes_count'])
 
-    def test_get_node(self):
-        # get node
-        response = self.test_client.get('/nodes')
-        self.assertEqual(HTTPStatus.OK, response.status_code)
-        data = json.loads(response.data)
-        self.assertEqual(0, data['node_status']['partner_nodes_count'])
-
     def test_delete_node(self):
-        # get node
-        response = self.test_client.get('/nodes')
+        # get status
+        response = self.test_client.get('/status')
         self.assertEqual(HTTPStatus.OK, response.status_code)
         data = json.loads(response.data)
         self.assertEqual(0, data['node_status']['partner_nodes_count'])
@@ -460,8 +453,8 @@ class TestIndexHTTPServer(unittest.TestCase):
         sleep(1)  # wait for node to be added
         self.assertEqual(HTTPStatus.OK, response.status_code)
 
-        # get node
-        response = self.test_client.get('/nodes')
+        # get status
+        response = self.test_client.get('/status')
         self.assertEqual(HTTPStatus.OK, response.status_code)
         data = json.loads(response.data)
         self.assertEqual(1, data['node_status']['partner_nodes_count'])
@@ -471,8 +464,8 @@ class TestIndexHTTPServer(unittest.TestCase):
         sleep(1)  # wait for node to be deleted
         self.assertEqual(HTTPStatus.OK, response.status_code)
 
-        # get node
-        response = self.test_client.get('/nodes')
+        # get status
+        response = self.test_client.get('/status')
         self.assertEqual(HTTPStatus.OK, response.status_code)
         data = json.loads(response.data)
         self.assertEqual(0, data['node_status']['partner_nodes_count'])
@@ -497,23 +490,36 @@ class TestIndexHTTPServer(unittest.TestCase):
         response = self.test_client.get('/snapshot')
         self.assertEqual(HTTPStatus.OK, response.status_code)
 
+        # save snapshot
         download_file_name = self.temp_dir.name + '/snapshot_downloaded.zip'
-
         with open(download_file_name, 'wb') as f:
             f.write(response.data)
 
+        # read snapshot
         with zipfile.ZipFile(download_file_name) as f:
             self.assertEqual(['raft.bin'], f.namelist())
 
+    def test_is_healthy(self):
+        # healthiness
+        response = self.test_client.get('/healthiness')
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+
     def test_is_alive(self):
         # liveness
-        response = self.test_client.get('/health/liveness')
+        response = self.test_client.get('/liveness')
         self.assertEqual(HTTPStatus.OK, response.status_code)
 
     def test_is_ready(self):
         # readiness
-        response = self.test_client.get('/health/readiness')
+        response = self.test_client.get('/readiness')
         self.assertEqual(HTTPStatus.OK, response.status_code)
+
+    def test_get_status(self):
+        # get node
+        response = self.test_client.get('/status')
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+        data = json.loads(response.data)
+        self.assertEqual(0, data['node_status']['partner_nodes_count'])
 
     def test_metrics(self):
         # metrics

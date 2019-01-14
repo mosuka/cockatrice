@@ -27,9 +27,9 @@ from whoosh.scoring import BM25F
 from cockatrice import NAME
 from cockatrice.protobuf.index_pb2 import CloseIndexResponse, CreateIndexResponse, CreateSnapshotResponse, \
     DeleteDocumentResponse, DeleteDocumentsResponse, DeleteIndexResponse, DeleteNodeResponse, GetDocumentResponse, \
-    GetIndexResponse, GetNodeResponse, GetSnapshotResponse, IsAliveResponse, IsReadyResponse, OpenIndexResponse, \
-    OptimizeIndexResponse, PutDocumentResponse, PutDocumentsResponse, PutNodeResponse, SearchDocumentsResponse, \
-    SnapshotExistsResponse, Status
+    GetIndexResponse, GetSnapshotResponse, GetStatusResponse, IsAliveResponse, IsHealthyResponse, IsReadyResponse, \
+    OpenIndexResponse, OptimizeIndexResponse, PutDocumentResponse, PutDocumentsResponse, PutNodeResponse, \
+    SearchDocumentsResponse, SnapshotExistsResponse, Status
 from cockatrice.protobuf.index_pb2_grpc import add_IndexServicer_to_server, IndexServicer as IndexServicerImpl
 from cockatrice.schema import Schema
 from cockatrice.scoring import get_multi_weighting
@@ -499,24 +499,6 @@ class IndexServicer(IndexServicerImpl):
 
         return response
 
-    def GetNode(self, request, context):
-        start_time = time.time()
-
-        response = GetNodeResponse()
-
-        try:
-            response.node_status = pickle.dumps(self.__index_core.getStatus())
-
-            response.status.success = True
-            response.status.message = 'successfully got cluster status'
-        except Exception as ex:
-            response.status.success = False
-            response.status.message = str(ex)
-        finally:
-            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
-
-        return response
-
     def DeleteNode(self, request, context):
         start_time = time.time()
 
@@ -597,6 +579,24 @@ class IndexServicer(IndexServicerImpl):
 
         return response
 
+    def IsHealthy(self, request, context):
+        start_time = time.time()
+
+        response = IsHealthyResponse()
+
+        try:
+            response.healthy = self.__index_core.is_healthy()
+
+            response.status.success = True
+            response.status.message = 'node is alive' if response.healthy else 'node is dead'
+        except Exception as ex:
+            response.status.success = False
+            response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+
+        return response
+
     def IsAlive(self, request, context):
         start_time = time.time()
 
@@ -625,6 +625,24 @@ class IndexServicer(IndexServicerImpl):
 
             response.status.success = True
             response.status.message = 'cluster is ready' if response.ready else 'cluster not ready'
+        except Exception as ex:
+            response.status.success = False
+            response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+
+        return response
+
+    def GetStatus(self, request, context):
+        start_time = time.time()
+
+        response = GetStatusResponse()
+
+        try:
+            response.node_status = pickle.dumps(self.__index_core.getStatus())
+
+            response.status.success = True
+            response.status.message = 'successfully got cluster status'
         except Exception as ex:
             response.status.success = False
             response.status.message = str(ex)

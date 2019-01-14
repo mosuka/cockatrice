@@ -28,13 +28,100 @@ from logging import getLogger
 
 import pysyncobj.pickle as pickle
 from prometheus_client.core import CollectorRegistry, Counter, Gauge, Histogram
-from pysyncobj import replicated, SyncObj, SyncObjConf
+from pysyncobj import FAIL_REASON, replicated, SyncObj, SyncObjConf
+from pysyncobj.encryptor import getEncryptor
+from pysyncobj.poller import createPoller
+from pysyncobj.tcp_connection import TcpConnection
 from whoosh.filedb.filestore import FileStorage
 from whoosh.qparser import QueryParser
 
 from cockatrice import NAME
-from cockatrice.util.resolver import parse_addr
+from cockatrice.util.resolver import get_ipv4, parse_addr
 from cockatrice.util.timer import RepeatedTimer
+
+
+class IndexCoreCommand:
+    def __init__(self, cmd, args=None, bind_addr='localhost:7070', password=None, timeout=1):
+        try:
+            self.__result = None
+
+            self.__request = [cmd]
+            if args is not None:
+                self.__request.extend(args)
+
+            host, port = parse_addr(bind_addr)
+
+            self.__host = get_ipv4(host)
+            self.__port = int(port)
+            self.__password = password
+            self.__poller = createPoller('auto')
+            self.__connection = TcpConnection(self.__poller, onMessageReceived=self.__on_message_received,
+                                              onConnected=self.__on_connected, onDisconnected=self.__on_disconnected,
+                                              socket=None, timeout=10.0, sendBufferSize=2 ** 13, recvBufferSize=2 ** 13)
+            if self.__password is not None:
+                self.__connection.encryptor = getEncryptor(self.__password)
+            self.__is_connected = self.__connection.connect(self.__host, self.__port)
+            while self.__is_connected:
+                self.__poller.poll(timeout)
+        except Exception as ex:
+            raise ex
+
+    def __on_message_received(self, message):
+        if self.__connection.encryptor and not self.__connection.sendRandKey:
+            self.__connection.sendRandKey = message
+            self.__connection.send(self.__request)
+            return
+
+        self.__result = message
+        self.__connection.disconnect()
+
+    def __on_connected(self):
+        if self.__connection.encryptor:
+            self.__connection.recvRandKey = os.urandom(32)
+            self.__connection.send(self.__connection.recvRandKey)
+            return
+
+        self.__connection.send(self.__request)
+
+    def __on_disconnected(self):
+        self.__is_connected = False
+
+    def get_result(self):
+        return self.__result
+
+
+def execute(cmd, args=None, bind_addr='127.0.0.1:7070', password=None, timeout=1):
+    try:
+        response = IndexCoreCommand(cmd, args=args, bind_addr=bind_addr, password=password,
+                                    timeout=timeout).get_result()
+    except Exception as ex:
+        raise ex
+
+    return response
+
+
+def get_status(bind_addr='127.0.0.1:7070', password=None, timeout=1):
+    return execute('status', args=None, bind_addr=bind_addr, password=password, timeout=timeout)
+
+
+def add_node(node_name, bind_addr='127.0.0.1:7070', password=None, timeout=1):
+    return execute('add', args=[node_name], bind_addr=bind_addr, password=password, timeout=timeout)
+
+
+def delete_node(node_name, bind_addr='127.0.0.1:7070', password=None, timeout=1):
+    return execute('remove', args=[node_name], bind_addr=bind_addr, password=password, timeout=timeout)
+
+
+def get_snapshot(bind_addr='127.0.0.1:7070', password=None, timeout=1):
+    return execute('get_snapshot', args=None, bind_addr=bind_addr, password=password, timeout=timeout)
+
+
+def is_alive(bind_addr='127.0.0.1:7070', password=None, timeout=1):
+    return execute('is_alive', args=None, bind_addr=bind_addr, password=password, timeout=timeout) == 'True'
+
+
+def is_ready(bind_addr='127.0.0.1:7070', password=None, timeout=1):
+    return execute('is_ready', args=None, bind_addr=bind_addr, password=password, timeout=timeout) == 'True'
 
 
 class IndexCore(SyncObj):
@@ -95,6 +182,7 @@ class IndexCore(SyncObj):
         # waiting for the preparation to be completed
         while not self.isReady():
             # recovering data
+            self.__logger.debug('waiting for the cluster ready')
             time.sleep(1)
         self.__logger.info('Server ready')
 
@@ -112,7 +200,7 @@ class IndexCore(SyncObj):
         super().destroy()
 
     def __record_metrics(self):
-        for index_name in self.get_indices().keys():
+        for index_name in list(self.get_indices().keys()):
             try:
                 self.__metrics_core_documents.labels(index_name=index_name).set(self.get_doc_count(index_name))
             except Exception as ex:
@@ -129,6 +217,9 @@ class IndexCore(SyncObj):
 
         return
 
+    def is_healthy(self):
+        return self.is_alive() and self.is_ready()
+
     def is_alive(self):
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
             alive = sock.connect_ex(parse_addr(self.__bind_addr)) == 0
@@ -141,6 +232,13 @@ class IndexCore(SyncObj):
     def get_addr(self):
         return self.__bind_addr
 
+    # override SyncObj.__utilityCallback
+    def _SyncObj__utilityCallback(self, res, err, conn, cmd, node):
+        cmdResult = 'FAIL'
+        if err == FAIL_REASON.SUCCESS:
+            cmdResult = 'SUCCESS'
+        conn.send(cmdResult + ' ' + cmd + ' ' + node)
+
     # override SyncObj.__onUtilityMessage
     def _SyncObj__onUtilityMessage(self, conn, message):
         try:
@@ -149,24 +247,28 @@ class IndexCore(SyncObj):
                 return True
             elif message[0] == 'add':
                 self.addNodeToCluster(message[1],
-                                      callback=functools.partial(self.__utilityCallback, conn=conn, cmd='ADD',
+                                      callback=functools.partial(self._SyncObj__utilityCallback, conn=conn, cmd='ADD',
                                                                  node=message[1]))
                 return True
             elif message[0] == 'remove':
                 if message[1] == self.__selfNodeAddr:
                     conn.send('FAIL REMOVE ' + message[1])
                 else:
-                    self.removeNodeFromCluster(message[1], callback=functools.partial(self.__utilityCallback, conn=conn,
-                                                                                      cmd='REMOVE', node=message[1]))
+                    self.removeNodeFromCluster(message[1],
+                                               callback=functools.partial(self._SyncObj__utilityCallback, conn=conn,
+                                                                          cmd='REMOVE', node=message[1]))
                 return True
             elif message[0] == 'set_version':
                 self.setCodeVersion(message[1],
-                                    callback=functools.partial(self.__utilityCallback, conn=conn, cmd='SET_VERSION',
-                                                               node=str(message[1])))
+                                    callback=functools.partial(self._SyncObj__utilityCallback, conn=conn,
+                                                               cmd='SET_VERSION', node=str(message[1])))
                 return True
             elif message[0] == 'get_snapshot':
-                with open(self.__conf.fullDumpFile, 'rb') as f:
-                    conn.send(f.read())
+                if os.path.exists(self.__conf.fullDumpFile):
+                    with open(self.__conf.fullDumpFile, 'rb') as f:
+                        conn.send(f.read())
+                else:
+                    conn.send('')
                 return True
             elif message[0] == 'is_alive':
                 conn.send(str(self.is_alive()))
@@ -178,6 +280,7 @@ class IndexCore(SyncObj):
             conn.send(str(e))
             return True
 
+    # index serializer
     def __serialize(self, filename, raft_data):
         try:
             with self.__lock:
@@ -189,6 +292,7 @@ class IndexCore(SyncObj):
         except Exception as ex:
             self.__logger.error(ex)
 
+    # index deserializer
     def __deserialize(self, filename):
         try:
             with self.__lock:
