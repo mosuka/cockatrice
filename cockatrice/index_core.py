@@ -337,11 +337,15 @@ class IndexCore(SyncObj):
         try:
             if index_name in self.__indices:
                 index = self.__indices[index_name]
+                self.__logger.info(
+                    '{0} in file storage on {1} was already opened'.format(index_name, self.__file_storage.folder))
             else:
                 self.__indices[index_name] = self.__file_storage.open_index(indexname=index_name, schema=schema)
                 index = self.__indices[index_name]
+                self.__logger.info(
+                    '{0} in file storage on {1} was opened'.format(index_name, self.__file_storage.folder))
         except Exception as ex:
-            self.__logger.info(
+            self.__logger.error(
                 'failed to open {0} in file storage on {1}: {2}'.format(index_name, self.__file_storage.folder, ex))
         finally:
             self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
@@ -357,6 +361,8 @@ class IndexCore(SyncObj):
         try:
             index = self.__indices.pop(index_name)
             index.close()
+            self.__logger.info(
+                '{0} in file storage on {1} was closed'.format(index_name, self.__file_storage.folder))
         except KeyError as ex:
             self.__logger.error('{0} does not exist'.format(ex.args[0]))
         except Exception as ex:
@@ -378,6 +384,8 @@ class IndexCore(SyncObj):
             else:
                 self.__indices[index_name] = self.__file_storage.create_index(schema, indexname=index_name)
                 index = self.__indices[index_name]
+                self.__logger.info(
+                    '{0} in file storage on {1} was created'.format(index_name, self.__file_storage.folder))
         except Exception as ex:
             self.__logger.error(
                 'failed to close {0} in file storage on {1}: {2}'.format(index_name, self.__file_storage.folder, ex))
@@ -407,6 +415,8 @@ class IndexCore(SyncObj):
             for filename in self.__file_storage:
                 if re.match(pattern_lock, filename):
                     self.__file_storage.delete_file(filename)
+            self.__logger.info(
+                '{0} in file storage on {1} was deleted'.format(index_name, self.__file_storage.folder))
         except Exception as ex:
             self.__logger.error(
                 'failed to delete {0} in file storage on {1}: {2}'.format(index_name, self.__file_storage.folder, ex))
@@ -442,6 +452,8 @@ class IndexCore(SyncObj):
         try:
             index = self.get_index(index_name)
             index.optimize()
+            self.__logger.info(
+                '{0} in file storage on {1} was optimized'.format(index_name, self.__file_storage.folder))
         except Exception as ex:
             self.__logger.error('failed to optimize {0}: {1}'.format(index_name, ex))
         finally:
@@ -500,9 +512,10 @@ class IndexCore(SyncObj):
             writer.update_document(**tmp_fields)
             count += 1
             success = True
+            self.__logger.info('{0} was put in {1}'.format(doc_id, index_name))
         except Exception as ex:
             count = -1
-            self.__logger.error('failed to index document in {0}: {1}'.format(index_name, ex))
+            self.__logger.error('failed to put {0} in {1}: {2}'.format(doc_id, index_name, ex))
         finally:
             if writer is not None:
                 if success and count > 0:
@@ -519,6 +532,10 @@ class IndexCore(SyncObj):
         try:
             results_page = self.search_documents(index_name, doc_id, self.get_schema(index_name).get_doc_id_field(), 1,
                                                  page_len=1)
+            if results_page.total > 0:
+                self.__logger.info('{0} was got from {1}'.format(doc_id, index_name))
+            else:
+                self.__logger.info('{0} did not exist in {1}'.format(doc_id, index_name))
         except Exception as ex:
             raise ex
         finally:
@@ -538,9 +555,10 @@ class IndexCore(SyncObj):
             writer = self.get_writer(index_name)
             count = writer.delete_by_term(self.get_schema(index_name).get_doc_id_field(), doc_id)
             success = True
+            self.__logger.info('{0} was deleted from {1}'.format(doc_id, index_name))
         except Exception as ex:
             count = -1
-            self.__logger.error('failed to delete document in {0}: {1}'.format(index_name, ex))
+            self.__logger.error('failed to delete {0} from {1}: {2}'.format(doc_id, index_name, ex))
         finally:
             if writer is not None:
                 if success and count > 0:
@@ -565,6 +583,7 @@ class IndexCore(SyncObj):
                 writer.update_document(**doc)
                 count = count + 1
             success = True
+            self.__logger.info('{0} documents ware put in {1}'.format(count, index_name))
         except Exception as ex:
             count = -1
             self.__logger.error('failed to index documents in {0} in bulk: {1}'.format(index_name, ex))
@@ -591,6 +610,7 @@ class IndexCore(SyncObj):
             for doc_id in doc_ids:
                 count = count + writer.delete_by_term(self.get_schema(index_name).get_doc_id_field(), doc_id)
             success = True
+            self.__logger.info('{0} documents ware deleted from {1}'.format(count, index_name))
         except Exception as ex:
             count = -1
             self.__logger.error('failed to delete documents in {0} in bulk: {1}'.format(index_name, ex))
@@ -612,6 +632,7 @@ class IndexCore(SyncObj):
             query_parser = QueryParser(search_field, self.get_schema(index_name))
             query_obj = query_parser.parse(query)
             results_page = searcher.search_page(query_obj, page_num, pagelen=page_len, **kwargs)
+            self.__logger.info('{0} documents ware searched from {1}'.format(results_page.total, index_name))
         except Exception as ex:
             raise ex
         finally:
