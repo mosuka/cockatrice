@@ -1,29 +1,26 @@
 Cockatrice Change Log
 
-==================== Cockatrice 0.7.1 ====================
+==================== Cockatrice 0.7.2 ====================
 
-January 15, 2019
+* Enable auto-commit
+
+
+==================== Cockatrice 0.7.1 ====================
 
 * Improve CLI
 
 
 ==================== Cockatrice 0.7.0 ====================
 
-January 10, 2019
-
 * Implement gRPC Server
 
 
 ==================== Cockatrice 0.6.3 ====================
 
-December 27, 2018
-
 * Bump up version
 
 
 ==================== Cockatrice 0.6.2 ====================
-
-December 27, 2018
 
 * Fix a bug in index recovery process at server startup
 * Upgrade Janome Tokenizer to 0.3.7
@@ -33,14 +30,10 @@ December 27, 2018
 
 ==================== Cockatrice 0.6.1 ====================
 
-December 25, 2018
-
 * Fix document build error
 
 
 ==================== Cockatrice 0.6.0 ====================
-
-December 25, 2018
 
 * Synchronize the latest index from the leader node
 * Print default values in CLI usage
