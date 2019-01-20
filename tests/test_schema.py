@@ -20,7 +20,6 @@ import unittest
 from tempfile import TemporaryDirectory
 
 import yaml
-from whoosh.index import create_in
 
 from cockatrice.schema import Schema
 
@@ -34,7 +33,7 @@ class TestSchema(unittest.TestCase):
     def tearDown(self):
         self.temp_dir.cleanup()
 
-    def test_yaml(self):
+    def test_create_from_yaml(self):
         schema_file = self.example_dir + '/schema.yaml'
         with open(schema_file, 'r', encoding='utf-8') as file_obj:
             schema_dict = yaml.safe_load(file_obj.read())
@@ -43,7 +42,7 @@ class TestSchema(unittest.TestCase):
 
         self.assertIsNotNone(schema)
 
-    def test_json(self):
+    def test_create_from_json(self):
         schema_file = self.example_dir + '/schema.json'
         with open(schema_file, 'r', encoding='utf-8') as file_obj:
             schema_dict = json.loads(file_obj.read())
@@ -51,34 +50,6 @@ class TestSchema(unittest.TestCase):
         schema = Schema(schema_dict)
 
         self.assertIsNotNone(schema)
-
-    def test_yaml_create_index(self):
-        schema_file = self.example_dir + '/schema.yaml'
-        with open(schema_file, 'r', encoding='utf-8') as file_obj:
-            schema_dict = yaml.safe_load(file_obj.read())
-
-        schema = Schema(schema_dict)
-
-        if self.index_dir is not None:
-            os.makedirs(self.index_dir, exist_ok=True)
-
-        ix = create_in(self.index_dir, schema)
-
-        self.assertIsNotNone(ix)
-
-    def test_json_create_index(self):
-        schema_file = self.example_dir + '/schema.json'
-        with open(schema_file, 'r', encoding='utf-8') as file_obj:
-            schema_dict = json.loads(file_obj.read())
-
-        schema = Schema(schema_dict)
-
-        if self.index_dir is not None:
-            os.makedirs(self.index_dir, exist_ok=True)
-
-        ix = create_in(self.index_dir, schema)
-
-        self.assertIsNotNone(ix)
 
     def test_yaml_get_unique_field(self):
         schema_file = self.example_dir + '/schema.yaml'

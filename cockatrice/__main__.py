@@ -21,9 +21,9 @@ import sys
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 
 from cockatrice import VERSION
-from cockatrice.cli import add_node, create_index, create_snapshot, delete_document, delete_documents, delete_index, \
-    delete_node, get_document, get_index, get_snapshot, healthiness, liveness, put_document, put_documents, readiness, \
-    search, start_indexer, status
+from cockatrice.cli import add_node, commit, create_index, create_snapshot, delete_document, delete_documents, \
+    delete_index, delete_node, get_document, get_index, get_snapshot, healthiness, liveness, optimize, put_document, \
+    put_documents, readiness, rollback, search, start_indexer, status
 
 
 def signal_handler(signal, frame):
@@ -75,6 +75,18 @@ def put_documents_handler(args):
 def delete_documents_handler(args):
     delete_documents(args.index_name, args.document_ids_file, host=args.host, port=args.port, output=args.output,
                      sync=args.sync)
+
+
+def commit_handler(args):
+    commit(args.index_name, host=args.host, port=args.port, output=args.output)
+
+
+def rollback_handler(args):
+    rollback(args.index_name, host=args.host, port=args.port, output=args.output)
+
+
+def optimize_handler(args):
+    optimize(args.index_name, host=args.host, port=args.port, output=args.output)
 
 
 def search_handler(args):
@@ -378,6 +390,42 @@ def main():
     parser_search.add_argument('index_name', metavar='INDEX_NAME', type=str, help='the index name')
     parser_search.add_argument('query', metavar='QUERY', type=str, help='the query string')
     parser_search.set_defaults(handler=search_handler)
+
+    # commit
+    parser_commit = subparsers.add_parser('commit', help='see `commit --help`',
+                                          formatter_class=ArgumentDefaultsHelpFormatter)
+    parser_commit.add_argument('--host', dest='host', default='localhost', metavar='HOST', type=str,
+                               help='the host address to listen on for http traffic')
+    parser_commit.add_argument('--port', dest='port', default=8080, metavar='PORT', type=int,
+                               help='the port to listen on for HTTP traffic')
+    parser_commit.add_argument('--output', dest='output', default='yaml', metavar='OUTPUT', type=str,
+                               help='the output format')
+    parser_commit.add_argument('index_name', metavar='INDEX_NAME', type=str, help='the index name')
+    parser_commit.set_defaults(handler=commit_handler)
+
+    # rollback
+    parser_rollback = subparsers.add_parser('rollback', help='see `rollback --help`',
+                                            formatter_class=ArgumentDefaultsHelpFormatter)
+    parser_rollback.add_argument('--host', dest='host', default='localhost', metavar='HOST', type=str,
+                                 help='the host address to listen on for http traffic')
+    parser_rollback.add_argument('--port', dest='port', default=8080, metavar='PORT', type=int,
+                                 help='the port to listen on for HTTP traffic')
+    parser_rollback.add_argument('--output', dest='output', default='yaml', metavar='OUTPUT', type=str,
+                                 help='the output format')
+    parser_rollback.add_argument('index_name', metavar='INDEX_NAME', type=str, help='the index name')
+    parser_rollback.set_defaults(handler=rollback_handler)
+
+    # optimize
+    parser_optimize = subparsers.add_parser('optimize', help='see `optimize --help`',
+                                            formatter_class=ArgumentDefaultsHelpFormatter)
+    parser_optimize.add_argument('--host', dest='host', default='localhost', metavar='HOST', type=str,
+                                 help='the host address to listen on for http traffic')
+    parser_optimize.add_argument('--port', dest='port', default=8080, metavar='PORT', type=int,
+                                 help='the port to listen on for HTTP traffic')
+    parser_optimize.add_argument('--output', dest='output', default='yaml', metavar='OUTPUT', type=str,
+                                 help='the output format')
+    parser_optimize.add_argument('index_name', metavar='INDEX_NAME', type=str, help='the index name')
+    parser_optimize.set_defaults(handler=optimize_handler)
 
     # healthiness
     parser_healthiness = subparsers.add_parser('healthiness', help='see `healthiness --help`',

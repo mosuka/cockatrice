@@ -18,10 +18,12 @@ package protobuf;
 
 service Index {
     rpc CreateIndex (CreateIndexRequest) returns (CreateIndexResponse) {}
-    rpc GetIndex (GetIndexRequest) returns (GetIndexResponse) {}
     rpc DeleteIndex (DeleteIndexRequest) returns (DeleteIndexResponse) {}
     rpc OpenIndex (OpenIndexRequest) returns (OpenIndexResponse) {}
     rpc CloseIndex (CloseIndexRequest) returns (CloseIndexResponse) {}
+    rpc GetIndex (GetIndexRequest) returns (GetIndexResponse) {}
+    rpc CommitIndex (CommitIndexRequest) returns (CommitIndexResponse) {}
+    rpc RollbackIndex (RollbackIndexRequest) returns (RollbackIndexResponse) {}
     rpc OptimizeIndex (OptimizeIndexRequest) returns (OptimizeIndexResponse) {}
     rpc PutDocument (PutDocumentRequest) returns (PutDocumentResponse) {}
     rpc GetDocument (GetDocumentRequest) returns (GetDocumentResponse) {}
@@ -31,7 +33,7 @@ service Index {
     rpc SearchDocuments (SearchDocumentsRequest) returns (SearchDocumentsResponse) {}
     rpc PutNode (PutNodeRequest) returns (PutNodeResponse) {}
     rpc DeleteNode (DeleteNodeRequest) returns (DeleteNodeResponse) {}
-    rpc SnapshotExists (SnapshotExistsRequest) returns (SnapshotExistsResponse) {}
+    rpc IsSnapshotExist (IsSnapshotExistRequest) returns (IsSnapshotExistResponse) {}
     rpc CreateSnapshot (CreateSnapshotRequest) returns (CreateSnapshotResponse) {}
     rpc GetSnapshot (GetSnapshotRequest) returns (stream GetSnapshotResponse) {}
     rpc IsHealthy (IsHealthyRequest) returns (IsHealthyResponse) {}
@@ -110,6 +112,24 @@ message CloseIndexRequest {
 message CloseIndexResponse {
     IndexStats index_stats = 1;
     Status status = 2;
+}
+
+message CommitIndexRequest {
+    string index_name = 1;
+    bool sync = 2;
+}
+
+message CommitIndexResponse {
+    Status status = 1;
+}
+
+message RollbackIndexRequest {
+    string index_name = 1;
+    bool sync = 2;
+}
+
+message RollbackIndexResponse {
+    Status status = 1;
 }
 
 message OptimizeIndexRequest {
@@ -207,14 +227,16 @@ message DeleteNodeResponse {
     Status status = 1;
 }
 
-message SnapshotExistsRequest {}
+message IsSnapshotExistRequest {}
 
-message SnapshotExistsResponse {
+message IsSnapshotExistResponse {
     bool exist = 1;
     Status status = 2;
 }
 
-message CreateSnapshotRequest {}
+message CreateSnapshotRequest {
+    bool sync = 1;
+}
 
 message CreateSnapshotResponse {
     Status status = 1;

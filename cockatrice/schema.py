@@ -108,3 +108,17 @@ class Schema(WhooshSchema):
 
     def get_default_search_field(self):
         return self.__schema_dict['default_search_field']
+
+    def get_auto_commit_period(self):
+        try:
+            period = self.__schema_dict['auto_commit']['period']
+        except KeyError:
+            period = 0
+        return period
+
+    def get_auto_commit_limit(self):
+        try:
+            limit = self.__schema_dict['auto_commit']['limit']
+        except KeyError:
+            limit = 10
+        return limit

@@ -19,11 +19,6 @@ class IndexStub(object):
         request_serializer=cockatrice_dot_protobuf_dot_index__pb2.CreateIndexRequest.SerializeToString,
         response_deserializer=cockatrice_dot_protobuf_dot_index__pb2.CreateIndexResponse.FromString,
         )
-    self.GetIndex = channel.unary_unary(
-        '/protobuf.Index/GetIndex',
-        request_serializer=cockatrice_dot_protobuf_dot_index__pb2.GetIndexRequest.SerializeToString,
-        response_deserializer=cockatrice_dot_protobuf_dot_index__pb2.GetIndexResponse.FromString,
-        )
     self.DeleteIndex = channel.unary_unary(
         '/protobuf.Index/DeleteIndex',
         request_serializer=cockatrice_dot_protobuf_dot_index__pb2.DeleteIndexRequest.SerializeToString,
@@ -38,6 +33,21 @@ class IndexStub(object):
         '/protobuf.Index/CloseIndex',
         request_serializer=cockatrice_dot_protobuf_dot_index__pb2.CloseIndexRequest.SerializeToString,
         response_deserializer=cockatrice_dot_protobuf_dot_index__pb2.CloseIndexResponse.FromString,
+        )
+    self.GetIndex = channel.unary_unary(
+        '/protobuf.Index/GetIndex',
+        request_serializer=cockatrice_dot_protobuf_dot_index__pb2.GetIndexRequest.SerializeToString,
+        response_deserializer=cockatrice_dot_protobuf_dot_index__pb2.GetIndexResponse.FromString,
+        )
+    self.CommitIndex = channel.unary_unary(
+        '/protobuf.Index/CommitIndex',
+        request_serializer=cockatrice_dot_protobuf_dot_index__pb2.CommitIndexRequest.SerializeToString,
+        response_deserializer=cockatrice_dot_protobuf_dot_index__pb2.CommitIndexResponse.FromString,
+        )
+    self.RollbackIndex = channel.unary_unary(
+        '/protobuf.Index/RollbackIndex',
+        request_serializer=cockatrice_dot_protobuf_dot_index__pb2.RollbackIndexRequest.SerializeToString,
+        response_deserializer=cockatrice_dot_protobuf_dot_index__pb2.RollbackIndexResponse.FromString,
         )
     self.OptimizeIndex = channel.unary_unary(
         '/protobuf.Index/OptimizeIndex',
@@ -84,10 +94,10 @@ class IndexStub(object):
         request_serializer=cockatrice_dot_protobuf_dot_index__pb2.DeleteNodeRequest.SerializeToString,
         response_deserializer=cockatrice_dot_protobuf_dot_index__pb2.DeleteNodeResponse.FromString,
         )
-    self.SnapshotExists = channel.unary_unary(
-        '/protobuf.Index/SnapshotExists',
-        request_serializer=cockatrice_dot_protobuf_dot_index__pb2.SnapshotExistsRequest.SerializeToString,
-        response_deserializer=cockatrice_dot_protobuf_dot_index__pb2.SnapshotExistsResponse.FromString,
+    self.IsSnapshotExist = channel.unary_unary(
+        '/protobuf.Index/IsSnapshotExist',
+        request_serializer=cockatrice_dot_protobuf_dot_index__pb2.IsSnapshotExistRequest.SerializeToString,
+        response_deserializer=cockatrice_dot_protobuf_dot_index__pb2.IsSnapshotExistResponse.FromString,
         )
     self.CreateSnapshot = channel.unary_unary(
         '/protobuf.Index/CreateSnapshot',
@@ -132,13 +142,6 @@ class IndexServicer(object):
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
 
-  def GetIndex(self, request, context):
-    # missing associated documentation comment in .proto file
-    pass
-    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-    context.set_details('Method not implemented!')
-    raise NotImplementedError('Method not implemented!')
-
   def DeleteIndex(self, request, context):
     # missing associated documentation comment in .proto file
     pass
@@ -154,6 +157,27 @@ class IndexServicer(object):
     raise NotImplementedError('Method not implemented!')
 
   def CloseIndex(self, request, context):
+    # missing associated documentation comment in .proto file
+    pass
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
+  def GetIndex(self, request, context):
+    # missing associated documentation comment in .proto file
+    pass
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
+  def CommitIndex(self, request, context):
+    # missing associated documentation comment in .proto file
+    pass
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
+  def RollbackIndex(self, request, context):
     # missing associated documentation comment in .proto file
     pass
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -223,7 +247,7 @@ class IndexServicer(object):
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
 
-  def SnapshotExists(self, request, context):
+  def IsSnapshotExist(self, request, context):
     # missing associated documentation comment in .proto file
     pass
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -280,11 +304,6 @@ def add_IndexServicer_to_server(servicer, server):
           request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.CreateIndexRequest.FromString,
           response_serializer=cockatrice_dot_protobuf_dot_index__pb2.CreateIndexResponse.SerializeToString,
       ),
-      'GetIndex': grpc.unary_unary_rpc_method_handler(
-          servicer.GetIndex,
-          request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.GetIndexRequest.FromString,
-          response_serializer=cockatrice_dot_protobuf_dot_index__pb2.GetIndexResponse.SerializeToString,
-      ),
       'DeleteIndex': grpc.unary_unary_rpc_method_handler(
           servicer.DeleteIndex,
           request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.DeleteIndexRequest.FromString,
@@ -299,6 +318,21 @@ def add_IndexServicer_to_server(servicer, server):
           servicer.CloseIndex,
           request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.CloseIndexRequest.FromString,
           response_serializer=cockatrice_dot_protobuf_dot_index__pb2.CloseIndexResponse.SerializeToString,
+      ),
+      'GetIndex': grpc.unary_unary_rpc_method_handler(
+          servicer.GetIndex,
+          request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.GetIndexRequest.FromString,
+          response_serializer=cockatrice_dot_protobuf_dot_index__pb2.GetIndexResponse.SerializeToString,
+      ),
+      'CommitIndex': grpc.unary_unary_rpc_method_handler(
+          servicer.CommitIndex,
+          request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.CommitIndexRequest.FromString,
+          response_serializer=cockatrice_dot_protobuf_dot_index__pb2.CommitIndexResponse.SerializeToString,
+      ),
+      'RollbackIndex': grpc.unary_unary_rpc_method_handler(
+          servicer.RollbackIndex,
+          request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.RollbackIndexRequest.FromString,
+          response_serializer=cockatrice_dot_protobuf_dot_index__pb2.RollbackIndexResponse.SerializeToString,
       ),
       'OptimizeIndex': grpc.unary_unary_rpc_method_handler(
           servicer.OptimizeIndex,
@@ -345,10 +379,10 @@ def add_IndexServicer_to_server(servicer, server):
           request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.DeleteNodeRequest.FromString,
           response_serializer=cockatrice_dot_protobuf_dot_index__pb2.DeleteNodeResponse.SerializeToString,
       ),
-      'SnapshotExists': grpc.unary_unary_rpc_method_handler(
-          servicer.SnapshotExists,
-          request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.SnapshotExistsRequest.FromString,
-          response_serializer=cockatrice_dot_protobuf_dot_index__pb2.SnapshotExistsResponse.SerializeToString,
+      'IsSnapshotExist': grpc.unary_unary_rpc_method_handler(
+          servicer.IsSnapshotExist,
+          request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.IsSnapshotExistRequest.FromString,
+          response_serializer=cockatrice_dot_protobuf_dot_index__pb2.IsSnapshotExistResponse.SerializeToString,
       ),
       'CreateSnapshot': grpc.unary_unary_rpc_method_handler(
           servicer.CreateSnapshot,

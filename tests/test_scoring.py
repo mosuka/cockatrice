@@ -27,12 +27,22 @@ class TestMultiWeighting(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def test_create_weighting(self):
+    def test_create_yaml(self):
         weighting_file = self.example_dir + '/weighting.yaml'
 
         with open(weighting_file, 'r', encoding='utf-8') as file_obj:
             weighting_yaml = file_obj.read()
 
         weighting = MultiWeighting(weighting_yaml)
+
+        self.assertIsNotNone(weighting)
+
+    def test_create_json(self):
+        weighting_file = self.example_dir + '/weighting.json'
+
+        with open(weighting_file, 'r', encoding='utf-8') as file_obj:
+            weighting_json = file_obj.read()
+
+        weighting = MultiWeighting(weighting_json)
 
         self.assertIsNotNone(weighting)

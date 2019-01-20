@@ -61,52 +61,22 @@ class TestIndexCore(unittest.TestCase):
             dynamicMembershipChange=True
         )
 
-        self.index_server = IndexCore(host=host, port=port, peer_addrs=peer_addrs, conf=conf, index_dir=index_dir,
-                                      logger=logger, metrics_registry=metrics_registry)
+        self.index_core = IndexCore(host=host, port=port, peer_addrs=peer_addrs, conf=conf, index_dir=index_dir,
+                                    logger=logger, metrics_registry=metrics_registry)
 
     def tearDown(self):
-        self.index_server.stop()
+        self.index_core.stop()
         self.temp_dir.cleanup()
 
-    def test_create_index_from_yaml(self):
+    def test_create_index(self):
         with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
             __dict = yaml.safe_load(file_obj.read())
         schema = Schema(__dict)
 
         # create index
         index_name = 'test_file_index'
-        index = self.index_server.create_index(index_name, schema, sync=True)
-        self.assertTrue(isinstance(index.storage, FileStorage))
-
-        # create index
-        index_name = 'test2_file_index'
-        index = self.index_server.create_index(index_name, schema, sync=True)
-        self.assertTrue(isinstance(index.storage, FileStorage))
-
-        # check the number of file file indices
-        expected_file_count = 2
-        actual_file_count = len(self.index_server.get_file_storage().list())
-        self.assertEqual(expected_file_count, actual_file_count)
-
-    def test_create_index_from_json(self):
-        with open(self.example_dir + '/schema.json', 'r', encoding='utf-8') as file_obj:
-            __dict = json.loads(file_obj.read())
-        schema = Schema(__dict)
-
-        # create index
-        index_name = 'test_file_index'
-        index = self.index_server.create_index(index_name, schema, sync=True)
-        self.assertTrue(isinstance(index.storage, FileStorage))
-
-        # create index
-        index_name = 'test2_file_index'
-        index = self.index_server.create_index(index_name, schema, sync=True)
-        self.assertTrue(isinstance(index.storage, FileStorage))
-
-        # check the number of file file indices
-        expected_file_count = 2
-        actual_file_count = len(self.index_server.get_file_storage().list())
-        self.assertEqual(expected_file_count, actual_file_count)
+        self.index_core.create_index(index_name, schema, sync=True)
+        self.assertTrue(self.index_core.is_index_exist(index_name))
 
     def test_delete_index(self):
         with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
@@ -115,22 +85,12 @@ class TestIndexCore(unittest.TestCase):
 
         # create index
         index_name = 'test_file_index'
-        index = self.index_server.create_index(index_name, schema, sync=True)
-        self.assertTrue(isinstance(index.storage, FileStorage))
+        self.index_core.create_index(index_name, schema, sync=True)
+        self.assertTrue(self.index_core.is_index_exist(index_name))
 
-        # create index
-        index_name = 'test2_file_index'
-        index = self.index_server.create_index(index_name, schema, sync=True)
-        self.assertTrue(isinstance(index.storage, FileStorage))
-
-        expected_file_count = 2
-        actual_file_count = len(self.index_server.get_file_storage().list())
-        self.assertEqual(expected_file_count, actual_file_count)
-
-        self.index_server.delete_index(index_name, sync=True)
-        expected_file_count = 1
-        actual_file_count = len(self.index_server.get_file_storage().list())
-        self.assertEqual(expected_file_count, actual_file_count)
+        # delete index
+        self.index_core.delete_index(index_name, sync=True)
+        self.assertFalse(self.index_core.is_index_exist(index_name))
 
     def test_get_index(self):
         with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
@@ -139,10 +99,10 @@ class TestIndexCore(unittest.TestCase):
 
         # create index
         index_name = 'test_file_index'
-        index = self.index_server.create_index(index_name, schema, sync=True)
-        self.assertTrue(isinstance(index.storage, FileStorage))
+        self.index_core.create_index(index_name, schema, sync=True)
+        self.assertTrue(self.index_core.is_index_exist(index_name))
 
-        i = self.index_server.get_index(index_name)
+        i = self.index_core.get_index(index_name)
         self.assertTrue(isinstance(i.storage, FileStorage))
 
     def test_put_document(self):
@@ -152,20 +112,68 @@ class TestIndexCore(unittest.TestCase):
 
         # create index
         index_name = 'test_file_index'
-        self.index_server.create_index(index_name, schema, sync=True)
+        self.index_core.create_index(index_name, schema, sync=True)
+        self.assertTrue(self.index_core.is_index_exist(index_name))
 
         test_doc_id = '1'
         with open(self.example_dir + '/doc1.json', 'r', encoding='utf-8') as file_obj:
             test_fields = json.loads(file_obj.read(), encoding='utf-8')
 
-        # index document
-        self.index_server.put_document(index_name, test_doc_id, test_fields, sync=True)
+        # put document
+        count = self.index_core.put_document(index_name, test_doc_id, test_fields, sync=True)
+        self.assertEqual(1, count)
+
+    def test_commit(self):
+        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
+            __dict = yaml.safe_load(file_obj.read())
+        schema = Schema(__dict)
+
+        # create index
+        index_name = 'test_file_index'
+        self.index_core.create_index(index_name, schema, sync=True)
+        self.assertTrue(self.index_core.is_index_exist(index_name))
+
+        test_doc_id = '1'
+        with open(self.example_dir + '/doc1.json', 'r', encoding='utf-8') as file_obj:
+            test_fields = json.loads(file_obj.read(), encoding='utf-8')
+
+        # put document
+        count = self.index_core.put_document(index_name, test_doc_id, test_fields, sync=True)
+        self.assertEqual(1, count)
+
+        # commit
+        success = self.index_core.commit_index(index_name, sync=True)
+        self.assertTrue(success)
 
         # get document
-        results_page = self.index_server.get_document(index_name, test_doc_id)
-        expected_count = 1
-        actual_count = results_page.total
-        self.assertEqual(expected_count, actual_count)
+        results_page = self.index_core.get_document(index_name, test_doc_id)
+        self.assertEqual(1, results_page.total)
+
+    def test_rollback(self):
+        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
+            __dict = yaml.safe_load(file_obj.read())
+        schema = Schema(__dict)
+
+        # create index
+        index_name = 'test_file_index'
+        self.index_core.create_index(index_name, schema, sync=True)
+        self.assertTrue(self.index_core.is_index_exist(index_name))
+
+        test_doc_id = '1'
+        with open(self.example_dir + '/doc1.json', 'r', encoding='utf-8') as file_obj:
+            test_fields = json.loads(file_obj.read(), encoding='utf-8')
+
+        # put document
+        count = self.index_core.put_document(index_name, test_doc_id, test_fields, sync=True)
+        self.assertEqual(1, count)
+
+        # rollback
+        success = self.index_core.rollback_index(index_name, sync=True)
+        self.assertTrue(success)
+
+        # get document
+        results_page = self.index_core.get_document(index_name, test_doc_id)
+        self.assertEqual(0, results_page.total)
 
     def test_get_document(self):
         with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
@@ -174,20 +182,24 @@ class TestIndexCore(unittest.TestCase):
 
         # create index
         index_name = 'test_file_index'
-        self.index_server.create_index(index_name, schema, sync=True)
+        self.index_core.create_index(index_name, schema, sync=True)
+        self.assertTrue(self.index_core.is_index_exist(index_name))
 
         test_doc_id = '1'
         with open(self.example_dir + '/doc1.json', 'r', encoding='utf-8') as file_obj:
             test_fields = json.loads(file_obj.read(), encoding='utf-8')
 
-        # index document
-        self.index_server.put_document(index_name, test_doc_id, test_fields, sync=True)
+        # put document
+        count = self.index_core.put_document(index_name, test_doc_id, test_fields, sync=True)
+        self.assertEqual(1, count)
+
+        # commit
+        success = self.index_core.commit_index(index_name, sync=True)
+        self.assertTrue(success)
 
         # get document
-        results_page = self.index_server.get_document(index_name, test_doc_id)
-        expected_count = 1
-        actual_count = results_page.total
-        self.assertEqual(expected_count, actual_count)
+        results_page = self.index_core.get_document(index_name, test_doc_id)
+        self.assertEqual(1, results_page.total)
 
     def test_delete_document(self):
         with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
@@ -196,29 +208,36 @@ class TestIndexCore(unittest.TestCase):
 
         # create index
         index_name = 'test_file_index'
-        self.index_server.create_index(index_name, schema, sync=True)
+        self.index_core.create_index(index_name, schema, sync=True)
+        self.assertTrue(self.index_core.is_index_exist(index_name))
 
         test_doc_id = '1'
         with open(self.example_dir + '/doc1.json', 'r', encoding='utf-8') as file_obj:
             test_fields = json.loads(file_obj.read(), encoding='utf-8')
 
-        # index document
-        self.index_server.put_document(index_name, test_doc_id, test_fields, sync=True)
+        # put document
+        count = self.index_core.put_document(index_name, test_doc_id, test_fields, sync=True)
+        self.assertEqual(1, count)
+
+        # commit
+        success = self.index_core.commit_index(index_name, sync=True)
+        self.assertTrue(success)
 
         # get document
-        results_page = self.index_server.get_document(index_name, test_doc_id)
-        expected_count = 1
-        actual_count = results_page.total
-        self.assertEqual(expected_count, actual_count)
+        results_page = self.index_core.get_document(index_name, test_doc_id)
+        self.assertEqual(1, results_page.total)
 
         # delete document
-        self.index_server.delete_document(index_name, test_doc_id, sync=True)
+        count = self.index_core.delete_document(index_name, test_doc_id, sync=True)
+        self.assertEqual(1, count)
+
+        # commit
+        success = self.index_core.commit_index(index_name, sync=True)
+        self.assertTrue(success)
 
         # get document
-        results_page = self.index_server.get_document(index_name, test_doc_id)
-        expected_count = 0
-        actual_count = results_page.total
-        self.assertEqual(expected_count, actual_count)
+        results_page = self.index_core.get_document(index_name, test_doc_id)
+        self.assertEqual(0, results_page.total)
 
     def test_put_documents(self):
         with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
@@ -227,38 +246,34 @@ class TestIndexCore(unittest.TestCase):
 
         # create index
         index_name = 'test_file_index'
-        self.index_server.create_index(index_name, schema, sync=True)
+        self.index_core.create_index(index_name, schema, sync=True)
+        self.assertTrue(self.index_core.is_index_exist(index_name))
 
         with open(self.example_dir + '/bulk_put.json', 'r', encoding='utf-8') as file_obj:
             test_docs = json.loads(file_obj.read(), encoding='utf-8')
 
-        # index documents in bulk
-        self.index_server.put_documents(index_name, test_docs, sync=True)
+        # put documents in bulk
+        count = self.index_core.put_documents(index_name, test_docs, sync=True)
+        self.assertEqual(5, count)
 
-        results_page = self.index_server.get_document(index_name, '1')
-        expected_count = 1
-        actual_count = results_page.total
-        self.assertEqual(expected_count, actual_count)
+        # commit
+        success = self.index_core.commit_index(index_name, sync=True)
+        self.assertTrue(success)
 
-        results_page = self.index_server.get_document(index_name, '2')
-        expected_count = 1
-        actual_count = results_page.total
-        self.assertEqual(expected_count, actual_count)
+        results_page = self.index_core.get_document(index_name, '1')
+        self.assertEqual(1, results_page.total)
 
-        results_page = self.index_server.get_document(index_name, '3')
-        expected_count = 1
-        actual_count = results_page.total
-        self.assertEqual(expected_count, actual_count)
+        results_page = self.index_core.get_document(index_name, '2')
+        self.assertEqual(1, results_page.total)
 
-        results_page = self.index_server.get_document(index_name, '4')
-        expected_count = 1
-        actual_count = results_page.total
-        self.assertEqual(expected_count, actual_count)
+        results_page = self.index_core.get_document(index_name, '3')
+        self.assertEqual(1, results_page.total)
 
-        results_page = self.index_server.get_document(index_name, '5')
-        expected_count = 1
-        actual_count = results_page.total
-        self.assertEqual(expected_count, actual_count)
+        results_page = self.index_core.get_document(index_name, '4')
+        self.assertEqual(1, results_page.total)
+
+        results_page = self.index_core.get_document(index_name, '5')
+        self.assertEqual(1, results_page.total)
 
     def test_delete_documents(self):
         with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
@@ -267,69 +282,60 @@ class TestIndexCore(unittest.TestCase):
 
         # create index
         index_name = 'test_file_index'
-        self.index_server.create_index(index_name, schema, sync=True)
+        self.index_core.create_index(index_name, schema, sync=True)
+        self.assertTrue(self.index_core.is_index_exist(index_name))
 
         with open(self.example_dir + '/bulk_put.json', 'r', encoding='utf-8') as file_obj:
             test_docs = json.loads(file_obj.read(), encoding='utf-8')
 
         # put documents in bulk
-        self.index_server.put_documents(index_name, test_docs, sync=True)
+        count = self.index_core.put_documents(index_name, test_docs, sync=True)
+        self.assertEqual(5, count)
 
-        results_page = self.index_server.get_document(index_name, '1')
-        expected_count = 1
-        actual_count = results_page.total
-        self.assertEqual(expected_count, actual_count)
+        # commit
+        success = self.index_core.commit_index(index_name, sync=True)
+        self.assertTrue(success)
 
-        results_page = self.index_server.get_document(index_name, '2')
-        expected_count = 1
-        actual_count = results_page.total
-        self.assertEqual(expected_count, actual_count)
+        results_page = self.index_core.get_document(index_name, '1')
+        self.assertEqual(1, results_page.total)
 
-        results_page = self.index_server.get_document(index_name, '3')
-        expected_count = 1
-        actual_count = results_page.total
-        self.assertEqual(expected_count, actual_count)
+        results_page = self.index_core.get_document(index_name, '2')
+        self.assertEqual(1, results_page.total)
 
-        results_page = self.index_server.get_document(index_name, '4')
-        expected_count = 1
-        actual_count = results_page.total
-        self.assertEqual(expected_count, actual_count)
+        results_page = self.index_core.get_document(index_name, '3')
+        self.assertEqual(1, results_page.total)
 
-        results_page = self.index_server.get_document(index_name, '5')
-        expected_count = 1
-        actual_count = results_page.total
-        self.assertEqual(expected_count, actual_count)
+        results_page = self.index_core.get_document(index_name, '4')
+        self.assertEqual(1, results_page.total)
+
+        results_page = self.index_core.get_document(index_name, '5')
+        self.assertEqual(1, results_page.total)
 
         with open(self.example_dir + '/bulk_delete.json', 'r', encoding='utf-8') as file_obj:
             test_docs = json.loads(file_obj.read(), encoding='utf-8')
 
         # delete documents in bulk
-        self.index_server.delete_documents(index_name, test_docs, sync=True)
+        count = self.index_core.delete_documents(index_name, test_docs, sync=True)
+        self.assertEqual(5, count)
 
-        results_page = self.index_server.get_document(index_name, '1')
-        expected_count = 0
-        actual_count = results_page.total
-        self.assertEqual(expected_count, actual_count)
+        # commit
+        success = self.index_core.commit_index(index_name, sync=True)
+        self.assertTrue(success)
 
-        results_page = self.index_server.get_document(index_name, '2')
-        expected_count = 0
-        actual_count = results_page.total
-        self.assertEqual(expected_count, actual_count)
+        results_page = self.index_core.get_document(index_name, '1')
+        self.assertEqual(0, results_page.total)
 
-        results_page = self.index_server.get_document(index_name, '3')
-        expected_count = 0
-        actual_count = results_page.total
-        self.assertEqual(expected_count, actual_count)
+        results_page = self.index_core.get_document(index_name, '2')
+        self.assertEqual(0, results_page.total)
 
-        results_page = self.index_server.get_document(index_name, '4')
-        expected_count = 0
-        actual_count = results_page.total
-        self.assertEqual(expected_count, actual_count)
+        results_page = self.index_core.get_document(index_name, '3')
+        self.assertEqual(0, results_page.total)
 
-        results_page = self.index_server.get_document(index_name, '5')
-        expected_count = 0
-        actual_count = results_page.total
-        self.assertEqual(expected_count, actual_count)
+        results_page = self.index_core.get_document(index_name, '4')
+        self.assertEqual(0, results_page.total)
+
+        results_page = self.index_core.get_document(index_name, '5')
+        self.assertEqual(0, results_page.total)
 
     def test_search_documents(self):
         # read schema
@@ -339,35 +345,28 @@ class TestIndexCore(unittest.TestCase):
 
         # create file index
         index_name = 'test_file_index'
-        self.index_server.create_index(index_name, schema, sync=True)
+        self.index_core.create_index(index_name, schema, sync=True)
+        self.assertTrue(self.index_core.is_index_exist(index_name))
 
         # read documents
         with open(self.example_dir + '/bulk_put.json', 'r', encoding='utf-8') as file_obj:
             test_docs = json.loads(file_obj.read(), encoding='utf-8')
 
-        # put documents
-        self.index_server.put_documents(index_name, test_docs, sync=True)
+        # put documents in bulk
+        count = self.index_core.put_documents(index_name, test_docs, sync=True)
+        self.assertEqual(5, count)
+
+        # commit
+        success = self.index_core.commit_index(index_name, sync=True)
+        self.assertTrue(success)
 
         # search documents
-        page = self.index_server.search_documents(index_name, 'search', search_field='text', page_num=1, page_len=10)
+        page = self.index_core.search_documents(index_name, 'search', search_field='text', page_num=1, page_len=10)
         self.assertEqual(5, page.total)
-
-        page = self.index_server.search_documents(index_name, 'search engine', search_field='text', page_num=1,
-                                                  page_len=10)
-        self.assertEqual(3, page.total)
-
-        page = self.index_server.search_documents(index_name, 'distributed search', search_field='text', page_num=1,
-                                                  page_len=10)
-        self.assertEqual(2, page.total)
-
-        page = self.index_server.search_documents(index_name, 'web search', search_field='text', page_num=1,
-                                                  page_len=10)
-        self.assertEqual(4, page.total)
 
     def test_snapshot_exists(self):
         # snapshot exists
-        exists = self.index_server.snapshot_exists()
-        self.assertEqual(False, exists)
+        self.assertFalse(self.index_core.is_snapshot_exist())
 
         # read schema
         with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
@@ -376,36 +375,40 @@ class TestIndexCore(unittest.TestCase):
 
         # create file index
         index_name = 'test_file_index'
-        self.index_server.create_index(index_name, schema, sync=True)
+        self.index_core.create_index(index_name, schema, sync=True)
+        self.assertTrue(self.index_core.is_index_exist(index_name))
 
         # read documents
         with open(self.example_dir + '/bulk_put.json', 'r', encoding='utf-8') as file_obj:
             test_docs = json.loads(file_obj.read(), encoding='utf-8')
 
-        # index documents in bulk
-        self.index_server.put_documents(index_name, test_docs, sync=True)
+        # put documents in bulk
+        count = self.index_core.put_documents(index_name, test_docs, sync=True)
+        self.assertEqual(5, count)
+
+        # commit
+        success = self.index_core.commit_index(index_name, sync=True)
+        self.assertTrue(success)
 
         # search documents
-        page = self.index_server.search_documents(index_name, 'search', search_field='text', page_num=1, page_len=10)
-        expected_count = 5
-        actual_count = page.total
-        self.assertEqual(expected_count, actual_count)
+        page = self.index_core.search_documents(index_name, 'search', search_field='text', page_num=1, page_len=10)
+        self.assertEqual(5, page.total)
 
         # create snapshot
-        self.index_server.forceLogCompaction()
+        self.index_core.create_snapshot(sync=True)
         sleep(1)  # wait for snapshot file to be created
-        self.assertEqual(True, os.path.exists(self.index_server.get_snapshot_file_name()))
+        self.assertTrue(os.path.exists(self.index_core.get_snapshot_file_name()))
 
-        with zipfile.ZipFile(self.index_server.get_snapshot_file_name()) as f:
-            self.assertEqual(True, 'raft.bin' in f.namelist())
-            self.assertEqual(True, 'test_file_index_WRITELOCK' in f.namelist())
-            self.assertEqual(True, '_test_file_index_1.toc' in f.namelist())
+        with zipfile.ZipFile(self.index_core.get_snapshot_file_name()) as f:
+            self.assertTrue('raft.bin' in f.namelist())
+            self.assertTrue('test_file_index_WRITELOCK' in f.namelist())
+            self.assertEqual(1,
+                             len([n for n in f.namelist() if n.startswith('_test_file_index_') and n.endswith('.toc')]))
             self.assertEqual(1,
                              len([n for n in f.namelist() if n.startswith('test_file_index_') and n.endswith('.seg')]))
 
         # snapshot exists
-        exists = self.index_server.snapshot_exists()
-        self.assertEqual(True, exists)
+        self.assertTrue(True, self.index_core.is_snapshot_exist())
 
     def test_create_snapshot(self):
         with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
@@ -414,30 +417,33 @@ class TestIndexCore(unittest.TestCase):
 
         # create file index
         index_name = 'test_file_index'
-        self.index_server.create_index(index_name, schema, sync=True)
+        self.index_core.create_index(index_name, schema, sync=True)
+        self.assertTrue(self.index_core.is_index_exist(index_name))
 
         with open(self.example_dir + '/bulk_put.json', 'r', encoding='utf-8') as file_obj:
             test_docs = json.loads(file_obj.read(), encoding='utf-8')
 
-        # index documents in bulk
-        self.index_server.put_documents(index_name, test_docs, sync=True)
+        # put documents in bulk
+        count = self.index_core.put_documents(index_name, test_docs, sync=True)
+        self.assertEqual(5, count)
+
+        # commit
+        success = self.index_core.commit_index(index_name, sync=True)
+        self.assertTrue(success)
 
         # search documents
-        page = self.index_server.search_documents(index_name, 'search', search_field='text', page_num=1, page_len=10)
-        expected_count = 5
-        actual_count = page.total
-        self.assertEqual(expected_count, actual_count)
+        page = self.index_core.search_documents(index_name, 'search', search_field='text', page_num=1, page_len=10)
+        self.assertEqual(5, page.total)
 
         # create snapshot
-        self.index_server.forceLogCompaction()
-
+        self.index_core.create_snapshot(sync=True)
         sleep(1)  # wait for snapshot file to be created
+        self.assertTrue(os.path.exists(self.index_core.get_snapshot_file_name()))
 
-        self.assertEqual(True, os.path.exists(self.index_server.get_snapshot_file_name()))
-
-        with zipfile.ZipFile(self.index_server.get_snapshot_file_name()) as f:
-            self.assertEqual(True, 'raft.bin' in f.namelist())
-            self.assertEqual(True, 'test_file_index_WRITELOCK' in f.namelist())
-            self.assertEqual(True, '_test_file_index_1.toc' in f.namelist())
+        with zipfile.ZipFile(self.index_core.get_snapshot_file_name()) as f:
+            self.assertTrue('raft.bin' in f.namelist())
+            self.assertTrue('test_file_index_WRITELOCK' in f.namelist())
+            self.assertEqual(1,
+                             len([n for n in f.namelist() if n.startswith('_test_file_index_') and n.endswith('.toc')]))
             self.assertEqual(1,
                              len([n for n in f.namelist() if n.startswith('test_file_index_') and n.endswith('.seg')]))

@@ -303,6 +303,33 @@ def search(index_name, query, page_num=1, page_len=10, weighting_file=None, host
         print(ex)
 
 
+def commit(index_name, host='localhost', port=8080, output='yaml', sync=False):
+    try:
+        response = requests.get(
+            'http://{0}:{1}/indices/{2}/commit?output={3}&sync={4}'.format(host, port, index_name, output, sync))
+        print(response.text)
+    except Exception as ex:
+        print(ex)
+
+
+def rollback(index_name, host='localhost', port=8080, output='yaml', sync=False):
+    try:
+        response = requests.get(
+            'http://{0}:{1}/indices/{2}/rollback?output={3}&sync={4}'.format(host, port, index_name, output, sync))
+        print(response.text)
+    except Exception as ex:
+        print(ex)
+
+
+def optimize(index_name, host='localhost', port=8080, output='yaml', sync=False):
+    try:
+        response = requests.get(
+            'http://{0}:{1}/indices/{2}/optimize?output={3}&sync={4}'.format(host, port, index_name, output, sync))
+        print(response.text)
+    except Exception as ex:
+        print(ex)
+
+
 def add_node(node_addr, host='localhost', port=8080, output='yaml'):
     try:
         response = requests.put(

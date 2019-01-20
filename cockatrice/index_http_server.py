@@ -31,10 +31,11 @@ from werkzeug.serving import make_server
 from yaml.constructor import ConstructorError
 
 from cockatrice import NAME, VERSION
-from cockatrice.protobuf.index_pb2 import CreateIndexRequest, CreateSnapshotRequest, DeleteDocumentRequest, \
-    DeleteDocumentsRequest, DeleteIndexRequest, DeleteNodeRequest, GetDocumentRequest, GetIndexRequest, \
-    GetSnapshotRequest, GetStatusRequest, IsAliveRequest, IsHealthyRequest, IsReadyRequest, OptimizeIndexRequest, \
-    PutDocumentRequest, PutDocumentsRequest, PutNodeRequest, SearchDocumentsRequest, SnapshotExistsRequest
+from cockatrice.protobuf.index_pb2 import CommitIndexRequest, CreateIndexRequest, CreateSnapshotRequest, \
+    DeleteDocumentRequest, DeleteDocumentsRequest, DeleteIndexRequest, DeleteNodeRequest, GetDocumentRequest, \
+    GetIndexRequest, GetSnapshotRequest, GetStatusRequest, IsAliveRequest, IsHealthyRequest, IsReadyRequest, \
+    IsSnapshotExistRequest, OptimizeIndexRequest, PutDocumentRequest, PutDocumentsRequest, PutNodeRequest, \
+    RollbackIndexRequest, SearchDocumentsRequest
 from cockatrice.protobuf.index_pb2_grpc import IndexStub
 
 TRUE_STRINGS = ['true', 'yes', 'on', 't', 'y', '1']
@@ -89,6 +90,10 @@ class IndexHTTPServer:
                                 view_func=self.__search_documents, methods=['GET', 'POST'])
         self.__app.add_url_rule('/indices/<index_name>/optimize', endpoint='optimize_index',
                                 view_func=self.__optimize_index, methods=['GET'])
+        self.__app.add_url_rule('/indices/<index_name>/commit', endpoint='commit',
+                                view_func=self.__commit_index, methods=['GET'])
+        self.__app.add_url_rule('/indices/<index_name>/rollback', endpoint='rollback',
+                                view_func=self.__rollback_index, methods=['GET'])
         self.__app.add_url_rule('/nodes/<node_name>', endpoint='put_node', view_func=self.__put_node, methods=['PUT'])
         self.__app.add_url_rule('/nodes/<node_name>', endpoint='delete_node', view_func=self.__delete_node,
                                 methods=['DELETE'])
@@ -369,6 +374,102 @@ class IndexHTTPServer:
             rpc_req.sync = sync
 
             rpc_resp = self.__index_stub.DeleteIndex(rpc_req)
+
+            if sync:
+                if rpc_resp.status.success:
+                    status_code = HTTPStatus.OK
+                else:
+                    data['error'] = '{0}'.format(rpc_resp.status.message)
+                    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            else:
+                status_code = HTTPStatus.ACCEPTED
+        except Exception as ex:
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            self.__logger.error(ex)
+        finally:
+            data['time'] = time.time() - start_time
+            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+                              'description': status_code.description}
+
+        output = request.args.get('output', default='json', type=str).lower()
+
+        # make response
+        resp = make_response(data, output)
+        resp.status_code = status_code
+
+        return resp
+
+    def __commit_index(self, index_name):
+        start_time = time.time()
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            self.__record_http_log(request, response)
+            self.__record_http_metrics(start_time, request, response)
+            return response
+
+        data = {}
+        status_code = None
+
+        try:
+            sync = False
+            if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
+                sync = True
+
+            rpc_req = CommitIndexRequest()
+            rpc_req.index_name = index_name
+            rpc_req.sync = sync
+
+            rpc_resp = self.__index_stub.CommitIndex(rpc_req)
+
+            if sync:
+                if rpc_resp.status.success:
+                    status_code = HTTPStatus.OK
+                else:
+                    data['error'] = '{0}'.format(rpc_resp.status.message)
+                    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            else:
+                status_code = HTTPStatus.ACCEPTED
+        except Exception as ex:
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            self.__logger.error(ex)
+        finally:
+            data['time'] = time.time() - start_time
+            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+                              'description': status_code.description}
+
+        output = request.args.get('output', default='json', type=str).lower()
+
+        # make response
+        resp = make_response(data, output)
+        resp.status_code = status_code
+
+        return resp
+
+    def __rollback_index(self, index_name):
+        start_time = time.time()
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            self.__record_http_log(request, response)
+            self.__record_http_metrics(start_time, request, response)
+            return response
+
+        data = {}
+        status_code = None
+
+        try:
+            sync = False
+            if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
+                sync = True
+
+            rpc_req = RollbackIndexRequest()
+            rpc_req.index_name = index_name
+            rpc_req.sync = sync
+
+            rpc_resp = self.__index_stub.RollbackIndex(rpc_req)
 
             if sync:
                 if rpc_resp.status.success:
@@ -699,7 +800,7 @@ class IndexHTTPServer:
             rpc_req = DeleteDocumentsRequest()
             rpc_req.index_name = index_name
             rpc_req.doc_ids = pickle.dumps(doc_ids_list)
-            rpc_req.sync = True
+            rpc_req.sync = sync
 
             rpc_resp = self.__index_stub.DeleteDocuments(rpc_req)
 
@@ -921,7 +1022,12 @@ class IndexHTTPServer:
         status_code = None
 
         try:
+            sync = False
+            if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
+                sync = True
+
             rpc_req = CreateSnapshotRequest()
+            rpc_req.sync = sync
 
             rpc_resp = self.__index_stub.CreateSnapshot(rpc_req)
 
@@ -957,8 +1063,8 @@ class IndexHTTPServer:
             return response
 
         try:
-            rpc_req = SnapshotExistsRequest()
-            rpc_resp = self.__index_stub.SnapshotExists(rpc_req)
+            rpc_req = IsSnapshotExistRequest()
+            rpc_resp = self.__index_stub.IsSnapshotExist(rpc_req)
 
             if rpc_resp.status.success:
                 if rpc_resp.exist:

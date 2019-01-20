@@ -30,11 +30,11 @@ from pysyncobj import SyncObjConf
 from cockatrice import NAME
 from cockatrice.index_core import IndexCore
 from cockatrice.index_grpc_server import IndexGRPCServer
-from cockatrice.protobuf.index_pb2 import CloseIndexRequest, CreateIndexRequest, CreateSnapshotRequest, \
-    DeleteDocumentRequest, DeleteDocumentsRequest, DeleteIndexRequest, DeleteNodeRequest, GetDocumentRequest, \
-    GetIndexRequest, GetSnapshotRequest, GetStatusRequest, IsAliveRequest, IsReadyRequest, OpenIndexRequest, \
-    OptimizeIndexRequest, PutDocumentRequest, PutDocumentsRequest, PutNodeRequest, SearchDocumentsRequest, \
-    SnapshotExistsRequest
+from cockatrice.protobuf.index_pb2 import CloseIndexRequest, CommitIndexRequest, CreateIndexRequest, \
+    CreateSnapshotRequest, DeleteDocumentRequest, DeleteDocumentsRequest, DeleteIndexRequest, DeleteNodeRequest, \
+    GetDocumentRequest, GetIndexRequest, GetSnapshotRequest, GetStatusRequest, IsAliveRequest, IsReadyRequest, \
+    IsSnapshotExistRequest, OpenIndexRequest, OptimizeIndexRequest, PutDocumentRequest, PutDocumentsRequest, \
+    PutNodeRequest, SearchDocumentsRequest
 from cockatrice.protobuf.index_pb2_grpc import IndexStub
 from tests import get_free_port
 
@@ -372,6 +372,13 @@ class TestIndexGRPCServer(unittest.TestCase):
         self.assertEqual(1, response.count)
         self.assertEqual(True, response.status.success)
 
+        # commit
+        request = CommitIndexRequest()
+        request.index_name = 'test_index'
+        request.sync = True
+        response = stub.CommitIndex(request)
+        self.assertEqual(True, response.status.success)
+
         # get document
         request = GetDocumentRequest()
         request.index_name = 'test_index'
@@ -418,6 +425,13 @@ class TestIndexGRPCServer(unittest.TestCase):
         self.assertEqual(1, response.count)
         self.assertEqual(True, response.status.success)
 
+        # commit
+        request = CommitIndexRequest()
+        request.index_name = 'test_index'
+        request.sync = True
+        response = stub.CommitIndex(request)
+        self.assertEqual(True, response.status.success)
+
         # get document
         request = GetDocumentRequest()
         request.index_name = 'test_index'
@@ -434,6 +448,13 @@ class TestIndexGRPCServer(unittest.TestCase):
         request.sync = True
         response = stub.DeleteDocument(request)
         self.assertEqual(1, response.count)
+        self.assertEqual(True, response.status.success)
+
+        # commit
+        request = CommitIndexRequest()
+        request.index_name = 'test_index'
+        request.sync = True
+        response = stub.CommitIndex(request)
         self.assertEqual(True, response.status.success)
 
         # get document
@@ -478,6 +499,29 @@ class TestIndexGRPCServer(unittest.TestCase):
         self.assertEqual(5, response.count)
         self.assertEqual(True, response.status.success)
 
+        # commit
+        request = CommitIndexRequest()
+        request.index_name = 'test_index'
+        request.sync = True
+        response = stub.CommitIndex(request)
+        self.assertEqual(True, response.status.success)
+
+        # read weighting.yaml
+        with open(self.example_dir + '/weighting.yaml', 'r', encoding='utf-8') as file_obj:
+            weighting_dict = yaml.safe_load(file_obj.read())
+
+        # search documents
+        request = SearchDocumentsRequest()
+        request.index_name = 'test_index'
+        request.query = 'search'
+        request.search_field = 'text'
+        request.page_num = 1
+        request.page_len = 10
+        request.weighting = pickle.dumps(weighting_dict)
+        response = stub.SearchDocuments(request)
+        self.assertEqual(5, pickle.loads(response.results)['total'])
+        self.assertEqual(True, response.status.success)
+
     def test_delete_documents(self):
         stub = IndexStub(self.channel)
 
@@ -513,6 +557,29 @@ class TestIndexGRPCServer(unittest.TestCase):
         self.assertEqual(5, response.count)
         self.assertEqual(True, response.status.success)
 
+        # commit
+        request = CommitIndexRequest()
+        request.index_name = 'test_index'
+        request.sync = True
+        response = stub.CommitIndex(request)
+        self.assertEqual(True, response.status.success)
+
+        # read weighting.yaml
+        with open(self.example_dir + '/weighting.yaml', 'r', encoding='utf-8') as file_obj:
+            weighting_dict = yaml.safe_load(file_obj.read())
+
+        # search documents
+        request = SearchDocumentsRequest()
+        request.index_name = 'test_index'
+        request.query = 'search'
+        request.search_field = 'text'
+        request.page_num = 1
+        request.page_len = 10
+        request.weighting = pickle.dumps(weighting_dict)
+        response = stub.SearchDocuments(request)
+        self.assertEqual(5, pickle.loads(response.results)['total'])
+        self.assertEqual(True, response.status.success)
+
         # read bulk_delete.yaml
         with open(self.example_dir + '/bulk_delete.yaml', 'r', encoding='utf-8') as file_obj:
             doc_ids_list = yaml.safe_load(file_obj.read())
@@ -524,6 +591,29 @@ class TestIndexGRPCServer(unittest.TestCase):
         request.sync = True
         response = stub.DeleteDocuments(request)
         self.assertEqual(5, response.count)
+        self.assertEqual(True, response.status.success)
+
+        # commit
+        request = CommitIndexRequest()
+        request.index_name = 'test_index'
+        request.sync = True
+        response = stub.CommitIndex(request)
+        self.assertEqual(True, response.status.success)
+
+        # read weighting.yaml
+        with open(self.example_dir + '/weighting.yaml', 'r', encoding='utf-8') as file_obj:
+            weighting_dict = yaml.safe_load(file_obj.read())
+
+        # search documents
+        request = SearchDocumentsRequest()
+        request.index_name = 'test_index'
+        request.query = 'search'
+        request.search_field = 'text'
+        request.page_num = 1
+        request.page_len = 10
+        request.weighting = pickle.dumps(weighting_dict)
+        response = stub.SearchDocuments(request)
+        self.assertEqual(0, pickle.loads(response.results)['total'])
         self.assertEqual(True, response.status.success)
 
     def test_search_documents(self):
@@ -559,6 +649,13 @@ class TestIndexGRPCServer(unittest.TestCase):
         request.sync = True
         response = stub.PutDocuments(request)
         self.assertEqual(5, response.count)
+        self.assertEqual(True, response.status.success)
+
+        # commit
+        request = CommitIndexRequest()
+        request.index_name = 'test_index'
+        request.sync = True
+        response = stub.CommitIndex(request)
         self.assertEqual(True, response.status.success)
 
         # read weighting.yaml
@@ -640,8 +737,8 @@ class TestIndexGRPCServer(unittest.TestCase):
         stub = IndexStub(self.channel)
 
         # snapshot exists
-        request = SnapshotExistsRequest()
-        response = stub.SnapshotExists(request)
+        request = IsSnapshotExistRequest()
+        response = stub.IsSnapshotExist(request)
         self.assertEqual(True, response.status.success)
         self.assertEqual(False, response.exist)
 
@@ -653,8 +750,8 @@ class TestIndexGRPCServer(unittest.TestCase):
         self.assertEqual(True, os.path.exists(self.index_core.get_snapshot_file_name()))
 
         # snapshot exists
-        request = SnapshotExistsRequest()
-        response = stub.SnapshotExists(request)
+        request = IsSnapshotExistRequest()
+        response = stub.IsSnapshotExist(request)
         self.assertEqual(True, response.status.success)
         self.assertEqual(True, response.exist)
 

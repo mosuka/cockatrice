@@ -486,5 +486,9 @@
         "sep": "-"
       }
     }
+  },
+  "auto_commit": {
+    "period": 0,
+    "limit": 100
   }
 }

@@ -198,6 +198,10 @@ class TestIndexHTTPServer(unittest.TestCase):
                                         query_string='sync=True', headers={'Content-Type': 'application/json'})
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
 
+        # commit
+        response = self.test_client.get('/indices/test_index/commit', query_string='sync=True')
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+
         # get document 1
         response = self.test_client.get('/indices/test_index/documents/1?output=yaml')
         self.assertEqual(HTTPStatus.OK, response.status_code)
@@ -222,6 +226,10 @@ class TestIndexHTTPServer(unittest.TestCase):
         response = self.test_client.put('/indices/test_index/documents/1', data=doc_json,
                                         query_string='sync=True', headers={'Content-Type': 'application/json'})
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
+
+        # commit
+        response = self.test_client.get('/indices/test_index/commit', query_string='sync=True')
+        self.assertEqual(HTTPStatus.OK, response.status_code)
 
         # get document 1
         response = self.test_client.get('/indices/test_index/documents/1', query_string='output=json')
@@ -275,6 +283,10 @@ class TestIndexHTTPServer(unittest.TestCase):
                                         headers={'Content-Type': 'application/json'})
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
 
+        # commit
+        response = self.test_client.get('/indices/test_index/commit', query_string='sync=True')
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+
         # get document 1
         response = self.test_client.get('/indices/test_index/documents/1', query_string='output=json')
         self.assertEqual(HTTPStatus.OK, response.status_code)
@@ -324,6 +336,10 @@ class TestIndexHTTPServer(unittest.TestCase):
                                         headers={'Content-Type': 'application/json'})
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
 
+        # commit
+        response = self.test_client.get('/indices/test_index/commit', query_string='sync=True')
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+
         # get document 1
         response = self.test_client.get('/indices/test_index/documents/1', query_string='output=json')
         self.assertEqual(HTTPStatus.OK, response.status_code)
@@ -363,9 +379,13 @@ class TestIndexHTTPServer(unittest.TestCase):
         with open(self.example_dir + '/bulk_delete.json', 'r', encoding='utf-8') as file_obj:
             doc_ids_json = file_obj.read()
 
-        # put documents
+        # delete documents
         response = self.test_client.delete('/indices/test_index/documents', data=doc_ids_json, query_string='sync=True',
                                            headers={'Content-Type': 'application/json'})
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+
+        # commit
+        response = self.test_client.get('/indices/test_index/commit', query_string='sync=True')
         self.assertEqual(HTTPStatus.OK, response.status_code)
 
         # get document 1
@@ -406,6 +426,10 @@ class TestIndexHTTPServer(unittest.TestCase):
         response = self.test_client.put('/indices/test_index/documents', data=docs_json, query_string='sync=True',
                                         headers={'Content-Type': 'application/json'})
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
+
+        # commit
+        response = self.test_client.get('/indices/test_index/commit', query_string='sync=True')
+        self.assertEqual(HTTPStatus.OK, response.status_code)
 
         # read weighting
         with open(self.example_dir + '/weighting.json', 'r', encoding='utf-8') as file_obj:

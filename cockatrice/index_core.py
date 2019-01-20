@@ -34,6 +34,7 @@ from pysyncobj.poller import createPoller
 from pysyncobj.tcp_connection import TcpConnection
 from whoosh.filedb.filestore import FileStorage
 from whoosh.qparser import QueryParser
+from whoosh.writing import BufferedWriter
 
 from cockatrice import NAME
 from cockatrice.util.resolver import get_ipv4, parse_addr
@@ -167,24 +168,26 @@ class IndexCore(SyncObj):
         self.__conf.validate()
 
         self.__indices = {}
+        self.__writers = {}
 
         self.__file_storage = None
 
         os.makedirs(self.__index_dir, exist_ok=True)
         self.__file_storage = FileStorage(self.__index_dir, supports_mmap=True, readonly=False, debug=False)
 
-        super(IndexCore, self).__init__(self.__bind_addr, self.__peer_addrs, conf=self.__conf)
-        self.__logger.info('Server started')
-
         # open existing indices on startup
-        self.__open_existing_indices()
+        for index_name in self.get_index_names():
+            self.__open_index(index_name, schema=None)
+
+        super(IndexCore, self).__init__(self.__bind_addr, self.__peer_addrs, conf=self.__conf)
+        self.__logger.info('index core started')
 
         # waiting for the preparation to be completed
         while not self.isReady():
             # recovering data
             self.__logger.debug('waiting for the cluster ready')
             time.sleep(1)
-        self.__logger.info('Server ready')
+        self.__logger.info('index core ready')
 
         self.repeated_timer = RepeatedTimer(1, self.__record_metrics)
         self.repeated_timer.start()
@@ -192,15 +195,16 @@ class IndexCore(SyncObj):
     def stop(self):
         self.repeated_timer.cancel()
 
-        for index_name in self.__indices.keys():
-            self.close_index(index_name)
+        # close indices
+        for index_name in list(self.__indices.keys()):
+            self.__close_index(index_name)
         self.destroy()
 
     def destroy(self):
         super().destroy()
 
     def __record_metrics(self):
-        for index_name in list(self.get_indices().keys()):
+        for index_name in list(self.__indices.keys()):
             try:
                 self.__metrics_core_documents.labels(index_name=index_name).set(self.get_doc_count(index_name))
             except Exception as ex:
@@ -282,41 +286,83 @@ class IndexCore(SyncObj):
 
     # index serializer
     def __serialize(self, filename, raft_data):
-        try:
-            with self.__lock:
+        with self.__lock:
+            writer_names = list(self.__writers.keys())
+            try:
+                # close the index writers
+                for index_name in writer_names:
+                    self.__close_writer(index_name)
+
+                # store the index files and raft logs to the snapshot file
                 with zipfile.ZipFile(filename, 'w', zipfile.ZIP_DEFLATED) as f:
-                    for index_filename in self.__file_storage:
+                    for index_filename in self.get_index_file_names(index_name=None):
                         abs_index_path = os.path.join(self.__file_storage.folder, index_filename)
                         f.write(abs_index_path, index_filename)
+                        self.__logger.debug('{0} has been stored in {1}'.format(abs_index_path, filename))
                     f.writestr('raft.bin', pickle.dumps(raft_data))
-        except Exception as ex:
-            self.__logger.error(ex)
+            except Exception as ex:
+                self.__logger.error(ex)
+            finally:
+                # reopen the index writers
+                for index_name in writer_names:
+                    self.__open_writer(index_name)
 
     # index deserializer
     def __deserialize(self, filename):
-        try:
-            with self.__lock:
-                self.__file_storage.destroy()
-                self.__file_storage.create()
+        with self.__lock:
+            index_names = list(self.__writers.keys())
+            try:
+                # close the index writers
+                for index_name in index_names:
+                    self.__close_writer(index_name)
 
-                with zipfile.ZipFile(filename, 'r') as f:
-                    for member in f.namelist():
+                # restore the index files and raft logs from the snapshot file
+                with zipfile.ZipFile(filename, 'r') as zf:
+                    for member in zf.namelist():
                         if member != 'raft.bin':
-                            f.extract(member, path=self.__file_storage.folder)
-                    return pickle.loads(f.read('raft.bin'))
-        except Exception as ex:
-            self.__logger.error(ex)
+                            zf.extract(member, path=self.__file_storage.folder)
+                            self.__logger.debug('{0} has been restored from {1}'.format(
+                                os.path.join(self.__file_storage.folder, member), filename))
 
-    def get_file_storage(self):
-        return self.__file_storage
+                    # reopen the indices
+                    for index_name in self.get_index_names():
+                        with open(os.path.join(self.__file_storage.folder, '{0}.schema'.format(index_name)), 'rb') as f:
+                            schema = pickle.loads(f.read())
+                        self.__open_index(index_name, schema)
 
-    def __index_exists(self, index_name):
-        return self.__file_storage.index_exists(indexname=index_name)
+                    return pickle.loads(zf.read('raft.bin'))
 
-    def __get_existing_index_names(self):
+            except Exception as ex:
+                self.__logger.error(ex)
+            finally:
+                # reopen the index writers
+                for index_name in index_names:
+                    self.__open_writer(index_name)
+
+    def get_index_file_names(self, index_name=None):
+        index_files = []
+
+        pattern_toc = re.compile(r'^_{0}_(\d+)\.toc$'.format(index_name))  # ex) _myindex_0.toc
+        pattern_seg = re.compile(r'^{0}_([a-z0-9]+)\.seg$'.format(index_name))  # ex) myindex_zseabukc2nbpvh0u.seg
+        pattern_lock = re.compile(r'^{0}_WRITELOCK$'.format(index_name))  # ex) myindex_WRITELOCK
+
+        for file_name in self.__file_storage.list():
+            if index_name is not None:
+                if re.match(pattern_toc, file_name):
+                    index_files.append(file_name)
+                elif re.match(pattern_seg, file_name):
+                    index_files.append(file_name)
+                elif re.match(pattern_lock, file_name):
+                    index_files.append(file_name)
+            else:
+                index_files.append(file_name)
+
+        return index_files
+
+    def get_index_names(self):
         index_names = []
 
-        pattern_toc = re.compile('^_(.+)_\\d+\\.toc$')
+        pattern_toc = re.compile(r'^_(.+)_\d+\.toc$')
         for filename in self.__file_storage:
             match = pattern_toc.search(filename)
             if match:
@@ -324,31 +370,39 @@ class IndexCore(SyncObj):
 
         return index_names
 
-    def __open_existing_indices(self):
-        for index_name in self.__get_existing_index_names():
-            self.open_index(index_name, schema=None, _doApply=False)
+    def is_index_exist(self, index_name):
+        return self.__file_storage.index_exists(indexname=index_name)
+
+    def is_index_open(self, index_name):
+        return index_name in self.__indices
 
     @replicated
     def open_index(self, index_name, schema=None):
         start_time = time.time()
 
+        try:
+            index = self.__open_index(index_name, schema=schema)
+        finally:
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+
+        return index
+
+    def __open_index(self, index_name, schema=None):
         index = None
 
         try:
-            if index_name in self.__indices:
-                index = self.__indices[index_name]
-                self.__logger.info(
-                    '{0} in file storage on {1} was already opened'.format(index_name, self.__file_storage.folder))
-            else:
-                self.__indices[index_name] = self.__file_storage.open_index(indexname=index_name, schema=schema)
-                index = self.__indices[index_name]
-                self.__logger.info(
-                    '{0} in file storage on {1} was opened'.format(index_name, self.__file_storage.folder))
+            # open the index
+            index = self.__indices.get(index_name)
+            if index is not None:
+                self.__close_index(index_name)
+            index = self.__file_storage.open_index(indexname=index_name, schema=schema)
+            self.__indices[index_name] = index
+            self.__logger.info('{0} was opened'.format(index_name))
+
+            # open the index writer
+            self.__open_writer(index_name)
         except Exception as ex:
-            self.__logger.error(
-                'failed to open {0} in file storage on {1}: {2}'.format(index_name, self.__file_storage.folder, ex))
-        finally:
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+            self.__logger.error('failed to open {0}: {1}'.format(index_name, ex))
 
         return index
 
@@ -356,19 +410,27 @@ class IndexCore(SyncObj):
     def close_index(self, index_name):
         start_time = time.time()
 
+        try:
+            index = self.__close_index(index_name)
+        finally:
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+
+        return index
+
+    def __close_index(self, index_name):
         index = None
 
         try:
+            # close the index writer
+            self.__close_writer(index_name)
+
+            # close the index
             index = self.__indices.pop(index_name)
-            index.close()
-            self.__logger.info(
-                '{0} in file storage on {1} was closed'.format(index_name, self.__file_storage.folder))
-        except KeyError as ex:
-            self.__logger.error('{0} does not exist'.format(ex.args[0]))
+            if index is not None:
+                index.close()
+            self.__logger.info('{0} was closed'.format(index_name))
         except Exception as ex:
             self.__logger.error('failed to close {0}: {1}'.format(index_name, ex))
-        finally:
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return index
 
@@ -376,21 +438,34 @@ class IndexCore(SyncObj):
     def create_index(self, index_name, schema):
         start_time = time.time()
 
-        index = None
-
         try:
-            if self.__index_exists(index_name):
-                self.open_index(index_name, schema=schema, _doApply=True)
-            else:
-                self.__indices[index_name] = self.__file_storage.create_index(schema, indexname=index_name)
-                index = self.__indices[index_name]
-                self.__logger.info(
-                    '{0} in file storage on {1} was created'.format(index_name, self.__file_storage.folder))
-        except Exception as ex:
-            self.__logger.error(
-                'failed to close {0} in file storage on {1}: {2}'.format(index_name, self.__file_storage.folder, ex))
+            index = self.__create_index(index_name, schema)
         finally:
             self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+
+        return index
+
+    def __create_index(self, index_name, schema):
+        with self.__lock:
+            index = None
+
+            try:
+                if self.is_index_exist(index_name):
+                    # open the index
+                    index = self.__open_index(index_name, schema=schema)
+                else:
+                    # create the index
+                    index = self.__file_storage.create_index(schema, indexname=index_name)
+                    self.__indices[index_name] = index
+                    self.__logger.info('{0} was created'.format(index_name))
+
+                    # open the index writer
+                    self.__open_writer(index_name)
+
+                with open(os.path.join(self.__file_storage.folder, '{0}.schema'.format(index_name)), 'wb') as f:
+                    f.write(pickle.dumps(schema))
+            except Exception as ex:
+                self.__logger.error('failed to create {0}: {1}'.format(index_name, ex))
 
         return index
 
@@ -398,44 +473,34 @@ class IndexCore(SyncObj):
     def delete_index(self, index_name):
         start_time = time.time()
 
-        # close index
-        index = self.close_index(index_name, _doApply=True)
-
-        # delete index files
         try:
-            pattern_toc = re.compile('^_{0}_(\\d+)\\.toc$'.format(index_name))
-            for filename in self.__file_storage:
-                if re.match(pattern_toc, filename):
-                    self.__file_storage.delete_file(filename)
-            pattern_seg = re.compile('^{0}_([a-z0-9]+)\\.seg$'.format(index_name))
-            for filename in self.__file_storage:
-                if re.match(pattern_seg, filename):
-                    self.__file_storage.delete_file(filename)
-            pattern_lock = re.compile('^{0}_WRITELOCK$'.format(index_name))
-            for filename in self.__file_storage:
-                if re.match(pattern_lock, filename):
-                    self.__file_storage.delete_file(filename)
-            self.__logger.info(
-                '{0} in file storage on {1} was deleted'.format(index_name, self.__file_storage.folder))
-        except Exception as ex:
-            self.__logger.error(
-                'failed to delete {0} in file storage on {1}: {2}'.format(index_name, self.__file_storage.folder, ex))
+            index = self.__delete_index(index_name)
         finally:
             self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return index
 
-    def get_indices(self):
-        self.__record_core_metrics(time.time(), inspect.getframeinfo(inspect.currentframe())[2])
-        return self.__indices
+    def __delete_index(self, index_name):
+        with self.__lock:
+            # close index
+            index = self.__close_index(index_name)
+
+            # delete index files
+            try:
+                for filename in self.get_index_file_names(index_name=index_name):
+                    self.__file_storage.delete_file(filename)
+                    self.__logger.info('{0} was deleted'.format(filename))
+                self.__logger.info('{0} was deleted'.format(index_name))
+            except Exception as ex:
+                self.__logger.error('failed to delete {0}: {1}'.format(index_name, ex))
+
+        return index
 
     def get_index(self, index_name):
         start_time = time.time()
 
         try:
-            index = self.__indices[index_name]
-        except KeyError as ex:
-            raise KeyError('{0} does not exist'.format(ex.args[0]))
+            index = self.__indices.get(index_name)
         except Exception as ex:
             raise ex
         finally:
@@ -444,53 +509,125 @@ class IndexCore(SyncObj):
         return index
 
     @replicated
-    def optimize_index(self, index_name):
+    def commit_index(self, index_name):
         start_time = time.time()
 
-        index = None
-
         try:
-            index = self.get_index(index_name)
-            index.optimize()
-            self.__logger.info(
-                '{0} in file storage on {1} was optimized'.format(index_name, self.__file_storage.folder))
-        except Exception as ex:
-            self.__logger.error('failed to optimize {0}: {1}'.format(index_name, ex))
+            success = self.__commit_index(index_name)
         finally:
             self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
-        return index
+        return success
+
+    def __commit_index(self, index_name):
+        success = False
+
+        try:
+            self.__writers.get(index_name).commit()
+            self.__logger.info('{0} was committed'.format(index_name))
+            success = True
+        except Exception as ex:
+            self.__logger.error('failed to commit index {0}: {1}'.format(index_name, ex))
+
+        return success
+
+    @replicated
+    def rollback_index(self, index_name):
+        start_time = time.time()
+
+        try:
+            success = self.__rollback_index(index_name)
+        finally:
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+
+        return success
+
+    def __rollback_index(self, index_name):
+        success = False
+
+        try:
+            self.__writers.get(index_name).cancel()
+            self.__logger.info('{0} was rolled back'.format(index_name))
+            success = True
+        except Exception as ex:
+            self.__logger.error('failed to rollback index {0}: {1}'.format(index_name, ex))
+
+        return success
+
+    @replicated
+    def optimize_index(self, index_name):
+        start_time = time.time()
+
+        try:
+            success = self.__optimize_index(index_name)
+        finally:
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+
+        return success
+
+    def __optimize_index(self, index_name):
+        success = False
+
+        try:
+            self.__indices.get(index_name).optimize()
+            self.__logger.info('{0} was optimized'.format(index_name))
+            success = True
+        except Exception as ex:
+            self.__logger.error('failed to optimize {0}: {1}'.format(index_name, ex))
+
+        return success
 
     def get_doc_count(self, index_name):
         try:
-            cnt = self.get_index(index_name).doc_count()
+            cnt = self.__indices.get(index_name).doc_count()
         except Exception as ex:
             raise ex
 
         return cnt
 
-    def get_writer(self, index_name):
-        try:
-            writer = self.get_index(index_name).writer()
-        except Exception as ex:
-            raise ex
-
-        return writer
-
     def get_schema(self, index_name):
         try:
-            schema = self.get_index(index_name).schema
+            schema = self.__indices.get(index_name).schema
         except Exception as ex:
             raise ex
 
         return schema
 
-    def get_searcher(self, index_name, weighting=None):
+    def __open_writer(self, index_name):
+        try:
+            # open the index writer
+            writer = self.__writers.get(index_name)
+            if writer is not None:
+                self.__close_writer(index_name)
+            # set period to 0 or None to not use auto-commit
+            writer = BufferedWriter(self.__indices.get(index_name),
+                                    period=self.get_schema(index_name).get_auto_commit_period(),
+                                    limit=self.get_schema(index_name).get_auto_commit_limit())
+            self.__writers[index_name] = writer
+            self.__logger.info('writer for {0} was opened'.format(index_name))
+        except Exception as ex:
+            raise ex
+
+        return writer
+
+    def __close_writer(self, index_name):
+        try:
+            # close the index writer
+            writer = self.__writers.pop(index_name)
+            if writer is not None:
+                writer.close()
+            self.__logger.info('writer for {0} was closed'.format(index_name))
+        except Exception as ex:
+            raise ex
+
+        return writer
+
+    def __get_searcher(self, index_name, weighting=None):
         try:
             if weighting is None:
-                searcher = self.get_index(index_name).searcher()
+                searcher = self.__indices.get(index_name).searcher()
             else:
-                searcher = self.get_index(index_name).searcher(weighting=weighting)
+                searcher = self.__indices.get(index_name).searcher(weighting=weighting)
         except Exception as ex:
             raise ex
 
@@ -500,29 +637,26 @@ class IndexCore(SyncObj):
     def put_document(self, index_name, doc_id, fields):
         start_time = time.time()
 
-        count = 0
-        success = False
-        writer = None
-
         try:
-            tmp_fields = copy.deepcopy(fields)
-            tmp_fields[self.get_schema(index_name).get_doc_id_field()] = doc_id
-
-            writer = self.get_writer(index_name)
-            writer.update_document(**tmp_fields)
-            count += 1
-            success = True
-            self.__logger.info('{0} was put in {1}'.format(doc_id, index_name))
+            count = self.__put_document(index_name, doc_id, fields)
         except Exception as ex:
             count = -1
             self.__logger.error('failed to put {0} in {1}: {2}'.format(doc_id, index_name, ex))
         finally:
-            if writer is not None:
-                if success and count > 0:
-                    writer.commit()
-                else:
-                    writer.cancel()
             self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+
+        return count
+
+    def __put_document(self, index_name, doc_id, fields):
+        try:
+            doc = copy.deepcopy(fields)
+            doc[self.get_schema(index_name).get_doc_id_field()] = doc_id
+
+            count = self.__put_documents(index_name, [doc])
+            self.__logger.info('{0} was put in {1}'.format(doc_id, index_name))
+        except Exception as ex:
+            self.__logger.error('failed to put {0} in {1}: {2}'.format(doc_id, index_name, ex))
+            raise ex
 
         return count
 
@@ -547,25 +681,23 @@ class IndexCore(SyncObj):
     def delete_document(self, index_name, doc_id):
         start_time = time.time()
 
-        count = 0
-        success = False
-        writer = None
-
         try:
-            writer = self.get_writer(index_name)
-            count = writer.delete_by_term(self.get_schema(index_name).get_doc_id_field(), doc_id)
-            success = True
-            self.__logger.info('{0} was deleted from {1}'.format(doc_id, index_name))
+            count = self.__delete_document(index_name, doc_id)
         except Exception as ex:
             count = -1
             self.__logger.error('failed to delete {0} from {1}: {2}'.format(doc_id, index_name, ex))
         finally:
-            if writer is not None:
-                if success and count > 0:
-                    writer.commit()
-                else:
-                    writer.cancel()
             self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+
+        return count
+
+    def __delete_document(self, index_name, doc_id):
+        try:
+            count = self.__delete_documents(index_name, [doc_id])
+            self.__logger.info('{0} was deleted from {1}'.format(doc_id, index_name))
+        except Exception as ex:
+            self.__logger.error('failed to delete {0} from {1}: {2}'.format(doc_id, index_name, ex))
+            raise ex
 
         return count
 
@@ -573,27 +705,28 @@ class IndexCore(SyncObj):
     def put_documents(self, index_name, docs):
         start_time = time.time()
 
+        try:
+            count = self.__put_documents(index_name, docs)
+        except Exception as ex:
+            count = -1
+            self.__logger.error('failed to put documents in bulk to {0}: {1}'.format(index_name, ex))
+        finally:
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+
+        return count
+
+    def __put_documents(self, index_name, docs):
         count = 0
-        success = False
-        writer = None
 
         try:
-            writer = self.get_writer(index_name)
+            writer = self.__writers.get(index_name)
             for doc in docs:
                 writer.update_document(**doc)
                 count = count + 1
-            success = True
             self.__logger.info('{0} documents ware put in {1}'.format(count, index_name))
         except Exception as ex:
-            count = -1
-            self.__logger.error('failed to index documents in {0} in bulk: {1}'.format(index_name, ex))
-        finally:
-            if writer is not None:
-                if success and count > 0:
-                    writer.commit()
-                else:
-                    writer.cancel()
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+            self.__logger.error('failed to put documents in bulk to {0}: {1}'.format(index_name, ex))
+            raise ex
 
         return count
 
@@ -601,26 +734,27 @@ class IndexCore(SyncObj):
     def delete_documents(self, index_name, doc_ids):
         start_time = time.time()
 
-        count = 0
-        success = False
-        writer = None
-
         try:
-            writer = self.get_writer(index_name)
-            for doc_id in doc_ids:
-                count = count + writer.delete_by_term(self.get_schema(index_name).get_doc_id_field(), doc_id)
-            success = True
-            self.__logger.info('{0} documents ware deleted from {1}'.format(count, index_name))
+            count = self.__delete_documents(index_name, doc_ids)
         except Exception as ex:
             count = -1
-            self.__logger.error('failed to delete documents in {0} in bulk: {1}'.format(index_name, ex))
+            self.__logger.error('failed to delete documents in bulk to {0}: {1}'.format(index_name, ex))
         finally:
-            if writer is not None:
-                if success and count > 0:
-                    writer.commit()
-                else:
-                    writer.cancel()
             self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+
+        return count
+
+    def __delete_documents(self, index_name, doc_ids):
+        count = 0
+
+        try:
+            writer = self.__writers.get(index_name)
+            for doc_id in doc_ids:
+                count = count + writer.delete_by_term(self.get_schema(index_name).get_doc_id_field(), doc_id)
+            self.__logger.info('{0} documents ware deleted from {1}'.format(count, index_name))
+        except Exception as ex:
+            self.__logger.error('failed to delete documents in bulk to {0}: {1}'.format(index_name, ex))
+            raise ex
 
         return count
 
@@ -628,7 +762,7 @@ class IndexCore(SyncObj):
         start_time = time.time()
 
         try:
-            searcher = self.get_searcher(index_name, weighting=weighting)
+            searcher = self.__get_searcher(index_name, weighting=weighting)
             query_parser = QueryParser(search_field, self.get_schema(index_name))
             query_obj = query_parser.parse(query)
             results_page = searcher.search_page(query_obj, page_num, pagelen=page_len, **kwargs)
@@ -640,10 +774,17 @@ class IndexCore(SyncObj):
 
         return results_page
 
+    @replicated
+    def create_snapshot(self):
+        self.__create_snapshot()
+
+    def __create_snapshot(self):
+        self.forceLogCompaction()
+
     def get_snapshot_file_name(self):
         return self.__conf.fullDumpFile
 
-    def snapshot_exists(self):
+    def is_snapshot_exist(self):
         return os.path.exists(self.get_snapshot_file_name())
 
     def open_snapshot_file(self):

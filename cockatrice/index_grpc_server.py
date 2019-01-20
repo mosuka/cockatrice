@@ -25,11 +25,11 @@ from prometheus_client.core import CollectorRegistry, Counter, Histogram
 from whoosh.scoring import BM25F
 
 from cockatrice import NAME
-from cockatrice.protobuf.index_pb2 import CloseIndexResponse, CreateIndexResponse, CreateSnapshotResponse, \
-    DeleteDocumentResponse, DeleteDocumentsResponse, DeleteIndexResponse, DeleteNodeResponse, GetDocumentResponse, \
-    GetIndexResponse, GetSnapshotResponse, GetStatusResponse, IsAliveResponse, IsHealthyResponse, IsReadyResponse, \
-    OpenIndexResponse, OptimizeIndexResponse, PutDocumentResponse, PutDocumentsResponse, PutNodeResponse, \
-    SearchDocumentsResponse, SnapshotExistsResponse, Status
+from cockatrice.protobuf.index_pb2 import CloseIndexResponse, CommitIndexResponse, CreateIndexResponse, \
+    CreateSnapshotResponse, DeleteDocumentResponse, DeleteDocumentsResponse, DeleteIndexResponse, DeleteNodeResponse, \
+    GetDocumentResponse, GetIndexResponse, GetSnapshotResponse, GetStatusResponse, IsAliveResponse, IsHealthyResponse, \
+    IsReadyResponse, IsSnapshotExistResponse, OpenIndexResponse, OptimizeIndexResponse, PutDocumentResponse, \
+    PutDocumentsResponse, PutNodeResponse, RollbackIndexResponse, SearchDocumentsResponse, Status
 from cockatrice.protobuf.index_pb2_grpc import add_IndexServicer_to_server, IndexServicer as IndexServicerImpl
 from cockatrice.schema import Schema
 from cockatrice.scoring import get_multi_weighting
@@ -114,19 +114,23 @@ class IndexServicer(IndexServicerImpl):
 
         try:
             index = self.__index_core.get_index(request.index_name)
+            if index is None:
+                response.status.success = False
+                response.status.message = '{0} does not exist'.format(request.index_name)
+            else:
+                response.index_stats.name = index.indexname
+                response.index_stats.doc_count = index.doc_count()
+                response.index_stats.doc_count_all = index.doc_count_all()
+                response.index_stats.latest_generation = index.latest_generation()
+                response.index_stats.last_modified = index.last_modified()
+                response.index_stats.version = index.version
+                response.index_stats.storage.folder = index.storage.folder
+                response.index_stats.storage.supports_mmap = index.storage.supports_mmap
+                response.index_stats.storage.readonly = index.storage.readonly
+                response.index_stats.storage.files.extend(index.storage.list())
 
-            response.index_stats.name = index.indexname
-            response.index_stats.doc_count = index.doc_count()
-            response.index_stats.doc_count_all = index.doc_count_all()
-            response.index_stats.latest_generation = index.latest_generation()
-            response.index_stats.version = index.version
-            response.index_stats.storage.folder = index.storage.folder
-            response.index_stats.storage.supports_mmap = index.storage.supports_mmap
-            response.index_stats.storage.readonly = index.storage.readonly
-            response.index_stats.storage.files.extend(index.storage.list())
-
-            response.status.success = True
-            response.status.message = '{0} was successfully retrieved'.format(index.indexname)
+                response.status.success = True
+                response.status.message = '{0} was successfully retrieved'.format(index.indexname)
         except Exception as ex:
             response.status.success = False
             response.status.message = ex.args[0]
@@ -236,6 +240,42 @@ class IndexServicer(IndexServicerImpl):
             else:
                 response.status.success = True
                 response.status.message = 'request was successfully accepted to close {0}'.format(request.index_name)
+        except Exception as ex:
+            response.status.success = False
+            response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+
+        return response
+
+    def CommitIndex(self, request, context):
+        start_time = time.time()
+
+        response = CommitIndexResponse()
+
+        try:
+            self.__index_core.commit_index(request.index_name, sync=request.sync)
+
+            response.status.success = True
+            response.status.message = '{0} was successfully committed'.format(request.index_name)
+        except Exception as ex:
+            response.status.success = False
+            response.status.message = str(ex)
+        finally:
+            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+
+        return response
+
+    def RollbackIndex(self, request, context):
+        start_time = time.time()
+
+        response = RollbackIndexResponse()
+
+        try:
+            self.__index_core.rollback_index(request.index_name, sync=request.sync)
+
+            response.status.success = True
+            response.status.message = '{0} was successfully rolled back'.format(request.index_name)
         except Exception as ex:
             response.status.success = False
             response.status.message = str(ex)
@@ -517,13 +557,13 @@ class IndexServicer(IndexServicerImpl):
 
         return response
 
-    def SnapshotExists(self, request, context):
+    def IsSnapshotExist(self, request, context):
         start_time = time.time()
 
-        response = SnapshotExistsResponse()
+        response = IsSnapshotExistResponse()
 
         try:
-            response.exist = self.__index_core.snapshot_exists()
+            response.exist = self.__index_core.is_snapshot_exist()
 
             response.status.success = True
             response.status.message = 'snapshot exists' if response.exist else 'snapshot does not exist'
@@ -541,7 +581,7 @@ class IndexServicer(IndexServicerImpl):
         response = CreateSnapshotResponse()
 
         try:
-            self.__index_core.forceLogCompaction()
+            self.__index_core.create_snapshot(sync=request.sync)
 
             response.status.success = True
             response.status.message = 'request was successfully accepted'
