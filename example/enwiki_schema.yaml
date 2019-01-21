@@ -406,7 +406,6 @@ filters:
     args:
       minsize: 2
       maxsize: null
-      at: null
   intraword:
     class: whoosh.analysis.IntraWordFilter
     args:
@@ -420,3 +419,10 @@ filters:
     args:
       size: 2
       sep: "-"
+
+#
+# auto commit settings
+#
+auto_commit:
+  period: 30  # Set this to 0 or null to not use auto-commit
+  limit: 1000

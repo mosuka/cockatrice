@@ -49,6 +49,7 @@ Contents
    monitor/index
    health_check/index
    api_reference/index
+   example/index
 
 
 Indices and tables

@@ -480,5 +480,9 @@
         "sep": "-"
       }
     }
+  },
+  "auto_commit": {
+    "period": 30,
+    "limit": 1000
   }
 }
