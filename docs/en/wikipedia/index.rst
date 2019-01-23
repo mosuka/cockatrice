@@ -26,7 +26,7 @@ Extracting Wikipedia data
 
 .. code-block:: bash
 
-    $ ./WikiExtractor.py -o ~/tmp/enwiki --json ~/tmp/enwiki-20190101-pages-articles.xml.bz2
+    $ ./WikiExtractor.py --output ~/tmp/enwiki --bytes 200K --json ~/tmp/enwiki-20190101-pages-articles.xml.bz2
 
 
 Starting Cockatrice
@@ -42,7 +42,7 @@ Creating index
 
 .. code-block:: bash
 
-    $ cockatrice create index --schema-file ~/github.com/mosuka/cockatrice/example/enwiki_schema.yaml enwiki
+    $ curl -s -X GET https://raw.githubusercontent.com/mosuka/cockatrice/master/example/enwiki_schema.yaml | xargs -0 cockatrice create index enwiki
 
 
 Indexing Wikipedia
@@ -50,5 +50,8 @@ Indexing Wikipedia
 
 .. code-block:: bash
 
-    $ cockatrice put documents --documents-file ~/github.com/mosuka/cockatrice/example/enwiki_schema.yaml enwiki
-
+    $ for FILE in $(find ./tmp/enwiki -type f -name '*' | sort)
+      do
+        echo ${FILE}
+        cat ${FILE} | jq  . | jq -s '.' | xargs -0 cockatrice put documents enwiki
+      done

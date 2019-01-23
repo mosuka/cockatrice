@@ -256,8 +256,16 @@ class TestIndexHTTPServer(unittest.TestCase):
                                         headers={'Content-Type': 'application/json'})
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
 
+        # commit
+        response = self.test_client.get('/indices/test_index/commit', query_string='sync=True')
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+
         # delete document 1
         response = self.test_client.delete('/indices/test_index/documents/1', query_string='sync=True')
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+
+        # commit
+        response = self.test_client.get('/indices/test_index/commit', query_string='sync=True')
         self.assertEqual(HTTPStatus.OK, response.status_code)
 
         # get document 1

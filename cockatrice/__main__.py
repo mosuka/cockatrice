@@ -42,7 +42,7 @@ def start_indexer_handler(args):
 
 
 def create_index_handler(args):
-    create_index(args.index_name, args.schema_file, host=args.host, port=args.port, output=args.output, sync=args.sync)
+    create_index(args.index_name, args.schema, host=args.host, port=args.port, output=args.output, sync=args.sync)
 
 
 def get_index_handler(args):
@@ -54,7 +54,7 @@ def delete_index_handler(args):
 
 
 def put_document_handler(args):
-    put_document(args.index_name, args.document_id, args.fields_file, host=args.host, port=args.port,
+    put_document(args.index_name, args.document_id, args.document_fields, host=args.host, port=args.port,
                  output=args.output, sync=args.sync)
 
 
@@ -68,12 +68,11 @@ def delete_document_handler(args):
 
 
 def put_documents_handler(args):
-    put_documents(args.index_name, args.documents_file, host=args.host, port=args.port, output=args.output,
-                  sync=args.sync)
+    put_documents(args.index_name, args.documents, host=args.host, port=args.port, output=args.output, sync=args.sync)
 
 
 def delete_documents_handler(args):
-    delete_documents(args.index_name, args.document_ids_file, host=args.host, port=args.port, output=args.output,
+    delete_documents(args.index_name, args.document_ids, host=args.host, port=args.port, output=args.output,
                      sync=args.sync)
 
 
@@ -195,13 +194,12 @@ def main():
                                      help='the host address to listen on for http traffic')
     parser_create_index.add_argument('--port', dest='port', default=8080, metavar='PORT', type=int,
                                      help='the port to listen on for HTTP traffic')
-    parser_create_index.add_argument('--schema-file', dest='schema_file', default=None, metavar='SCHEMA_FILE', type=str,
-                                     help='the schema for index')
     parser_create_index.add_argument('--output', dest='output', default='yaml', metavar='OUTPUT', type=str,
                                      help='the output format')
     parser_create_index.add_argument('--sync', dest='sync', default=False, metavar='SYNC', type=bool,
                                      help='wait for synchronize data')
     parser_create_index.add_argument('index_name', metavar='INDEX_NAME', type=str, help='the index name')
+    parser_create_index.add_argument('schema', metavar='SCHEMA', type=str, help='the schema for the index')
     parser_create_index.set_defaults(handler=create_index_handler)
 
     # create snapshot
@@ -241,14 +239,13 @@ def main():
                                      help='the host address to listen on for http traffic')
     parser_put_document.add_argument('--port', dest='port', default=8080, metavar='PORT', type=int,
                                      help='the port to listen on for HTTP traffic')
-    parser_put_document.add_argument('--fields-file', dest='fields_file', default=None, metavar='FIELDS_FILE', type=str,
-                                     help='the fields file')
     parser_put_document.add_argument('--output', dest='output', default='yaml', metavar='OUTPUT', type=str,
                                      help='the output format')
     parser_put_document.add_argument('--sync', dest='sync', default=False, metavar='SYNC', type=bool,
                                      help='wait for synchronize data')
     parser_put_document.add_argument('index_name', metavar='INDEX_NAME', type=str, help='the index name')
     parser_put_document.add_argument('document_id', metavar='DOCUMENT_ID', type=str, help='the document id')
+    parser_put_document.add_argument('document_fields', metavar='DOCUMENT_FIELDS', type=str, help='the document fields')
     parser_put_document.set_defaults(handler=put_document_handler)
 
     # put documents
@@ -258,13 +255,12 @@ def main():
                                       help='the host address to listen on for http traffic')
     parser_put_documents.add_argument('--port', dest='port', default=8080, metavar='PORT', type=int,
                                       help='the port to listen on for HTTP traffic')
-    parser_put_documents.add_argument('--documents-file', dest='documents_file', default=None, metavar='DOCUMENTS_FILE',
-                                      type=str, help='the documents file')
     parser_put_documents.add_argument('--output', dest='output', default='yaml', metavar='OUTPUT', type=str,
                                       help='the output format')
     parser_put_documents.add_argument('--sync', dest='sync', default=False, metavar='SYNC', type=bool,
                                       help='wait for synchronize data')
     parser_put_documents.add_argument('index_name', metavar='INDEX_NAME', type=str, help='the index name')
+    parser_put_documents.add_argument('documents', metavar='DOCUMENTS', type=str, help='the documents list')
     parser_put_documents.set_defaults(handler=put_documents_handler)
 
     # get
@@ -348,13 +344,12 @@ def main():
                                          help='the host address to listen on for http traffic')
     parser_delete_documents.add_argument('--port', dest='port', default=8080, metavar='PORT', type=int,
                                          help='the port to listen on for HTTP traffic')
-    parser_delete_documents.add_argument('--document-ids-file', dest='document_ids_file', default=None,
-                                         metavar='DOCUMENT_IDS_FILE', type=str, help='the document IDs file')
     parser_delete_documents.add_argument('--output', dest='output', default='yaml', metavar='OUTPUT', type=str,
                                          help='the output format')
     parser_delete_documents.add_argument('--sync', dest='sync', default=False, metavar='SYNC', type=bool,
                                          help='wait for synchronize data')
     parser_delete_documents.add_argument('index_name', metavar='INDEX_NAME', type=str, help='the index name')
+    parser_delete_documents.add_argument('document_ids', metavar='DOCUMENT_IDS', type=str, help='the document ID list')
     parser_delete_documents.set_defaults(handler=delete_documents_handler)
 
     # delete node

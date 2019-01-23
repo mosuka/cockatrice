@@ -34,7 +34,6 @@ from pysyncobj.poller import createPoller
 from pysyncobj.tcp_connection import TcpConnection
 from whoosh.filedb.filestore import FileStorage
 from whoosh.qparser import QueryParser
-from whoosh.writing import BufferedWriter
 
 from cockatrice import NAME
 from cockatrice.util.resolver import get_ipv4, parse_addr
@@ -168,16 +167,15 @@ class IndexCore(SyncObj):
         self.__conf.validate()
 
         self.__indices = {}
+
+        self.__writer_locks = {}
         self.__writers = {}
+        self.__writer_timers = {}
 
         self.__file_storage = None
 
         os.makedirs(self.__index_dir, exist_ok=True)
         self.__file_storage = FileStorage(self.__index_dir, supports_mmap=True, readonly=False, debug=False)
-
-        # open existing indices on startup
-        for index_name in self.get_index_names():
-            self.__open_index(index_name, schema=None)
 
         super(IndexCore, self).__init__(self.__bind_addr, self.__peer_addrs, conf=self.__conf)
         self.__logger.info('index core started')
@@ -189,15 +187,20 @@ class IndexCore(SyncObj):
             time.sleep(1)
         self.__logger.info('index core ready')
 
-        self.repeated_timer = RepeatedTimer(1, self.__record_metrics)
-        self.repeated_timer.start()
+        # open existing indices on startup
+        for index_name in self.get_index_names():
+            self.__open_index(index_name, schema=None)
+
+        self.metrics_timer = RepeatedTimer(10, self.__record_metrics)
+        self.metrics_timer.start()
 
     def stop(self):
-        self.repeated_timer.cancel()
+        self.metrics_timer.cancel()
 
         # close indices
         for index_name in list(self.__indices.keys()):
             self.__close_index(index_name)
+
         self.destroy()
 
     def destroy(self):
@@ -287,57 +290,41 @@ class IndexCore(SyncObj):
     # index serializer
     def __serialize(self, filename, raft_data):
         with self.__lock:
-            writer_names = list(self.__writers.keys())
             try:
-                # close the index writers
-                for index_name in writer_names:
-                    self.__close_writer(index_name)
+                self.__logger.info('serializer has been started')
 
                 # store the index files and raft logs to the snapshot file
                 with zipfile.ZipFile(filename, 'w', zipfile.ZIP_DEFLATED) as f:
-                    for index_filename in self.get_index_file_names(index_name=None):
-                        abs_index_path = os.path.join(self.__file_storage.folder, index_filename)
-                        f.write(abs_index_path, index_filename)
-                        self.__logger.debug('{0} has been stored in {1}'.format(abs_index_path, filename))
+                    for index_name in self.get_index_names():
+                        with self.__writer_locks.get(index_name):
+                            self.__commit_index(index_name)
+
+                            for index_filename in self.get_index_file_names(index_name=index_name):
+                                abs_index_path = os.path.join(self.__file_storage.folder, index_filename)
+                                f.write(abs_index_path, index_filename)
+                                self.__logger.debug('{0} has been stored in {1}'.format(abs_index_path, filename))
                     f.writestr('raft.bin', pickle.dumps(raft_data))
             except Exception as ex:
                 self.__logger.error(ex)
-            finally:
-                # reopen the index writers
-                for index_name in writer_names:
-                    self.__open_writer(index_name)
+            self.__logger.info('serializer has been stopped')
 
     # index deserializer
     def __deserialize(self, filename):
         with self.__lock:
-            index_names = list(self.__writers.keys())
             try:
-                # close the index writers
-                for index_name in index_names:
-                    self.__close_writer(index_name)
-
-                # restore the index files and raft logs from the snapshot file
+                self.__logger.info('deserializer has been started')
                 with zipfile.ZipFile(filename, 'r') as zf:
                     for member in zf.namelist():
                         if member != 'raft.bin':
                             zf.extract(member, path=self.__file_storage.folder)
                             self.__logger.debug('{0} has been restored from {1}'.format(
                                 os.path.join(self.__file_storage.folder, member), filename))
-
-                    # reopen the indices
-                    for index_name in self.get_index_names():
-                        with open(os.path.join(self.__file_storage.folder, '{0}.schema'.format(index_name)), 'rb') as f:
-                            schema = pickle.loads(f.read())
-                        self.__open_index(index_name, schema)
-
                     return pickle.loads(zf.read('raft.bin'))
 
             except Exception as ex:
                 self.__logger.error(ex)
             finally:
-                # reopen the index writers
-                for index_name in index_names:
-                    self.__open_writer(index_name)
+                self.__logger.info('deserializer has been stopped')
 
     def get_index_file_names(self, index_name=None):
         index_files = []
@@ -346,7 +333,7 @@ class IndexCore(SyncObj):
         pattern_seg = re.compile(r'^{0}_([a-z0-9]+)\.seg$'.format(index_name))  # ex) myindex_zseabukc2nbpvh0u.seg
         pattern_lock = re.compile(r'^{0}_WRITELOCK$'.format(index_name))  # ex) myindex_WRITELOCK
 
-        for file_name in self.__file_storage.list():
+        for file_name in list(self.__file_storage.list()):
             if index_name is not None:
                 if re.match(pattern_toc, file_name):
                     index_files.append(file_name)
@@ -363,9 +350,9 @@ class IndexCore(SyncObj):
         index_names = []
 
         pattern_toc = re.compile(r'^_(.+)_\d+\.toc$')
-        for filename in self.__file_storage:
+        for filename in list(self.__file_storage.list()):
             match = pattern_toc.search(filename)
-            if match:
+            if match and match.group(1) not in index_names:
                 index_names.append(match.group(1))
 
         return index_names
@@ -393,14 +380,14 @@ class IndexCore(SyncObj):
         try:
             # open the index
             index = self.__indices.get(index_name)
-            if index is not None:
-                self.__close_index(index_name)
-            index = self.__file_storage.open_index(indexname=index_name, schema=schema)
-            self.__indices[index_name] = index
-            self.__logger.info('{0} was opened'.format(index_name))
+            if index is None:
+                index = self.__file_storage.open_index(indexname=index_name, schema=schema)
+                self.__indices[index_name] = index
+                self.__logger.info('{0} was opened'.format(index_name))
 
             # open the index writer
             self.__open_writer(index_name)
+
         except Exception as ex:
             self.__logger.error('failed to open {0}: {1}'.format(index_name, ex))
 
@@ -421,6 +408,13 @@ class IndexCore(SyncObj):
         index = None
 
         try:
+            # stop timers
+            if index_name in self.__writer_timers:
+                timer = self.__writer_timers.pop(index_name)
+                if timer is not None:
+                    timer.cancel()
+                    self.__logger.info('auto-commit timer for {0} was stopped'.format(index_name))
+
             # close the index writer
             self.__close_writer(index_name)
 
@@ -428,7 +422,7 @@ class IndexCore(SyncObj):
             index = self.__indices.pop(index_name)
             if index is not None:
                 index.close()
-            self.__logger.info('{0} was closed'.format(index_name))
+                self.__logger.info('{0} was closed'.format(index_name))
         except Exception as ex:
             self.__logger.error('failed to close {0}: {1}'.format(index_name, ex))
 
@@ -462,6 +456,12 @@ class IndexCore(SyncObj):
                     # open the index writer
                     self.__open_writer(index_name)
 
+                    # start the timer
+                    self.__writer_timers[index_name] = RepeatedTimer(10, self.commit_index, (index_name,))
+                    self.__writer_timers.get(index_name).start()
+                    self.__logger.info('auto-commit timer for {0} was started'.format(index_name))
+
+                # save the schema in the index dir
                 with open(os.path.join(self.__file_storage.folder, '{0}.schema'.format(index_name)), 'wb') as f:
                     f.write(pickle.dumps(schema))
             except Exception as ex:
@@ -520,14 +520,18 @@ class IndexCore(SyncObj):
         return success
 
     def __commit_index(self, index_name):
-        success = False
+        with self.__writer_locks[index_name]:
+            success = False
 
-        try:
-            self.__writers.get(index_name).commit()
-            self.__logger.info('{0} was committed'.format(index_name))
-            success = True
-        except Exception as ex:
-            self.__logger.error('failed to commit index {0}: {1}'.format(index_name, ex))
+            try:
+                self.__get_writer(index_name).commit()
+                self.__logger.info('{0} was committed'.format(index_name))
+                success = True
+
+                # reopen index writer
+                self.__open_writer(index_name)
+            except Exception as ex:
+                self.__logger.error('failed to commit index {0}: {1}'.format(index_name, ex))
 
         return success
 
@@ -543,14 +547,15 @@ class IndexCore(SyncObj):
         return success
 
     def __rollback_index(self, index_name):
-        success = False
+        with self.__writer_locks[index_name]:
+            success = False
 
-        try:
-            self.__writers.get(index_name).cancel()
-            self.__logger.info('{0} was rolled back'.format(index_name))
-            success = True
-        except Exception as ex:
-            self.__logger.error('failed to rollback index {0}: {1}'.format(index_name, ex))
+            try:
+                self.__get_writer(index_name).cancel()
+                self.__logger.info('{0} was rolled back'.format(index_name))
+                success = True
+            except Exception as ex:
+                self.__logger.error('failed to rollback index {0}: {1}'.format(index_name, ex))
 
         return success
 
@@ -566,14 +571,15 @@ class IndexCore(SyncObj):
         return success
 
     def __optimize_index(self, index_name):
-        success = False
+        with self.__writer_locks[index_name]:
+            success = False
 
-        try:
-            self.__indices.get(index_name).optimize()
-            self.__logger.info('{0} was optimized'.format(index_name))
-            success = True
-        except Exception as ex:
-            self.__logger.error('failed to optimize {0}: {1}'.format(index_name, ex))
+            try:
+                self.__writers.get(index_name).commit(optimize=True)
+                self.__logger.info('{0} was optimized'.format(index_name))
+                success = True
+            except Exception as ex:
+                self.__logger.error('failed to optimize {0}: {1}'.format(index_name, ex))
 
         return success
 
@@ -596,15 +602,14 @@ class IndexCore(SyncObj):
     def __open_writer(self, index_name):
         try:
             # open the index writer
-            writer = self.__writers.get(index_name)
-            if writer is not None:
-                self.__close_writer(index_name)
-            # set period to 0 or None to not use auto-commit
-            writer = BufferedWriter(self.__indices.get(index_name),
-                                    period=self.get_schema(index_name).get_auto_commit_period(),
-                                    limit=self.get_schema(index_name).get_auto_commit_limit())
+            writer = self.__indices.get(index_name).writer(proc=16, batchsize=10)
+            # writer = BufferedWriter(self.__indices.get(index_name),
+            #                         period=self.get_schema(index_name).get_auto_commit_period(),
+            #                         limit=self.get_schema(index_name).get_auto_commit_limit())
             self.__writers[index_name] = writer
             self.__logger.info('writer for {0} was opened'.format(index_name))
+
+            self.__writer_locks[index_name] = threading.RLock()
         except Exception as ex:
             raise ex
 
@@ -613,10 +618,20 @@ class IndexCore(SyncObj):
     def __close_writer(self, index_name):
         try:
             # close the index writer
-            writer = self.__writers.pop(index_name)
-            if writer is not None:
-                writer.close()
+            writer = self.__writers.pop(index_name) if index_name in self.__writers else None
+            if writer is not None and not writer.is_closed:
+                writer.commit()  # SegmentWriter
             self.__logger.info('writer for {0} was closed'.format(index_name))
+
+            self.__writer_locks.pop(index_name)
+        except Exception as ex:
+            raise ex
+
+        return writer
+
+    def __get_writer(self, index_name):
+        try:
+            writer = self.__writers.get(index_name)
         except Exception as ex:
             raise ex
 
@@ -719,9 +734,11 @@ class IndexCore(SyncObj):
         count = 0
 
         try:
-            writer = self.__writers.get(index_name)
+            writer = self.__get_writer(index_name)
             for doc in docs:
                 writer.update_document(**doc)
+                self.__logger.debug(
+                    '{0} ware put in {1}'.format(doc[self.get_schema(index_name).get_doc_id_field()], index_name))
                 count = count + 1
             self.__logger.info('{0} documents ware put in {1}'.format(count, index_name))
         except Exception as ex:
@@ -751,6 +768,7 @@ class IndexCore(SyncObj):
             writer = self.__writers.get(index_name)
             for doc_id in doc_ids:
                 count = count + writer.delete_by_term(self.get_schema(index_name).get_doc_id_field(), doc_id)
+                self.__logger.debug('{0} ware deleted from {1}'.format(doc_id, index_name))
             self.__logger.info('{0} documents ware deleted from {1}'.format(count, index_name))
         except Exception as ex:
             self.__logger.error('failed to delete documents in bulk to {0}: {1}'.format(index_name, ex))

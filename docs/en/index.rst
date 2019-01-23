@@ -49,7 +49,7 @@ Contents
    monitor/index
    health_check/index
    api_reference/index
-   example/index
+   wikipedia/index
 
 
 Indices and tables

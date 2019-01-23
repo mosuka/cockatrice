@@ -122,19 +122,16 @@ def start_indexer(host='localhost', port=7070, seed_addr=None, snapshot_file='/t
             indexer.stop()
 
 
-def create_index(index_name, schema_file, host='localhost', port=8080, output='yaml', sync=False):
+def create_index(index_name, schema, host='localhost', port=8080, output='yaml', sync=False):
     try:
-        with open(schema_file) as f:
-            schema_data = f.read()
-
         content_type = ''
         try:
-            json.loads(schema_data)
+            json.loads(schema)
             content_type = 'application/json'
         except json.decoder.JSONDecodeError:
             pass
         try:
-            yaml.safe_load(schema_data)
+            yaml.safe_load(schema)
             content_type = 'application/yaml'
         except yaml.constructor.ConstructorError:
             pass
@@ -142,7 +139,7 @@ def create_index(index_name, schema_file, host='localhost', port=8080, output='y
         response = requests.put(
             'http://{0}:{1}/indices/{2}?output={3}&sync={4}'.format(host, port, index_name, output, sync),
             headers={'Content-Type': content_type},
-            data=schema_data)
+            data=schema.encode('utf-8'))
         print(response.text)
     except Exception as ex:
         print(ex)
@@ -165,19 +162,16 @@ def delete_index(index_name, host='localhost', port=8080, output='yaml', sync=Fa
         print(ex)
 
 
-def put_document(index_name, document_id, fields_file, host='localhost', port=8080, output='yaml', sync=False):
+def put_document(index_name, document_id, document_fields, host='localhost', port=8080, output='yaml', sync=False):
     try:
-        with open(fields_file) as f:
-            fields_data = f.read()
-
         content_type = ''
         try:
-            json.loads(fields_data)
+            json.loads(document_fields)
             content_type = 'application/json'
         except json.decoder.JSONDecodeError:
             pass
         try:
-            yaml.safe_load(fields_data)
+            yaml.safe_load(document_fields)
             content_type = 'application/yaml'
         except yaml.constructor.ConstructorError:
             pass
@@ -186,7 +180,7 @@ def put_document(index_name, document_id, fields_file, host='localhost', port=80
             'http://{0}:{1}/indices/{2}/documents/{3}?output={4}&sync={5}'.format(host, port, index_name, document_id,
                                                                                   output, sync),
             headers={'Content-Type': content_type},
-            data=fields_data)
+            data=document_fields.encode('utf-8'))
         print(response.text)
     except Exception as ex:
         print(ex)
@@ -211,19 +205,16 @@ def delete_document(index_name, document_id, host='localhost', port=8080, output
         print(ex)
 
 
-def put_documents(index_name, documents_file, host='localhost', port=8080, output='yaml', sync=False):
+def put_documents(index_name, documents, host='localhost', port=8080, output='yaml', sync=False):
     try:
-        with open(documents_file) as f:
-            documents_data = f.read()
-
         content_type = ''
         try:
-            json.loads(documents_data)
+            json.loads(documents)
             content_type = 'application/json'
         except json.decoder.JSONDecodeError:
             pass
         try:
-            yaml.safe_load(documents_data)
+            yaml.safe_load(documents)
             content_type = 'application/yaml'
         except yaml.constructor.ConstructorError:
             pass
@@ -231,25 +222,22 @@ def put_documents(index_name, documents_file, host='localhost', port=8080, outpu
         response = requests.put(
             'http://{0}:{1}/indices/{2}/documents?output={3}&sync={4}'.format(host, port, index_name, output, sync),
             headers={'Content-Type': content_type},
-            data=documents_data)
+            data=documents.encode('utf-8'))
         print(response.text)
     except Exception as ex:
         print(ex)
 
 
-def delete_documents(index_name, document_ids_file, host='localhost', port=8080, output='yaml', sync=False):
+def delete_documents(index_name, document_ids, host='localhost', port=8080, output='yaml', sync=False):
     try:
-        with open(document_ids_file) as f:
-            document_ids_data = f.read()
-
         content_type = ''
         try:
-            json.loads(document_ids_data)
+            json.loads(document_ids)
             content_type = 'application/json'
         except json.decoder.JSONDecodeError:
             pass
         try:
-            yaml.safe_load(document_ids_data)
+            yaml.safe_load(document_ids)
             content_type = 'application/yaml'
         except yaml.constructor.ConstructorError:
             pass
@@ -257,7 +245,7 @@ def delete_documents(index_name, document_ids_file, host='localhost', port=8080,
         response = requests.delete(
             'http://{0}:{1}/indices/{2}/documents?output={3}&sync={4}'.format(host, port, index_name, output, sync),
             headers={'Content-Type': content_type},
-            data=document_ids_data)
+            data=document_ids.encode('utf-8'))
         print(response.text)
     except Exception as ex:
         print(ex)
@@ -297,7 +285,7 @@ def search(index_name, query, page_num=1, page_len=10, weighting_file=None, host
                                                                                                           page_len,
                                                                                                           output),
                 headers={'Content-Type': content_type},
-                data=weighting_data)
+                data=weighting_data.encode('utf-8'))
         print(response.text)
     except Exception as ex:
         print(ex)
