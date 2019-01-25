@@ -2,6 +2,8 @@ Cockatrice Change Log
 
 ==================== Cockatrice 0.7.2 ====================
 
+* Add index writer
+* Add Wikipedia example
 * Enable auto-commit
 
 
