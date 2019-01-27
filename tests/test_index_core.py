@@ -28,8 +28,8 @@ from pysyncobj import SyncObjConf
 from whoosh.filedb.filestore import FileStorage
 
 import cockatrice
+from cockatrice.index_config import IndexConfig
 from cockatrice.index_core import IndexCore
-from cockatrice.schema import Schema
 from tests import get_free_port
 
 
@@ -41,7 +41,7 @@ class TestIndexCore(unittest.TestCase):
         host = '0.0.0.0'
         port = get_free_port()
         peer_addrs = []
-        dump_file = self.temp_dir.name + '/data.dump'
+        snapshot_file = self.temp_dir.name + '/snapshot.zip'
 
         index_dir = self.temp_dir.name + '/index'
 
@@ -56,7 +56,7 @@ class TestIndexCore(unittest.TestCase):
         metrics_registry = CollectorRegistry()
 
         conf = SyncObjConf(
-            fullDumpFile=dump_file,
+            fullDumpFile=snapshot_file,
             logCompactionMinTime=300,
             dynamicMembershipChange=True
         )
@@ -69,23 +69,28 @@ class TestIndexCore(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_create_index(self):
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            __dict = yaml.safe_load(file_obj.read())
-        schema = Schema(__dict)
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
+        index_config = IndexConfig(index_config_dict)
 
         # create index
         index_name = 'test_file_index'
-        self.index_core.create_index(index_name, schema, sync=True)
+        self.index_core.create_index(index_name, index_config, sync=True)
         self.assertTrue(self.index_core.is_index_exist(index_name))
 
+        # close index
+        self.index_core.close_index(index_name)
+
     def test_delete_index(self):
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            __dict = yaml.safe_load(file_obj.read())
-        schema = Schema(__dict)
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
+        index_config = IndexConfig(index_config_dict)
 
         # create index
         index_name = 'test_file_index'
-        self.index_core.create_index(index_name, schema, sync=True)
+        self.index_core.create_index(index_name, index_config, sync=True)
         self.assertTrue(self.index_core.is_index_exist(index_name))
 
         # delete index
@@ -93,26 +98,31 @@ class TestIndexCore(unittest.TestCase):
         self.assertFalse(self.index_core.is_index_exist(index_name))
 
     def test_get_index(self):
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            __dict = yaml.safe_load(file_obj.read())
-        schema = Schema(__dict)
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
+        index_config = IndexConfig(index_config_dict)
 
         # create index
         index_name = 'test_file_index'
-        self.index_core.create_index(index_name, schema, sync=True)
+        self.index_core.create_index(index_name, index_config, sync=True)
         self.assertTrue(self.index_core.is_index_exist(index_name))
 
         i = self.index_core.get_index(index_name)
         self.assertTrue(isinstance(i.storage, FileStorage))
 
+        # close index
+        self.index_core.close_index(index_name)
+
     def test_put_document(self):
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            __dict = yaml.safe_load(file_obj.read())
-        schema = Schema(__dict)
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
+        index_config = IndexConfig(index_config_dict)
 
         # create index
         index_name = 'test_file_index'
-        self.index_core.create_index(index_name, schema, sync=True)
+        self.index_core.create_index(index_name, index_config, sync=True)
         self.assertTrue(self.index_core.is_index_exist(index_name))
 
         test_doc_id = '1'
@@ -123,14 +133,18 @@ class TestIndexCore(unittest.TestCase):
         count = self.index_core.put_document(index_name, test_doc_id, test_fields, sync=True)
         self.assertEqual(1, count)
 
+        # close index
+        self.index_core.close_index(index_name)
+
     def test_commit(self):
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            __dict = yaml.safe_load(file_obj.read())
-        schema = Schema(__dict)
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
+        index_config = IndexConfig(index_config_dict)
 
         # create index
         index_name = 'test_file_index'
-        self.index_core.create_index(index_name, schema, sync=True)
+        self.index_core.create_index(index_name, index_config, sync=True)
         self.assertTrue(self.index_core.is_index_exist(index_name))
 
         test_doc_id = '1'
@@ -149,14 +163,18 @@ class TestIndexCore(unittest.TestCase):
         results_page = self.index_core.get_document(index_name, test_doc_id)
         self.assertEqual(1, results_page.total)
 
+        # close index
+        self.index_core.close_index(index_name)
+
     def test_rollback(self):
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            __dict = yaml.safe_load(file_obj.read())
-        schema = Schema(__dict)
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
+        index_config = IndexConfig(index_config_dict)
 
         # create index
         index_name = 'test_file_index'
-        self.index_core.create_index(index_name, schema, sync=True)
+        self.index_core.create_index(index_name, index_config, sync=True)
         self.assertTrue(self.index_core.is_index_exist(index_name))
 
         test_doc_id = '1'
@@ -175,14 +193,18 @@ class TestIndexCore(unittest.TestCase):
         results_page = self.index_core.get_document(index_name, test_doc_id)
         self.assertEqual(0, results_page.total)
 
+        # close index
+        self.index_core.close_index(index_name)
+
     def test_get_document(self):
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            __dict = yaml.safe_load(file_obj.read())
-        schema = Schema(__dict)
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
+        index_config = IndexConfig(index_config_dict)
 
         # create index
         index_name = 'test_file_index'
-        self.index_core.create_index(index_name, schema, sync=True)
+        self.index_core.create_index(index_name, index_config, sync=True)
         self.assertTrue(self.index_core.is_index_exist(index_name))
 
         test_doc_id = '1'
@@ -201,14 +223,18 @@ class TestIndexCore(unittest.TestCase):
         results_page = self.index_core.get_document(index_name, test_doc_id)
         self.assertEqual(1, results_page.total)
 
+        # close index
+        self.index_core.close_index(index_name)
+
     def test_delete_document(self):
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            __dict = yaml.safe_load(file_obj.read())
-        schema = Schema(__dict)
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
+        index_config = IndexConfig(index_config_dict)
 
         # create index
         index_name = 'test_file_index'
-        self.index_core.create_index(index_name, schema, sync=True)
+        self.index_core.create_index(index_name, index_config, sync=True)
         self.assertTrue(self.index_core.is_index_exist(index_name))
 
         test_doc_id = '1'
@@ -239,14 +265,18 @@ class TestIndexCore(unittest.TestCase):
         results_page = self.index_core.get_document(index_name, test_doc_id)
         self.assertEqual(0, results_page.total)
 
+        # close index
+        self.index_core.close_index(index_name)
+
     def test_put_documents(self):
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            __dict = yaml.safe_load(file_obj.read())
-        schema = Schema(__dict)
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
+        index_config = IndexConfig(index_config_dict)
 
         # create index
         index_name = 'test_file_index'
-        self.index_core.create_index(index_name, schema, sync=True)
+        self.index_core.create_index(index_name, index_config, sync=True)
         self.assertTrue(self.index_core.is_index_exist(index_name))
 
         with open(self.example_dir + '/bulk_put.json', 'r', encoding='utf-8') as file_obj:
@@ -275,14 +305,18 @@ class TestIndexCore(unittest.TestCase):
         results_page = self.index_core.get_document(index_name, '5')
         self.assertEqual(1, results_page.total)
 
+        # close index
+        self.index_core.close_index(index_name)
+
     def test_delete_documents(self):
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            __dict = yaml.safe_load(file_obj.read())
-        schema = Schema(__dict)
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
+        index_config = IndexConfig(index_config_dict)
 
         # create index
         index_name = 'test_file_index'
-        self.index_core.create_index(index_name, schema, sync=True)
+        self.index_core.create_index(index_name, index_config, sync=True)
         self.assertTrue(self.index_core.is_index_exist(index_name))
 
         with open(self.example_dir + '/bulk_put.json', 'r', encoding='utf-8') as file_obj:
@@ -337,15 +371,18 @@ class TestIndexCore(unittest.TestCase):
         results_page = self.index_core.get_document(index_name, '5')
         self.assertEqual(0, results_page.total)
 
+        # close index
+        self.index_core.close_index(index_name)
+
     def test_search_documents(self):
-        # read schema
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            __dict = yaml.safe_load(file_obj.read())
-        schema = Schema(__dict)
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
+        index_config = IndexConfig(index_config_dict)
 
         # create file index
         index_name = 'test_file_index'
-        self.index_core.create_index(index_name, schema, sync=True)
+        self.index_core.create_index(index_name, index_config, sync=True)
         self.assertTrue(self.index_core.is_index_exist(index_name))
 
         # read documents
@@ -364,18 +401,21 @@ class TestIndexCore(unittest.TestCase):
         page = self.index_core.search_documents(index_name, 'search', search_field='text', page_num=1, page_len=10)
         self.assertEqual(5, page.total)
 
+        # close index
+        self.index_core.close_index(index_name)
+
     def test_snapshot_exists(self):
         # snapshot exists
         self.assertFalse(self.index_core.is_snapshot_exist())
 
-        # read schema
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            __dict = yaml.safe_load(file_obj.read())
-        schema = Schema(__dict)
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
+        index_config = IndexConfig(index_config_dict)
 
         # create file index
         index_name = 'test_file_index'
-        self.index_core.create_index(index_name, schema, sync=True)
+        self.index_core.create_index(index_name, index_config, sync=True)
         self.assertTrue(self.index_core.is_index_exist(index_name))
 
         # read documents
@@ -410,14 +450,18 @@ class TestIndexCore(unittest.TestCase):
         # snapshot exists
         self.assertTrue(True, self.index_core.is_snapshot_exist())
 
+        # close index
+        self.index_core.close_index(index_name)
+
     def test_create_snapshot(self):
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            __dict = yaml.safe_load(file_obj.read())
-        schema = Schema(__dict)
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
+        index_config = IndexConfig(index_config_dict)
 
         # create file index
         index_name = 'test_file_index'
-        self.index_core.create_index(index_name, schema, sync=True)
+        self.index_core.create_index(index_name, index_config, sync=True)
         self.assertTrue(self.index_core.is_index_exist(index_name))
 
         with open(self.example_dir + '/bulk_put.json', 'r', encoding='utf-8') as file_obj:
@@ -447,3 +491,6 @@ class TestIndexCore(unittest.TestCase):
                              len([n for n in f.namelist() if n.startswith('_test_file_index_') and n.endswith('.toc')]))
             self.assertEqual(1,
                              len([n for n in f.namelist() if n.startswith('test_file_index_') and n.endswith('.seg')]))
+
+        # close index
+        self.index_core.close_index(index_name)

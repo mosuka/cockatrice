@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='protobuf',
   syntax='proto3',
   serialized_options=None,
-  serialized_pb=_b('\n\x1f\x63ockatrice/protobuf/index.proto\x12\x08protobuf\"*\n\x06Status\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t\"\x89\x02\n\nIndexStats\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x11\n\tdoc_count\x18\x02 \x01(\x03\x12\x15\n\rdoc_count_all\x18\x03 \x01(\x03\x12\x15\n\rlast_modified\x18\x04 \x01(\x01\x12\x19\n\x11latest_generation\x18\x05 \x01(\x03\x12\x0f\n\x07version\x18\x06 \x01(\x03\x12-\n\x07storage\x18\x07 \x01(\x0b\x32\x1c.protobuf.IndexStats.Storage\x1aQ\n\x07Storage\x12\x0e\n\x06\x66older\x18\x01 \x01(\t\x12\x15\n\rsupports_mmap\x18\x02 \x01(\x08\x12\x10\n\x08readonly\x18\x03 \x01(\x08\x12\r\n\x05\x66iles\x18\x04 \x03(\t\"F\n\x12\x43reateIndexRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0e\n\x06schema\x18\x02 \x01(\x0c\x12\x0c\n\x04sync\x18\x03 \x01(\x08\"b\n\x13\x43reateIndexResponse\x12)\n\x0bindex_stats\x18\x01 \x01(\x0b\x32\x14.protobuf.IndexStats\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"%\n\x0fGetIndexRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\"_\n\x10GetIndexResponse\x12)\n\x0bindex_stats\x18\x01 \x01(\x0b\x32\x14.protobuf.IndexStats\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"6\n\x12\x44\x65leteIndexRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0c\n\x04sync\x18\x02 \x01(\x08\"b\n\x13\x44\x65leteIndexResponse\x12)\n\x0bindex_stats\x18\x01 \x01(\x0b\x32\x14.protobuf.IndexStats\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"D\n\x10OpenIndexRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0e\n\x06schema\x18\x02 \x01(\x0c\x12\x0c\n\x04sync\x18\x03 \x01(\x08\"`\n\x11OpenIndexResponse\x12)\n\x0bindex_stats\x18\x01 \x01(\x0b\x32\x14.protobuf.IndexStats\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"5\n\x11\x43loseIndexRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0c\n\x04sync\x18\x02 \x01(\x08\"a\n\x12\x43loseIndexResponse\x12)\n\x0bindex_stats\x18\x01 \x01(\x0b\x32\x14.protobuf.IndexStats\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"6\n\x12\x43ommitIndexRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0c\n\x04sync\x18\x02 \x01(\x08\"7\n\x13\x43ommitIndexResponse\x12 \n\x06status\x18\x01 \x01(\x0b\x32\x10.protobuf.Status\"8\n\x14RollbackIndexRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0c\n\x04sync\x18\x02 \x01(\x08\"9\n\x15RollbackIndexResponse\x12 \n\x06status\x18\x01 \x01(\x0b\x32\x10.protobuf.Status\"8\n\x14OptimizeIndexRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0c\n\x04sync\x18\x02 \x01(\x08\"d\n\x15OptimizeIndexResponse\x12)\n\x0bindex_stats\x18\x01 \x01(\x0b\x32\x14.protobuf.IndexStats\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"V\n\x12PutDocumentRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0e\n\x06\x64oc_id\x18\x02 \x01(\t\x12\x0e\n\x06\x66ields\x18\x03 \x01(\x0c\x12\x0c\n\x04sync\x18\x04 \x01(\x08\"F\n\x13PutDocumentResponse\x12\r\n\x05\x63ount\x18\x01 \x01(\x03\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"8\n\x12GetDocumentRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0e\n\x06\x64oc_id\x18\x02 \x01(\t\"G\n\x13GetDocumentResponse\x12\x0e\n\x06\x66ields\x18\x01 \x01(\x0c\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"I\n\x15\x44\x65leteDocumentRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0e\n\x06\x64oc_id\x18\x02 \x01(\t\x12\x0c\n\x04sync\x18\x03 \x01(\x08\"I\n\x16\x44\x65leteDocumentResponse\x12\r\n\x05\x63ount\x18\x01 \x01(\x03\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"E\n\x13PutDocumentsRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0c\n\x04\x64ocs\x18\x02 \x01(\x0c\x12\x0c\n\x04sync\x18\x03 \x01(\x08\"G\n\x14PutDocumentsResponse\x12\r\n\x05\x63ount\x18\x01 \x01(\x03\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"K\n\x16\x44\x65leteDocumentsRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0f\n\x07\x64oc_ids\x18\x02 \x01(\x0c\x12\x0c\n\x04sync\x18\x03 \x01(\x08\"J\n\x17\x44\x65leteDocumentsResponse\x12\r\n\x05\x63ount\x18\x01 \x01(\x03\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"\x88\x01\n\x16SearchDocumentsRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\r\n\x05query\x18\x02 \x01(\t\x12\x14\n\x0csearch_field\x18\x03 \x01(\t\x12\x10\n\x08page_num\x18\x04 \x01(\x03\x12\x10\n\x08page_len\x18\x05 \x01(\x03\x12\x11\n\tweighting\x18\x06 \x01(\x0c\"L\n\x17SearchDocumentsResponse\x12\x0f\n\x07results\x18\x01 \x01(\x0c\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"#\n\x0ePutNodeRequest\x12\x11\n\tnode_name\x18\x01 \x01(\t\"3\n\x0fPutNodeResponse\x12 \n\x06status\x18\x01 \x01(\x0b\x32\x10.protobuf.Status\"&\n\x11\x44\x65leteNodeRequest\x12\x11\n\tnode_name\x18\x01 \x01(\t\"6\n\x12\x44\x65leteNodeResponse\x12 \n\x06status\x18\x01 \x01(\x0b\x32\x10.protobuf.Status\"\x18\n\x16IsSnapshotExistRequest\"J\n\x17IsSnapshotExistResponse\x12\r\n\x05\x65xist\x18\x01 \x01(\x08\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"%\n\x15\x43reateSnapshotRequest\x12\x0c\n\x04sync\x18\x01 \x01(\x08\":\n\x16\x43reateSnapshotResponse\x12 \n\x06status\x18\x01 \x01(\x0b\x32\x10.protobuf.Status\"(\n\x12GetSnapshotRequest\x12\x12\n\nchunk_size\x18\x01 \x01(\x03\"T\n\x13GetSnapshotResponse\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05\x63hunk\x18\x02 \x01(\x0c\x12 \n\x06status\x18\x03 \x01(\x0b\x32\x10.protobuf.Status\"\x12\n\x10IsHealthyRequest\"F\n\x11IsHealthyResponse\x12\x0f\n\x07healthy\x18\x01 \x01(\x08\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"\x10\n\x0eIsAliveRequest\"B\n\x0fIsAliveResponse\x12\r\n\x05\x61live\x18\x01 \x01(\x08\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"\x10\n\x0eIsReadyRequest\"B\n\x0fIsReadyResponse\x12\r\n\x05ready\x18\x01 \x01(\x08\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"\x12\n\x10GetStatusRequest\"J\n\x11GetStatusResponse\x12\x13\n\x0bnode_status\x18\x01 \x01(\x0c\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status2\x8b\x0e\n\x05Index\x12L\n\x0b\x43reateIndex\x12\x1c.protobuf.CreateIndexRequest\x1a\x1d.protobuf.CreateIndexResponse\"\x00\x12L\n\x0b\x44\x65leteIndex\x12\x1c.protobuf.DeleteIndexRequest\x1a\x1d.protobuf.DeleteIndexResponse\"\x00\x12\x46\n\tOpenIndex\x12\x1a.protobuf.OpenIndexRequest\x1a\x1b.protobuf.OpenIndexResponse\"\x00\x12I\n\nCloseIndex\x12\x1b.protobuf.CloseIndexRequest\x1a\x1c.protobuf.CloseIndexResponse\"\x00\x12\x43\n\x08GetIndex\x12\x19.protobuf.GetIndexRequest\x1a\x1a.protobuf.GetIndexResponse\"\x00\x12L\n\x0b\x43ommitIndex\x12\x1c.protobuf.CommitIndexRequest\x1a\x1d.protobuf.CommitIndexResponse\"\x00\x12R\n\rRollbackIndex\x12\x1e.protobuf.RollbackIndexRequest\x1a\x1f.protobuf.RollbackIndexResponse\"\x00\x12R\n\rOptimizeIndex\x12\x1e.protobuf.OptimizeIndexRequest\x1a\x1f.protobuf.OptimizeIndexResponse\"\x00\x12L\n\x0bPutDocument\x12\x1c.protobuf.PutDocumentRequest\x1a\x1d.protobuf.PutDocumentResponse\"\x00\x12L\n\x0bGetDocument\x12\x1c.protobuf.GetDocumentRequest\x1a\x1d.protobuf.GetDocumentResponse\"\x00\x12U\n\x0e\x44\x65leteDocument\x12\x1f.protobuf.DeleteDocumentRequest\x1a .protobuf.DeleteDocumentResponse\"\x00\x12O\n\x0cPutDocuments\x12\x1d.protobuf.PutDocumentsRequest\x1a\x1e.protobuf.PutDocumentsResponse\"\x00\x12X\n\x0f\x44\x65leteDocuments\x12 .protobuf.DeleteDocumentsRequest\x1a!.protobuf.DeleteDocumentsResponse\"\x00\x12X\n\x0fSearchDocuments\x12 .protobuf.SearchDocumentsRequest\x1a!.protobuf.SearchDocumentsResponse\"\x00\x12@\n\x07PutNode\x12\x18.protobuf.PutNodeRequest\x1a\x19.protobuf.PutNodeResponse\"\x00\x12I\n\nDeleteNode\x12\x1b.protobuf.DeleteNodeRequest\x1a\x1c.protobuf.DeleteNodeResponse\"\x00\x12X\n\x0fIsSnapshotExist\x12 .protobuf.IsSnapshotExistRequest\x1a!.protobuf.IsSnapshotExistResponse\"\x00\x12U\n\x0e\x43reateSnapshot\x12\x1f.protobuf.CreateSnapshotRequest\x1a .protobuf.CreateSnapshotResponse\"\x00\x12N\n\x0bGetSnapshot\x12\x1c.protobuf.GetSnapshotRequest\x1a\x1d.protobuf.GetSnapshotResponse\"\x00\x30\x01\x12\x46\n\tIsHealthy\x12\x1a.protobuf.IsHealthyRequest\x1a\x1b.protobuf.IsHealthyResponse\"\x00\x12@\n\x07IsAlive\x12\x18.protobuf.IsAliveRequest\x1a\x19.protobuf.IsAliveResponse\"\x00\x12@\n\x07IsReady\x12\x18.protobuf.IsReadyRequest\x1a\x19.protobuf.IsReadyResponse\"\x00\x12\x46\n\tGetStatus\x12\x1a.protobuf.GetStatusRequest\x1a\x1b.protobuf.GetStatusResponse\"\x00\x62\x06proto3')
+  serialized_pb=_b('\n\x1f\x63ockatrice/protobuf/index.proto\x12\x08protobuf\"*\n\x06Status\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t\"\x89\x02\n\nIndexStats\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x11\n\tdoc_count\x18\x02 \x01(\x03\x12\x15\n\rdoc_count_all\x18\x03 \x01(\x03\x12\x15\n\rlast_modified\x18\x04 \x01(\x01\x12\x19\n\x11latest_generation\x18\x05 \x01(\x03\x12\x0f\n\x07version\x18\x06 \x01(\x03\x12-\n\x07storage\x18\x07 \x01(\x0b\x32\x1c.protobuf.IndexStats.Storage\x1aQ\n\x07Storage\x12\x0e\n\x06\x66older\x18\x01 \x01(\t\x12\x15\n\rsupports_mmap\x18\x02 \x01(\x08\x12\x10\n\x08readonly\x18\x03 \x01(\x08\x12\r\n\x05\x66iles\x18\x04 \x03(\t\"L\n\x12\x43reateIndexRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x14\n\x0cindex_config\x18\x02 \x01(\x0c\x12\x0c\n\x04sync\x18\x03 \x01(\x08\"b\n\x13\x43reateIndexResponse\x12)\n\x0bindex_stats\x18\x01 \x01(\x0b\x32\x14.protobuf.IndexStats\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"%\n\x0fGetIndexRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\"_\n\x10GetIndexResponse\x12)\n\x0bindex_stats\x18\x01 \x01(\x0b\x32\x14.protobuf.IndexStats\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"6\n\x12\x44\x65leteIndexRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0c\n\x04sync\x18\x02 \x01(\x08\"b\n\x13\x44\x65leteIndexResponse\x12)\n\x0bindex_stats\x18\x01 \x01(\x0b\x32\x14.protobuf.IndexStats\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"J\n\x10OpenIndexRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x14\n\x0cindex_config\x18\x02 \x01(\x0c\x12\x0c\n\x04sync\x18\x03 \x01(\x08\"`\n\x11OpenIndexResponse\x12)\n\x0bindex_stats\x18\x01 \x01(\x0b\x32\x14.protobuf.IndexStats\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"5\n\x11\x43loseIndexRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0c\n\x04sync\x18\x02 \x01(\x08\"a\n\x12\x43loseIndexResponse\x12)\n\x0bindex_stats\x18\x01 \x01(\x0b\x32\x14.protobuf.IndexStats\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"6\n\x12\x43ommitIndexRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0c\n\x04sync\x18\x02 \x01(\x08\"7\n\x13\x43ommitIndexResponse\x12 \n\x06status\x18\x01 \x01(\x0b\x32\x10.protobuf.Status\"8\n\x14RollbackIndexRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0c\n\x04sync\x18\x02 \x01(\x08\"9\n\x15RollbackIndexResponse\x12 \n\x06status\x18\x01 \x01(\x0b\x32\x10.protobuf.Status\"8\n\x14OptimizeIndexRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0c\n\x04sync\x18\x02 \x01(\x08\"d\n\x15OptimizeIndexResponse\x12)\n\x0bindex_stats\x18\x01 \x01(\x0b\x32\x14.protobuf.IndexStats\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"V\n\x12PutDocumentRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0e\n\x06\x64oc_id\x18\x02 \x01(\t\x12\x0e\n\x06\x66ields\x18\x03 \x01(\x0c\x12\x0c\n\x04sync\x18\x04 \x01(\x08\"F\n\x13PutDocumentResponse\x12\r\n\x05\x63ount\x18\x01 \x01(\x03\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"8\n\x12GetDocumentRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0e\n\x06\x64oc_id\x18\x02 \x01(\t\"G\n\x13GetDocumentResponse\x12\x0e\n\x06\x66ields\x18\x01 \x01(\x0c\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"I\n\x15\x44\x65leteDocumentRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0e\n\x06\x64oc_id\x18\x02 \x01(\t\x12\x0c\n\x04sync\x18\x03 \x01(\x08\"I\n\x16\x44\x65leteDocumentResponse\x12\r\n\x05\x63ount\x18\x01 \x01(\x03\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"E\n\x13PutDocumentsRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0c\n\x04\x64ocs\x18\x02 \x01(\x0c\x12\x0c\n\x04sync\x18\x03 \x01(\x08\"G\n\x14PutDocumentsResponse\x12\r\n\x05\x63ount\x18\x01 \x01(\x03\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"K\n\x16\x44\x65leteDocumentsRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\x0f\n\x07\x64oc_ids\x18\x02 \x01(\x0c\x12\x0c\n\x04sync\x18\x03 \x01(\x08\"J\n\x17\x44\x65leteDocumentsResponse\x12\r\n\x05\x63ount\x18\x01 \x01(\x03\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"\x88\x01\n\x16SearchDocumentsRequest\x12\x12\n\nindex_name\x18\x01 \x01(\t\x12\r\n\x05query\x18\x02 \x01(\t\x12\x14\n\x0csearch_field\x18\x03 \x01(\t\x12\x10\n\x08page_num\x18\x04 \x01(\x03\x12\x10\n\x08page_len\x18\x05 \x01(\x03\x12\x11\n\tweighting\x18\x06 \x01(\x0c\"L\n\x17SearchDocumentsResponse\x12\x0f\n\x07results\x18\x01 \x01(\x0c\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"#\n\x0ePutNodeRequest\x12\x11\n\tnode_name\x18\x01 \x01(\t\"3\n\x0fPutNodeResponse\x12 \n\x06status\x18\x01 \x01(\x0b\x32\x10.protobuf.Status\"&\n\x11\x44\x65leteNodeRequest\x12\x11\n\tnode_name\x18\x01 \x01(\t\"6\n\x12\x44\x65leteNodeResponse\x12 \n\x06status\x18\x01 \x01(\x0b\x32\x10.protobuf.Status\"\x18\n\x16IsSnapshotExistRequest\"J\n\x17IsSnapshotExistResponse\x12\r\n\x05\x65xist\x18\x01 \x01(\x08\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"%\n\x15\x43reateSnapshotRequest\x12\x0c\n\x04sync\x18\x01 \x01(\x08\":\n\x16\x43reateSnapshotResponse\x12 \n\x06status\x18\x01 \x01(\x0b\x32\x10.protobuf.Status\"(\n\x12GetSnapshotRequest\x12\x12\n\nchunk_size\x18\x01 \x01(\x03\"T\n\x13GetSnapshotResponse\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05\x63hunk\x18\x02 \x01(\x0c\x12 \n\x06status\x18\x03 \x01(\x0b\x32\x10.protobuf.Status\"\x12\n\x10IsHealthyRequest\"F\n\x11IsHealthyResponse\x12\x0f\n\x07healthy\x18\x01 \x01(\x08\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"\x10\n\x0eIsAliveRequest\"B\n\x0fIsAliveResponse\x12\r\n\x05\x61live\x18\x01 \x01(\x08\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"\x10\n\x0eIsReadyRequest\"B\n\x0fIsReadyResponse\x12\r\n\x05ready\x18\x01 \x01(\x08\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status\"\x12\n\x10GetStatusRequest\"J\n\x11GetStatusResponse\x12\x13\n\x0bnode_status\x18\x01 \x01(\x0c\x12 \n\x06status\x18\x02 \x01(\x0b\x32\x10.protobuf.Status2\x8b\x0e\n\x05Index\x12L\n\x0b\x43reateIndex\x12\x1c.protobuf.CreateIndexRequest\x1a\x1d.protobuf.CreateIndexResponse\"\x00\x12L\n\x0b\x44\x65leteIndex\x12\x1c.protobuf.DeleteIndexRequest\x1a\x1d.protobuf.DeleteIndexResponse\"\x00\x12\x46\n\tOpenIndex\x12\x1a.protobuf.OpenIndexRequest\x1a\x1b.protobuf.OpenIndexResponse\"\x00\x12I\n\nCloseIndex\x12\x1b.protobuf.CloseIndexRequest\x1a\x1c.protobuf.CloseIndexResponse\"\x00\x12\x43\n\x08GetIndex\x12\x19.protobuf.GetIndexRequest\x1a\x1a.protobuf.GetIndexResponse\"\x00\x12L\n\x0b\x43ommitIndex\x12\x1c.protobuf.CommitIndexRequest\x1a\x1d.protobuf.CommitIndexResponse\"\x00\x12R\n\rRollbackIndex\x12\x1e.protobuf.RollbackIndexRequest\x1a\x1f.protobuf.RollbackIndexResponse\"\x00\x12R\n\rOptimizeIndex\x12\x1e.protobuf.OptimizeIndexRequest\x1a\x1f.protobuf.OptimizeIndexResponse\"\x00\x12L\n\x0bPutDocument\x12\x1c.protobuf.PutDocumentRequest\x1a\x1d.protobuf.PutDocumentResponse\"\x00\x12L\n\x0bGetDocument\x12\x1c.protobuf.GetDocumentRequest\x1a\x1d.protobuf.GetDocumentResponse\"\x00\x12U\n\x0e\x44\x65leteDocument\x12\x1f.protobuf.DeleteDocumentRequest\x1a .protobuf.DeleteDocumentResponse\"\x00\x12O\n\x0cPutDocuments\x12\x1d.protobuf.PutDocumentsRequest\x1a\x1e.protobuf.PutDocumentsResponse\"\x00\x12X\n\x0f\x44\x65leteDocuments\x12 .protobuf.DeleteDocumentsRequest\x1a!.protobuf.DeleteDocumentsResponse\"\x00\x12X\n\x0fSearchDocuments\x12 .protobuf.SearchDocumentsRequest\x1a!.protobuf.SearchDocumentsResponse\"\x00\x12@\n\x07PutNode\x12\x18.protobuf.PutNodeRequest\x1a\x19.protobuf.PutNodeResponse\"\x00\x12I\n\nDeleteNode\x12\x1b.protobuf.DeleteNodeRequest\x1a\x1c.protobuf.DeleteNodeResponse\"\x00\x12X\n\x0fIsSnapshotExist\x12 .protobuf.IsSnapshotExistRequest\x1a!.protobuf.IsSnapshotExistResponse\"\x00\x12U\n\x0e\x43reateSnapshot\x12\x1f.protobuf.CreateSnapshotRequest\x1a .protobuf.CreateSnapshotResponse\"\x00\x12N\n\x0bGetSnapshot\x12\x1c.protobuf.GetSnapshotRequest\x1a\x1d.protobuf.GetSnapshotResponse\"\x00\x30\x01\x12\x46\n\tIsHealthy\x12\x1a.protobuf.IsHealthyRequest\x1a\x1b.protobuf.IsHealthyResponse\"\x00\x12@\n\x07IsAlive\x12\x18.protobuf.IsAliveRequest\x1a\x19.protobuf.IsAliveResponse\"\x00\x12@\n\x07IsReady\x12\x18.protobuf.IsReadyRequest\x1a\x19.protobuf.IsReadyResponse\"\x00\x12\x46\n\tGetStatus\x12\x1a.protobuf.GetStatusRequest\x1a\x1b.protobuf.GetStatusResponse\"\x00\x62\x06proto3')
 )
 
 
@@ -202,7 +202,7 @@ _CREATEINDEXREQUEST = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='schema', full_name='protobuf.CreateIndexRequest.schema', index=1,
+      name='index_config', full_name='protobuf.CreateIndexRequest.index_config', index=1,
       number=2, type=12, cpp_type=9, label=1,
       has_default_value=False, default_value=_b(""),
       message_type=None, enum_type=None, containing_type=None,
@@ -228,7 +228,7 @@ _CREATEINDEXREQUEST = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=357,
-  serialized_end=427,
+  serialized_end=433,
 )
 
 
@@ -265,8 +265,8 @@ _CREATEINDEXRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=429,
-  serialized_end=527,
+  serialized_start=435,
+  serialized_end=533,
 )
 
 
@@ -296,8 +296,8 @@ _GETINDEXREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=529,
-  serialized_end=566,
+  serialized_start=535,
+  serialized_end=572,
 )
 
 
@@ -334,8 +334,8 @@ _GETINDEXRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=568,
-  serialized_end=663,
+  serialized_start=574,
+  serialized_end=669,
 )
 
 
@@ -372,8 +372,8 @@ _DELETEINDEXREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=665,
-  serialized_end=719,
+  serialized_start=671,
+  serialized_end=725,
 )
 
 
@@ -410,8 +410,8 @@ _DELETEINDEXRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=721,
-  serialized_end=819,
+  serialized_start=727,
+  serialized_end=825,
 )
 
 
@@ -430,7 +430,7 @@ _OPENINDEXREQUEST = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='schema', full_name='protobuf.OpenIndexRequest.schema', index=1,
+      name='index_config', full_name='protobuf.OpenIndexRequest.index_config', index=1,
       number=2, type=12, cpp_type=9, label=1,
       has_default_value=False, default_value=_b(""),
       message_type=None, enum_type=None, containing_type=None,
@@ -455,8 +455,8 @@ _OPENINDEXREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=821,
-  serialized_end=889,
+  serialized_start=827,
+  serialized_end=901,
 )
 
 
@@ -493,8 +493,8 @@ _OPENINDEXRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=891,
-  serialized_end=987,
+  serialized_start=903,
+  serialized_end=999,
 )
 
 
@@ -531,8 +531,8 @@ _CLOSEINDEXREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=989,
-  serialized_end=1042,
+  serialized_start=1001,
+  serialized_end=1054,
 )
 
 
@@ -569,8 +569,8 @@ _CLOSEINDEXRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1044,
-  serialized_end=1141,
+  serialized_start=1056,
+  serialized_end=1153,
 )
 
 
@@ -607,8 +607,8 @@ _COMMITINDEXREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1143,
-  serialized_end=1197,
+  serialized_start=1155,
+  serialized_end=1209,
 )
 
 
@@ -638,8 +638,8 @@ _COMMITINDEXRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1199,
-  serialized_end=1254,
+  serialized_start=1211,
+  serialized_end=1266,
 )
 
 
@@ -676,8 +676,8 @@ _ROLLBACKINDEXREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1256,
-  serialized_end=1312,
+  serialized_start=1268,
+  serialized_end=1324,
 )
 
 
@@ -707,8 +707,8 @@ _ROLLBACKINDEXRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1314,
-  serialized_end=1371,
+  serialized_start=1326,
+  serialized_end=1383,
 )
 
 
@@ -745,8 +745,8 @@ _OPTIMIZEINDEXREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1373,
-  serialized_end=1429,
+  serialized_start=1385,
+  serialized_end=1441,
 )
 
 
@@ -783,8 +783,8 @@ _OPTIMIZEINDEXRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1431,
-  serialized_end=1531,
+  serialized_start=1443,
+  serialized_end=1543,
 )
 
 
@@ -835,8 +835,8 @@ _PUTDOCUMENTREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1533,
-  serialized_end=1619,
+  serialized_start=1545,
+  serialized_end=1631,
 )
 
 
@@ -873,8 +873,8 @@ _PUTDOCUMENTRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1621,
-  serialized_end=1691,
+  serialized_start=1633,
+  serialized_end=1703,
 )
 
 
@@ -911,8 +911,8 @@ _GETDOCUMENTREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1693,
-  serialized_end=1749,
+  serialized_start=1705,
+  serialized_end=1761,
 )
 
 
@@ -949,8 +949,8 @@ _GETDOCUMENTRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1751,
-  serialized_end=1822,
+  serialized_start=1763,
+  serialized_end=1834,
 )
 
 
@@ -994,8 +994,8 @@ _DELETEDOCUMENTREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1824,
-  serialized_end=1897,
+  serialized_start=1836,
+  serialized_end=1909,
 )
 
 
@@ -1032,8 +1032,8 @@ _DELETEDOCUMENTRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1899,
-  serialized_end=1972,
+  serialized_start=1911,
+  serialized_end=1984,
 )
 
 
@@ -1077,8 +1077,8 @@ _PUTDOCUMENTSREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1974,
-  serialized_end=2043,
+  serialized_start=1986,
+  serialized_end=2055,
 )
 
 
@@ -1115,8 +1115,8 @@ _PUTDOCUMENTSRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2045,
-  serialized_end=2116,
+  serialized_start=2057,
+  serialized_end=2128,
 )
 
 
@@ -1160,8 +1160,8 @@ _DELETEDOCUMENTSREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2118,
-  serialized_end=2193,
+  serialized_start=2130,
+  serialized_end=2205,
 )
 
 
@@ -1198,8 +1198,8 @@ _DELETEDOCUMENTSRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2195,
-  serialized_end=2269,
+  serialized_start=2207,
+  serialized_end=2281,
 )
 
 
@@ -1264,8 +1264,8 @@ _SEARCHDOCUMENTSREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2272,
-  serialized_end=2408,
+  serialized_start=2284,
+  serialized_end=2420,
 )
 
 
@@ -1302,8 +1302,8 @@ _SEARCHDOCUMENTSRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2410,
-  serialized_end=2486,
+  serialized_start=2422,
+  serialized_end=2498,
 )
 
 
@@ -1333,8 +1333,8 @@ _PUTNODEREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2488,
-  serialized_end=2523,
+  serialized_start=2500,
+  serialized_end=2535,
 )
 
 
@@ -1364,8 +1364,8 @@ _PUTNODERESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2525,
-  serialized_end=2576,
+  serialized_start=2537,
+  serialized_end=2588,
 )
 
 
@@ -1395,8 +1395,8 @@ _DELETENODEREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2578,
-  serialized_end=2616,
+  serialized_start=2590,
+  serialized_end=2628,
 )
 
 
@@ -1426,8 +1426,8 @@ _DELETENODERESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2618,
-  serialized_end=2672,
+  serialized_start=2630,
+  serialized_end=2684,
 )
 
 
@@ -1450,8 +1450,8 @@ _ISSNAPSHOTEXISTREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2674,
-  serialized_end=2698,
+  serialized_start=2686,
+  serialized_end=2710,
 )
 
 
@@ -1488,8 +1488,8 @@ _ISSNAPSHOTEXISTRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2700,
-  serialized_end=2774,
+  serialized_start=2712,
+  serialized_end=2786,
 )
 
 
@@ -1519,8 +1519,8 @@ _CREATESNAPSHOTREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2776,
-  serialized_end=2813,
+  serialized_start=2788,
+  serialized_end=2825,
 )
 
 
@@ -1550,8 +1550,8 @@ _CREATESNAPSHOTRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2815,
-  serialized_end=2873,
+  serialized_start=2827,
+  serialized_end=2885,
 )
 
 
@@ -1581,8 +1581,8 @@ _GETSNAPSHOTREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2875,
-  serialized_end=2915,
+  serialized_start=2887,
+  serialized_end=2927,
 )
 
 
@@ -1626,8 +1626,8 @@ _GETSNAPSHOTRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2917,
-  serialized_end=3001,
+  serialized_start=2929,
+  serialized_end=3013,
 )
 
 
@@ -1650,8 +1650,8 @@ _ISHEALTHYREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3003,
-  serialized_end=3021,
+  serialized_start=3015,
+  serialized_end=3033,
 )
 
 
@@ -1688,8 +1688,8 @@ _ISHEALTHYRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3023,
-  serialized_end=3093,
+  serialized_start=3035,
+  serialized_end=3105,
 )
 
 
@@ -1712,8 +1712,8 @@ _ISALIVEREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3095,
-  serialized_end=3111,
+  serialized_start=3107,
+  serialized_end=3123,
 )
 
 
@@ -1750,8 +1750,8 @@ _ISALIVERESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3113,
-  serialized_end=3179,
+  serialized_start=3125,
+  serialized_end=3191,
 )
 
 
@@ -1774,8 +1774,8 @@ _ISREADYREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3181,
-  serialized_end=3197,
+  serialized_start=3193,
+  serialized_end=3209,
 )
 
 
@@ -1812,8 +1812,8 @@ _ISREADYRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3199,
-  serialized_end=3265,
+  serialized_start=3211,
+  serialized_end=3277,
 )
 
 
@@ -1836,8 +1836,8 @@ _GETSTATUSREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3267,
-  serialized_end=3285,
+  serialized_start=3279,
+  serialized_end=3297,
 )
 
 
@@ -1874,8 +1874,8 @@ _GETSTATUSRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3287,
-  serialized_end=3361,
+  serialized_start=3299,
+  serialized_end=3373,
 )
 
 _INDEXSTATS_STORAGE.containing_type = _INDEXSTATS
@@ -2311,8 +2311,8 @@ _INDEX = _descriptor.ServiceDescriptor(
   file=DESCRIPTOR,
   index=0,
   serialized_options=None,
-  serialized_start=3364,
-  serialized_end=5167,
+  serialized_start=3376,
+  serialized_end=5179,
   methods=[
   _descriptor.MethodDescriptor(
     name='CreateIndex',

@@ -487,8 +487,13 @@
       }
     }
   },
-  "auto_commit": {
-    "period": 0,
-    "limit": 100
+  "writer": {
+    "auto_commit": {
+      "period": 30,
+      "limit": 100
+    },
+    "processors": 1,
+    "batch_size": 100,
+    "multi_segment": true
   }
 }

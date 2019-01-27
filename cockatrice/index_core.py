@@ -168,6 +168,7 @@ class IndexCore(SyncObj):
         self.__conf.validate()
 
         self.__indices = {}
+        self.__index_configs = {}
         self.__writers = {}
 
         self.__file_storage = None
@@ -187,7 +188,7 @@ class IndexCore(SyncObj):
 
         # open existing indices on startup
         for index_name in self.get_index_names():
-            self.__open_index(index_name, schema=None)
+            self.__open_index(index_name, index_config=None)
 
         self.metrics_timer = RepeatedTimer(10, self.__record_metrics)
         self.metrics_timer.start()
@@ -360,47 +361,48 @@ class IndexCore(SyncObj):
         return index_name in self.__indices
 
     @replicated
-    def open_index(self, index_name, schema=None):
+    def open_index(self, index_name, index_config=None):
+        return self.__open_index(index_name, index_config=index_config)
+
+    def __open_index(self, index_name, index_config=None):
         start_time = time.time()
 
-        try:
-            index = self.__open_index(index_name, schema=schema)
-        finally:
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
-
-        return index
-
-    def __open_index(self, index_name, schema=None):
         index = None
 
         try:
             # open the index
             index = self.__indices.get(index_name)
             if index is None:
-                index = self.__file_storage.open_index(indexname=index_name, schema=schema)
+                if index_config is None:
+                    # set the index config from saved data
+                    with open(os.path.join(self.__file_storage.folder, '{0}_index_config.bin'.format(index_name)),
+                              'rb') as f:
+                        self.__index_configs[index_name] = pickle.loads(f.read())
+                else:
+                    # set the index config from given data
+                    self.__index_configs[index_name] = index_config
+
+                index = self.__file_storage.open_index(indexname=index_name,
+                                                       schema=self.__index_configs[index_name].get_schema())
                 self.__indices[index_name] = index
                 self.__logger.info('{0} was opened'.format(index_name))
 
             # open the index writer
             self.__open_writer(index_name)
-
         except Exception as ex:
             self.__logger.error('failed to open {0}: {1}'.format(index_name, ex))
-
-        return index
-
-    @replicated
-    def close_index(self, index_name):
-        start_time = time.time()
-
-        try:
-            index = self.__close_index(index_name)
         finally:
             self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return index
 
+    @replicated
+    def close_index(self, index_name):
+        return self.__close_index(index_name)
+
     def __close_index(self, index_name):
+        start_time = time.time()
+
         index = None
 
         try:
@@ -414,69 +416,72 @@ class IndexCore(SyncObj):
                 self.__logger.info('{0} was closed'.format(index_name))
         except Exception as ex:
             self.__logger.error('failed to close {0}: {1}'.format(index_name, ex))
-
-        return index
-
-    @replicated
-    def create_index(self, index_name, schema):
-        start_time = time.time()
-
-        try:
-            index = self.__create_index(index_name, schema)
         finally:
             self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return index
 
-    def __create_index(self, index_name, schema):
-        with self.__lock:
-            index = None
+    @replicated
+    def create_index(self, index_name, index_config):
+        return self.__create_index(index_name, index_config)
 
-            try:
-                if self.is_index_exist(index_name):
-                    # open the index
-                    index = self.__open_index(index_name, schema=schema)
-                else:
-                    # create the index
-                    index = self.__file_storage.create_index(schema, indexname=index_name)
-                    self.__indices[index_name] = index
-                    self.__logger.info('{0} was created'.format(index_name))
+    def __create_index(self, index_name, index_config):
+        start_time = time.time()
 
-                    # open the index writer
-                    self.__open_writer(index_name)
+        index = None
+
+        try:
+            if self.is_index_exist(index_name):
+                # open the index
+                index = self.__open_index(index_name, index_config=index_config)
+            else:
+                # set index config
+                self.__index_configs[index_name] = index_config
+
+                # create the index
+                index = self.__file_storage.create_index(self.__index_configs[index_name].get_schema(),
+                                                         indexname=index_name)
+                self.__indices[index_name] = index
+                self.__logger.info('{0} was created'.format(index_name))
+
+                # open the index writer
+                self.__open_writer(index_name)
 
                 # save the schema in the index dir
-                with open(os.path.join(self.__file_storage.folder, '{0}.schema'.format(index_name)), 'wb') as f:
-                    f.write(pickle.dumps(schema))
-            except Exception as ex:
-                self.__logger.error('failed to create {0}: {1}'.format(index_name, ex))
+                with open(os.path.join(self.__file_storage.folder, '{0}_index_config.bin'.format(index_name)),
+                          'wb') as f:
+                    f.write(pickle.dumps(index_config))
+        except Exception as ex:
+            self.__logger.error('failed to create {0}: {1}'.format(index_name, ex))
+        finally:
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return index
 
     @replicated
     def delete_index(self, index_name):
-        start_time = time.time()
-
-        try:
-            index = self.__delete_index(index_name)
-        finally:
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
-
-        return index
+        return self.__delete_index(index_name)
 
     def __delete_index(self, index_name):
-        with self.__lock:
-            # close index
-            index = self.__close_index(index_name)
+        start_time = time.time()
 
+        # close index
+        index = self.__close_index(index_name)
+
+        try:
             # delete index files
-            try:
-                for filename in self.get_index_file_names(index_name=index_name):
-                    self.__file_storage.delete_file(filename)
-                    self.__logger.info('{0} was deleted'.format(filename))
-                self.__logger.info('{0} was deleted'.format(index_name))
-            except Exception as ex:
-                self.__logger.error('failed to delete {0}: {1}'.format(index_name, ex))
+            for filename in self.get_index_file_names(index_name=index_name):
+                self.__file_storage.delete_file(filename)
+                self.__logger.info('{0} was deleted'.format(filename))
+            self.__logger.info('{0} was deleted'.format(index_name))
+
+            # delete the index config
+            self.__index_configs.pop(index_name, None)
+            os.remove(os.path.join(self.__file_storage.folder, '{0}_index_config.bin'.format(index_name)))
+        except Exception as ex:
+            self.__logger.error('failed to delete {0}: {1}'.format(index_name, ex))
+        finally:
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return index
 
@@ -494,16 +499,11 @@ class IndexCore(SyncObj):
 
     @replicated
     def commit_index(self, index_name):
-        start_time = time.time()
-
-        try:
-            success = self.__commit_index(index_name)
-        finally:
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
-
-        return success
+        return self.__commit_index(index_name)
 
     def __commit_index(self, index_name):
+        start_time = time.time()
+
         success = False
 
         try:
@@ -512,21 +512,18 @@ class IndexCore(SyncObj):
             success = True
         except Exception as ex:
             self.__logger.error('failed to commit index {0}: {1}'.format(index_name, ex))
-
-        return success
-
-    @replicated
-    def rollback_index(self, index_name):
-        start_time = time.time()
-
-        try:
-            success = self.__rollback_index(index_name)
         finally:
             self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return success
 
+    @replicated
+    def rollback_index(self, index_name):
+        return self.__rollback_index(index_name)
+
     def __rollback_index(self, index_name):
+        start_time = time.time()
+
         success = False
 
         try:
@@ -535,21 +532,18 @@ class IndexCore(SyncObj):
             success = True
         except Exception as ex:
             self.__logger.error('failed to rollback index {0}: {1}'.format(index_name, ex))
-
-        return success
-
-    @replicated
-    def optimize_index(self, index_name):
-        start_time = time.time()
-
-        try:
-            success = self.__optimize_index(index_name)
         finally:
             self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return success
 
+    @replicated
+    def optimize_index(self, index_name):
+        return self.__optimize_index(index_name)
+
     def __optimize_index(self, index_name):
+        start_time = time.time()
+
         success = False
 
         try:
@@ -558,6 +552,8 @@ class IndexCore(SyncObj):
             success = True
         except Exception as ex:
             self.__logger.error('failed to optimize {0}: {1}'.format(index_name, ex))
+        finally:
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return success
 
@@ -580,9 +576,13 @@ class IndexCore(SyncObj):
     def __open_writer(self, index_name):
         try:
             # open the index writer
-            writer = IndexWriter(self.__indices.get(index_name), procs=None, batchsize=100, subargs=None,
-                                 multisegment=False, period=self.get_schema(index_name).get_auto_commit_period(),
-                                 limit=self.get_schema(index_name).get_auto_commit_limit(), logger=self.__logger)
+            writer = IndexWriter(self.__indices.get(index_name),
+                                 procs=self.__index_configs.get(index_name).get_writer_processors(),
+                                 batchsize=self.__index_configs.get(index_name).get_writer_batch_size(),
+                                 multisegment=self.__index_configs.get(index_name).get_writer_multi_segment(),
+                                 period=self.__index_configs.get(index_name).get_writer_auto_commit_period(),
+                                 limit=self.__index_configs.get(index_name).get_writer_auto_commit_limit(),
+                                 logger=self.__logger)
             self.__writers[index_name] = writer
             self.__logger.info('writer for {0} was opened'.format(index_name))
         except Exception as ex:
@@ -603,12 +603,7 @@ class IndexCore(SyncObj):
         return writer
 
     def __get_writer(self, index_name):
-        try:
-            writer = self.__writers.get(index_name)
-        except Exception as ex:
-            raise ex
-
-        return writer
+        return self.__writers.get(index_name, None)
 
     def __get_searcher(self, index_name, weighting=None):
         try:
@@ -623,28 +618,29 @@ class IndexCore(SyncObj):
 
     @replicated
     def put_document(self, index_name, doc_id, fields):
+        return self.__put_document(index_name, doc_id, fields)
+
+    def __put_document(self, index_name, doc_id, fields):
+        doc = copy.deepcopy(fields)
+        doc[self.__index_configs.get(index_name).get_doc_id_field()] = doc_id
+
+        return self.__put_documents(index_name, [doc])
+
+    @replicated
+    def put_documents(self, index_name, docs):
+        return self.__put_documents(index_name, docs)
+
+    def __put_documents(self, index_name, docs):
         start_time = time.time()
 
         try:
-            count = self.__put_document(index_name, doc_id, fields)
+            count = self.__get_writer(index_name).update_documents(docs)
+            self.__logger.info('{0} documents ware put in {1}'.format(count, index_name))
         except Exception as ex:
+            self.__logger.error('failed to put documents in bulk to {0}: {1}'.format(index_name, ex))
             count = -1
-            self.__logger.error('failed to put {0} in {1}: {2}'.format(doc_id, index_name, ex))
         finally:
             self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
-
-        return count
-
-    def __put_document(self, index_name, doc_id, fields):
-        try:
-            doc = copy.deepcopy(fields)
-            doc[self.get_schema(index_name).get_doc_id_field()] = doc_id
-
-            count = self.__put_documents(index_name, [doc])
-            self.__logger.info('{0} was put in {1}'.format(doc_id, index_name))
-        except Exception as ex:
-            self.__logger.error('failed to put {0} in {1}: {2}'.format(doc_id, index_name, ex))
-            raise ex
 
         return count
 
@@ -652,7 +648,8 @@ class IndexCore(SyncObj):
         start_time = time.time()
 
         try:
-            results_page = self.search_documents(index_name, doc_id, self.get_schema(index_name).get_doc_id_field(), 1,
+            results_page = self.search_documents(index_name, doc_id,
+                                                 self.__index_configs.get(index_name).get_doc_id_field(), 1,
                                                  page_len=1)
             if results_page.total > 0:
                 self.__logger.info('{0} was got from {1}'.format(doc_id, index_name))
@@ -667,73 +664,26 @@ class IndexCore(SyncObj):
 
     @replicated
     def delete_document(self, index_name, doc_id):
-        start_time = time.time()
-
-        try:
-            count = self.__delete_document(index_name, doc_id)
-        except Exception as ex:
-            count = -1
-            self.__logger.error('failed to delete {0} from {1}: {2}'.format(doc_id, index_name, ex))
-        finally:
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
-
-        return count
+        return self.__delete_document(index_name, doc_id)
 
     def __delete_document(self, index_name, doc_id):
-        try:
-            count = self.__delete_documents(index_name, [doc_id])
-            self.__logger.info('{0} was deleted from {1}'.format(doc_id, index_name))
-        except Exception as ex:
-            self.__logger.error('failed to delete {0} from {1}: {2}'.format(doc_id, index_name, ex))
-            raise ex
-
-        return count
-
-    @replicated
-    def put_documents(self, index_name, docs):
-        start_time = time.time()
-
-        try:
-            count = self.__put_documents(index_name, docs)
-        except Exception as ex:
-            count = -1
-            self.__logger.error('failed to put documents in bulk to {0}: {1}'.format(index_name, ex))
-        finally:
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
-
-        return count
-
-    def __put_documents(self, index_name, docs):
-        try:
-            count = self.__get_writer(index_name).update_documents(docs)
-            self.__logger.info('{0} documents ware put in {1}'.format(count, index_name))
-        except Exception as ex:
-            self.__logger.error('failed to put documents in bulk to {0}: {1}'.format(index_name, ex))
-            raise ex
-
-        return count
+        return self.__delete_documents(index_name, [doc_id])
 
     @replicated
     def delete_documents(self, index_name, doc_ids):
+        return self.__delete_documents(index_name, doc_ids)
+
+    def __delete_documents(self, index_name, doc_ids):
         start_time = time.time()
 
         try:
-            count = self.__delete_documents(index_name, doc_ids)
-        except Exception as ex:
-            count = -1
-            self.__logger.error('failed to delete documents in bulk to {0}: {1}'.format(index_name, ex))
-        finally:
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
-
-        return count
-
-    def __delete_documents(self, index_name, doc_ids):
-        try:
-            count = self.__get_writer(index_name).delete_documents(doc_ids, doc_id_field=self.get_schema(
+            count = self.__get_writer(index_name).delete_documents(doc_ids, doc_id_field=self.__index_configs.get(
                 index_name).get_doc_id_field())
         except Exception as ex:
             self.__logger.error('failed to delete documents in bulk to {0}: {1}'.format(index_name, ex))
-            raise ex
+            count = -1
+        finally:
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return count
 
@@ -758,7 +708,12 @@ class IndexCore(SyncObj):
         self.__create_snapshot()
 
     def __create_snapshot(self):
-        self.forceLogCompaction()
+        start_time = time.time()
+
+        try:
+            self.forceLogCompaction()
+        finally:
+            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
     def get_snapshot_file_name(self):
         return self.__conf.fullDumpFile

@@ -66,15 +66,16 @@ class IndexWriter(WhooshIndexWriter):
             if self.__period:
                 self.autocommit_timer.cancel()
 
-            self.__writer.commit(mergetype=mergetype, optimize=optimize, merge=merge)
+            if not self.is_closed():
+                self.__writer.commit(mergetype=mergetype, optimize=optimize, merge=merge)
 
-            if restart:
-                self.__writer = self.__index.writer(proc=self.__procs, batchsize=self.__batchsize,
-                                                    subargs=self.__subargs, multisegment=self.__multisegment,
-                                                    **self.__kwargs)
-                if self.__period:
-                    self.autocommit_timer = threading.Timer(self.__period, self.commit)
-                    self.autocommit_timer.start()
+                if restart:
+                    self.__writer = self.__index.writer(proc=self.__procs, batchsize=self.__batchsize,
+                                                        subargs=self.__subargs, multisegment=self.__multisegment,
+                                                        **self.__kwargs)
+                    if self.__period:
+                        self.autocommit_timer = threading.Timer(self.__period, self.commit)
+                        self.autocommit_timer.start()
 
     def update_documents(self, docs):
         count = 0

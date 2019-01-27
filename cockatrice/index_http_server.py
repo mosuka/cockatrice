@@ -246,14 +246,14 @@ class IndexHTTPServer:
             mime = mimeparse.parse_mime_type(request.headers.get('Content-Type'))
             charset = 'utf-8' if mime[2].get('charset') is None else mime[2].get('charset')
             if mime[1] == 'yaml':
-                schema_dict = yaml.safe_load(request.data.decode(charset))
+                index_config_dict = yaml.safe_load(request.data.decode(charset))
             elif mime[1] in ['application/json']:
-                schema_dict = json.loads(request.data.decode(charset))
+                index_config_dict = json.loads(request.data.decode(charset))
             else:
                 raise ValueError('unsupported format')
 
-            if schema_dict is None:
-                raise ValueError('schema is None')
+            if index_config_dict is None:
+                raise ValueError('index config is None')
 
             sync = False
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
@@ -261,7 +261,7 @@ class IndexHTTPServer:
 
             rpc_req = CreateIndexRequest()
             rpc_req.index_name = index_name
-            rpc_req.schema = pickle.dumps(schema_dict)
+            rpc_req.index_config = pickle.dumps(index_config_dict)
             rpc_req.sync = sync
 
             rpc_resp = self.__index_stub.CreateIndex(rpc_req)

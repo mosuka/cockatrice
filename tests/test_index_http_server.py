@@ -95,59 +95,58 @@ class TestIndexHTTPServer(unittest.TestCase):
         self.assertEqual(HTTPStatus.OK, response.status_code)
 
     def test_put_index(self):
-        index_name = 'test_index'
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            schema_yaml = file_obj.read()
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_yaml = file_obj.read()
 
         # create index
-        response = self.test_client.put('/indices/' + index_name, data=schema_yaml, query_string='sync=True',
+        response = self.test_client.put('/indices/test_index', data=index_config_yaml, query_string='sync=True',
                                         headers={'Content-Type': 'application/yaml'})
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
 
     def test_get_index(self):
-        index_name = 'test_index'
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            schema_yaml = file_obj.read()
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_yaml = file_obj.read()
 
         # create index
-        response = self.test_client.put('/indices/' + index_name, data=schema_yaml, query_string='sync=True',
+        response = self.test_client.put('/indices/test_index', data=index_config_yaml, query_string='sync=True',
                                         headers={'Content-Type': 'application/yaml'})
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
 
         # get index
-        response = self.test_client.get('/indices/' + index_name)
+        response = self.test_client.get('/indices/test_index')
         self.assertEqual(HTTPStatus.OK, response.status_code)
 
     def test_delete_index(self):
-        index_name = 'test_index'
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            schema_yaml = file_obj.read()
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_yaml = file_obj.read()
 
         # create index
-        response = self.test_client.put('/indices/' + index_name, data=schema_yaml, query_string='sync=True',
+        response = self.test_client.put('/indices/test_index', data=index_config_yaml, query_string='sync=True',
                                         headers={'Content-Type': 'application/yaml'})
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
 
         # get index
-        response = self.test_client.get('/indices/' + index_name)
+        response = self.test_client.get('/indices/test_index')
         self.assertEqual(HTTPStatus.OK, response.status_code)
 
         # delete index
-        response = self.test_client.delete('/indices/' + index_name, query_string='sync=True')
+        response = self.test_client.delete('/indices/test_index', query_string='sync=True')
         self.assertEqual(HTTPStatus.OK, response.status_code)
 
         # get index
-        response = self.test_client.get('/indices/' + index_name)
+        response = self.test_client.get('/indices/test_index')
         self.assertEqual(HTTPStatus.NOT_FOUND, response.status_code)
 
     def test_put_document_yaml(self):
-        # read schema
-        index_name = 'test_index'
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            schema_yaml = file_obj.read()
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_yaml = file_obj.read()
 
         # create index
-        response = self.test_client.put('/indices/' + index_name, data=schema_yaml, query_string='sync=True',
+        response = self.test_client.put('/indices/test_index', data=index_config_yaml, query_string='sync=True',
                                         headers={'Content-Type': 'application/yaml'})
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
 
@@ -156,17 +155,17 @@ class TestIndexHTTPServer(unittest.TestCase):
             doc = file_obj.read()
 
         # put document 1
-        response = self.test_client.put('/indices/' + index_name + '/documents/1', data=doc,
-                                        query_string='sync=True', headers={'Content-Type': 'application/yaml'})
+        response = self.test_client.put('/indices/test_index/documents/1', data=doc, query_string='sync=True',
+                                        headers={'Content-Type': 'application/yaml'})
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
 
     def test_put_document_json(self):
-        # read schema
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            schema_yaml = file_obj.read()
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_yaml = file_obj.read()
 
         # create index
-        response = self.test_client.put('/indices/test_index', data=schema_yaml, query_string='sync=True',
+        response = self.test_client.put('/indices/test_index', data=index_config_yaml, query_string='sync=True',
                                         headers={'Content-Type': 'application/yaml'})
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
 
@@ -180,12 +179,12 @@ class TestIndexHTTPServer(unittest.TestCase):
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
 
     def test_get_document_yaml(self):
-        # read schema
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            schema_yaml = file_obj.read()
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_yaml = file_obj.read()
 
         # create index
-        response = self.test_client.put('/indices/test_index', data=schema_yaml, query_string='sync=True',
+        response = self.test_client.put('/indices/test_index', data=index_config_yaml, query_string='sync=True',
                                         headers={'Content-Type': 'application/yaml'})
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
 
@@ -209,12 +208,12 @@ class TestIndexHTTPServer(unittest.TestCase):
         self.assertEqual('1', data['fields']['id'])
 
     def test_get_document_json(self):
-        # read schema
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            schema_yaml = file_obj.read()
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_yaml = file_obj.read()
 
         # create index
-        response = self.test_client.put('/indices/test_index', data=schema_yaml, query_string='sync=True',
+        response = self.test_client.put('/indices/test_index', data=index_config_yaml, query_string='sync=True',
                                         headers={'Content-Type': 'application/yaml'})
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
 
@@ -238,12 +237,12 @@ class TestIndexHTTPServer(unittest.TestCase):
         self.assertEqual('1', data['fields']['id'])
 
     def test_delete_document(self):
-        # read schema
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            schema_yaml = file_obj.read()
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_yaml = file_obj.read()
 
         # create index
-        response = self.test_client.put('/indices/test_index', data=schema_yaml, query_string='sync=True',
+        response = self.test_client.put('/indices/test_index', data=index_config_yaml, query_string='sync=True',
                                         headers={'Content-Type': 'application/yaml'})
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
 
@@ -273,12 +272,12 @@ class TestIndexHTTPServer(unittest.TestCase):
         self.assertEqual(HTTPStatus.NOT_FOUND, response.status_code)
 
     def test_put_documents_json(self):
-        # read schema
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            schema_yaml = file_obj.read()
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_yaml = file_obj.read()
 
         # create index
-        response = self.test_client.put('/indices/test_index', data=schema_yaml, query_string='sync=True',
+        response = self.test_client.put('/indices/test_index', data=index_config_yaml, query_string='sync=True',
                                         headers={'Content-Type': 'application/yaml'})
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
 
@@ -326,12 +325,12 @@ class TestIndexHTTPServer(unittest.TestCase):
         self.assertEqual('5', data['fields']['id'])
 
     def test_delete_documents_json(self):
-        # read schema
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            schema_yaml = file_obj.read()
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_yaml = file_obj.read()
 
         # create index
-        response = self.test_client.put('/indices/test_index', data=schema_yaml, query_string='sync=True',
+        response = self.test_client.put('/indices/test_index', data=index_config_yaml, query_string='sync=True',
                                         headers={'Content-Type': 'application/yaml'})
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
 
@@ -417,12 +416,12 @@ class TestIndexHTTPServer(unittest.TestCase):
         self.assertEqual(HTTPStatus.NOT_FOUND, response.status_code)
 
     def test_search_documents_json(self):
-        # read schema
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            schema_yaml = file_obj.read()
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_yaml = file_obj.read()
 
         # create index
-        response = self.test_client.put('/indices/test_index', data=schema_yaml, query_string='sync=True',
+        response = self.test_client.put('/indices/test_index', data=index_config_yaml, query_string='sync=True',
                                         headers={'Content-Type': 'application/yaml'})
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
 

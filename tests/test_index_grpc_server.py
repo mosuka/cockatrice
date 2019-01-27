@@ -93,14 +93,14 @@ class TestIndexGRPCServer(unittest.TestCase):
     def test_create_index(self):
         stub = IndexStub(self.channel)
 
-        # read schema.yaml
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            scheme_dict = yaml.safe_load(file_obj.read())
+        # read index_config.yaml
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
 
         # create index
         request = CreateIndexRequest()
         request.index_name = 'test_index'
-        request.schema = pickle.dumps(scheme_dict)
+        request.index_config = pickle.dumps(index_config_dict)
         request.sync = True
 
         response = stub.CreateIndex(request)
@@ -110,14 +110,14 @@ class TestIndexGRPCServer(unittest.TestCase):
     def test_get_index(self):
         stub = IndexStub(self.channel)
 
-        # read schema.yaml
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            scheme_dict = yaml.safe_load(file_obj.read())
+        # read index_config.yaml
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
 
         # create index
         request = CreateIndexRequest()
         request.index_name = 'test_index'
-        request.schema = pickle.dumps(scheme_dict)
+        request.index_config = pickle.dumps(index_config_dict)
         request.sync = True
 
         response = stub.CreateIndex(request)
@@ -136,14 +136,14 @@ class TestIndexGRPCServer(unittest.TestCase):
     def test_delete_index(self):
         stub = IndexStub(self.channel)
 
-        # read schema.yaml
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            scheme_dict = yaml.safe_load(file_obj.read())
+        # read index_config.yaml
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
 
         # create index
         request = CreateIndexRequest()
         request.index_name = 'test_index'
-        request.schema = pickle.dumps(scheme_dict)
+        request.index_config = pickle.dumps(index_config_dict)
         request.sync = True
 
         response = stub.CreateIndex(request)
@@ -179,14 +179,14 @@ class TestIndexGRPCServer(unittest.TestCase):
     def test_open_index(self):
         stub = IndexStub(self.channel)
 
-        # read schema.yaml
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            scheme_dict = yaml.safe_load(file_obj.read())
+        # read index_config.yaml
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
 
         # create index
         request = CreateIndexRequest()
         request.index_name = 'test_index'
-        request.schema = pickle.dumps(scheme_dict)
+        request.index_config = pickle.dumps(index_config_dict)
         request.sync = True
 
         response = stub.CreateIndex(request)
@@ -240,14 +240,14 @@ class TestIndexGRPCServer(unittest.TestCase):
     def test_close_index(self):
         stub = IndexStub(self.channel)
 
-        # read schema.yaml
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            scheme_dict = yaml.safe_load(file_obj.read())
+        # read index_config.yaml
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
 
         # create index
         request = CreateIndexRequest()
         request.index_name = 'test_index'
-        request.schema = pickle.dumps(scheme_dict)
+        request.index_config = pickle.dumps(index_config_dict)
         request.sync = True
         response = stub.CreateIndex(request)
         self.assertEqual(True, response.status.success)
@@ -275,14 +275,14 @@ class TestIndexGRPCServer(unittest.TestCase):
     def test_optimize_index(self):
         stub = IndexStub(self.channel)
 
-        # read schema.yaml
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            scheme_dict = yaml.safe_load(file_obj.read())
+        # read index_config.yaml
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
 
         # create index
         request = CreateIndexRequest()
         request.index_name = 'test_index'
-        request.schema = pickle.dumps(scheme_dict)
+        request.index_config = pickle.dumps(index_config_dict)
         request.sync = True
         response = stub.CreateIndex(request)
         self.assertEqual(True, response.status.success)
@@ -304,14 +304,14 @@ class TestIndexGRPCServer(unittest.TestCase):
     def test_put_document(self):
         stub = IndexStub(self.channel)
 
-        # read schema.yaml
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            scheme_dict = yaml.safe_load(file_obj.read())
+        # read index_config.yaml
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
 
         # create index
         request = CreateIndexRequest()
         request.index_name = 'test_index'
-        request.schema = pickle.dumps(scheme_dict)
+        request.index_config = pickle.dumps(index_config_dict)
         request.sync = True
         response = stub.CreateIndex(request)
         self.assertEqual(True, response.status.success)
@@ -339,14 +339,14 @@ class TestIndexGRPCServer(unittest.TestCase):
     def test_get_document(self):
         stub = IndexStub(self.channel)
 
-        # read schema.yaml
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            scheme_dict = yaml.safe_load(file_obj.read())
+        # read index_config.yaml
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
 
         # create index
         request = CreateIndexRequest()
         request.index_name = 'test_index'
-        request.schema = pickle.dumps(scheme_dict)
+        request.index_config = pickle.dumps(index_config_dict)
         request.sync = True
         response = stub.CreateIndex(request)
         self.assertEqual(True, response.status.success)
@@ -392,14 +392,14 @@ class TestIndexGRPCServer(unittest.TestCase):
     def test_delete_document(self):
         stub = IndexStub(self.channel)
 
-        # read schema.yaml
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            scheme_dict = yaml.safe_load(file_obj.read())
+        # read index_config.yaml
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
 
         # create index
         request = CreateIndexRequest()
         request.index_name = 'test_index'
-        request.schema = pickle.dumps(scheme_dict)
+        request.index_config = pickle.dumps(index_config_dict)
         request.sync = True
         response = stub.CreateIndex(request)
         self.assertEqual(True, response.status.success)
@@ -467,14 +467,14 @@ class TestIndexGRPCServer(unittest.TestCase):
     def test_put_documents(self):
         stub = IndexStub(self.channel)
 
-        # read schema.yaml
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            scheme_dict = yaml.safe_load(file_obj.read())
+        # read index_config.yaml
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
 
         # create index
         request = CreateIndexRequest()
         request.index_name = 'test_index'
-        request.schema = pickle.dumps(scheme_dict)
+        request.index_config = pickle.dumps(index_config_dict)
         request.sync = True
         response = stub.CreateIndex(request)
         self.assertEqual(True, response.status.success)
@@ -525,14 +525,14 @@ class TestIndexGRPCServer(unittest.TestCase):
     def test_delete_documents(self):
         stub = IndexStub(self.channel)
 
-        # read schema.yaml
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            scheme_dict = yaml.safe_load(file_obj.read())
+        # read index_config.yaml
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
 
         # create index
         request = CreateIndexRequest()
         request.index_name = 'test_index'
-        request.schema = pickle.dumps(scheme_dict)
+        request.index_config = pickle.dumps(index_config_dict)
         request.sync = True
         response = stub.CreateIndex(request)
         self.assertEqual(True, response.status.success)
@@ -619,14 +619,14 @@ class TestIndexGRPCServer(unittest.TestCase):
     def test_search_documents(self):
         stub = IndexStub(self.channel)
 
-        # read schema.yaml
-        with open(self.example_dir + '/schema.yaml', 'r', encoding='utf-8') as file_obj:
-            scheme_dict = yaml.safe_load(file_obj.read())
+        # read index_config.yaml
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
 
         # create index
         request = CreateIndexRequest()
         request.index_name = 'test_index'
-        request.schema = pickle.dumps(scheme_dict)
+        request.index_config = pickle.dumps(index_config_dict)
         request.sync = True
         response = stub.CreateIndex(request)
         self.assertEqual(True, response.status.success)

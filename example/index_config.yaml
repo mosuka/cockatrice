@@ -26,11 +26,6 @@ schema:
       stored: true
 
 #
-# define default search field
-#
-default_search_field: text
-
-#
 # define field types
 #
 field_types:
@@ -426,8 +421,28 @@ filters:
       sep: "-"
 
 #
-# auto commit settings
+# define writer setting
 #
-auto_commit:
-  period: 0  # Set this to 0 or null to not use auto-commit
-  limit: 100
+writer:
+  #
+  # auto commit settings
+  #
+  auto_commit:
+    period: 30  # Set this to 0 or null to not use auto-commit
+    limit: 100
+
+  #
+  #
+  #
+  processors: 1
+
+  #
+  #
+  #
+  batch_size: 100
+
+  #
+  #
+  #
+  multi_segment: true
+

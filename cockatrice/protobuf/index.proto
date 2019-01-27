@@ -65,7 +65,7 @@ message IndexStats {
 
 message CreateIndexRequest {
     string index_name = 1;
-    bytes schema = 2;
+    bytes index_config = 2;
     bool sync = 3;
 }
 
@@ -95,7 +95,7 @@ message DeleteIndexResponse {
 
 message OpenIndexRequest {
     string index_name = 1;
-    bytes schema = 2;
+    bytes index_config = 2;
     bool sync = 3;
 }
 

@@ -25,13 +25,13 @@ from prometheus_client.core import CollectorRegistry, Counter, Histogram
 from whoosh.scoring import BM25F
 
 from cockatrice import NAME
+from cockatrice.index_config import IndexConfig
 from cockatrice.protobuf.index_pb2 import CloseIndexResponse, CommitIndexResponse, CreateIndexResponse, \
     CreateSnapshotResponse, DeleteDocumentResponse, DeleteDocumentsResponse, DeleteIndexResponse, DeleteNodeResponse, \
     GetDocumentResponse, GetIndexResponse, GetSnapshotResponse, GetStatusResponse, IsAliveResponse, IsHealthyResponse, \
     IsReadyResponse, IsSnapshotExistResponse, OpenIndexResponse, OptimizeIndexResponse, PutDocumentResponse, \
     PutDocumentsResponse, PutNodeResponse, RollbackIndexResponse, SearchDocumentsResponse, Status
 from cockatrice.protobuf.index_pb2_grpc import add_IndexServicer_to_server, IndexServicer as IndexServicerImpl
-from cockatrice.schema import Schema
 from cockatrice.scoring import get_multi_weighting
 
 
@@ -76,8 +76,8 @@ class IndexServicer(IndexServicerImpl):
         response = CreateIndexResponse()
 
         try:
-            schema = Schema(pickle.loads(request.schema))
-            index = self.__index_core.create_index(request.index_name, schema, sync=request.sync)
+            index_config = IndexConfig(pickle.loads(request.index_config))
+            index = self.__index_core.create_index(request.index_name, index_config, sync=request.sync)
 
             if request.sync:
                 if index is None:
@@ -181,8 +181,8 @@ class IndexServicer(IndexServicerImpl):
         response = OpenIndexResponse()
 
         try:
-            schema = None if request.schema == b'' else Schema(pickle.loads(request.schema))
-            index = self.__index_core.open_index(request.index_name, schema=schema, sync=request.sync)
+            index_config = None if request.index_config == b'' else Schema(pickle.loads(request.index_config))
+            index = self.__index_core.open_index(request.index_name, index_config=index_config, sync=request.sync)
 
             if request.sync:
                 if index is None:
