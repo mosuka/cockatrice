@@ -421,7 +421,13 @@ filters:
       sep: "-"
 
 #
-# define writer setting
+# define storage settings
+#
+storage:
+  type: "file"  # "ram" or "file"
+
+#
+# define writer settings
 #
 writer:
   #
@@ -445,4 +451,3 @@ writer:
   #
   #
   multi_segment: true
-

@@ -13,11 +13,11 @@ schema:
     args:
       stored: true
   title:
-    field_type: text_janome
+    field_type: text
     args:
       stored: true
   text:
-    field_type: text_janome
+    field_type: text
     args:
       stored: true
 
@@ -406,7 +406,6 @@ filters:
     args:
       minsize: 2
       maxsize: null
-      at: null
   intraword:
     class: whoosh.analysis.IntraWordFilter
     args:
@@ -422,8 +421,33 @@ filters:
       sep: "-"
 
 #
-# auto commit settings
+# define storage settings
 #
-auto_commit:
-  period: 30  # Set this to 0 or null to not use auto-commit
-  limit: 1000
+storage:
+  type: "ram"  # "ram" or "file"
+
+#
+# define writer settings
+#
+writer:
+  #
+  # auto commit settings
+  #
+  auto_commit:
+    period: 30  # Set this to 0 or null to not use auto-commit
+    limit: 100
+
+  #
+  #
+  #
+  processors: null  # Set to 0 or null to use the number of CPUs in the system
+
+  #
+  #
+  #
+  batch_size: 100
+
+  #
+  #
+  #
+  multi_segment: true

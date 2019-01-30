@@ -91,6 +91,10 @@ class Indexer:
                                                    logger=self.__logger, http_logger=self.__http_logger,
                                                    metrics_registry=self.__metrics_registry)
 
+        self.__logger.info('indexer has started')
+
     def stop(self):
         self.__index_http_server.stop()
         self.__index_core.stop()
+
+        self.__logger.info('indexer has stopped')

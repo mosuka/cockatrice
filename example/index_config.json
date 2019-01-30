@@ -7,6 +7,12 @@
         "stored": true
       }
     },
+    "url": {
+      "field_type": "keyword",
+      "args": {
+        "stored": true
+      }
+    },
     "title": {
       "field_type": "text",
       "args": {
@@ -15,18 +21,6 @@
     },
     "text": {
       "field_type": "text",
-      "args": {
-        "stored": true
-      }
-    },
-    "contributor": {
-      "field_type": "keyword",
-      "args": {
-        "stored": true
-      }
-    },
-    "timestamp": {
-      "field_type": "datetime",
       "args": {
         "stored": true
       }
@@ -487,10 +481,13 @@
       }
     }
   },
+  "storage": {
+    "type": "file"
+  },
   "writer": {
     "auto_commit": {
       "period": 30,
-      "limit": 100
+      "limit": 1000
     },
     "processors": 1,
     "batch_size": 100,

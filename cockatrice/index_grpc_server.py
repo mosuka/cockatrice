@@ -711,7 +711,9 @@ class IndexGRPCServer:
 
         self.__grpc_server.start()
 
-        self.__logger.info('gRPC server started')
+        self.__logger.info('gRPC server has started')
 
     def stop(self):
         self.__grpc_server.stop(grace=0.0)
+
+        self.__logger.info('gRPC server has stopped')

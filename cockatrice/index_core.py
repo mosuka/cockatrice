@@ -32,7 +32,7 @@ from pysyncobj import FAIL_REASON, replicated, SyncObj, SyncObjConf
 from pysyncobj.encryptor import getEncryptor
 from pysyncobj.poller import createPoller
 from pysyncobj.tcp_connection import TcpConnection
-from whoosh.filedb.filestore import FileStorage
+from whoosh.filedb.filestore import FileStorage, RamStorage
 from whoosh.qparser import QueryParser
 
 from cockatrice import NAME
@@ -171,13 +171,12 @@ class IndexCore(SyncObj):
         self.__index_configs = {}
         self.__writers = {}
 
-        self.__file_storage = None
-
         os.makedirs(self.__index_dir, exist_ok=True)
         self.__file_storage = FileStorage(self.__index_dir, supports_mmap=True, readonly=False, debug=False)
+        self.__ram_storage = RamStorage()
 
         super(IndexCore, self).__init__(self.__bind_addr, self.__peer_addrs, conf=self.__conf)
-        self.__logger.info('index core started')
+        self.__logger.info('index core has started')
 
         # waiting for the preparation to be completed
         while not self.isReady():
@@ -202,6 +201,8 @@ class IndexCore(SyncObj):
 
         self.destroy()
 
+        self.__logger.info('index core has stopped')
+
     def destroy(self):
         super().destroy()
 
@@ -220,8 +221,6 @@ class IndexCore(SyncObj):
         self.__metrics_core_requests_duration_seconds.labels(
             func=func_name
         ).observe(time.time() - start_time)
-
-        return
 
     def is_healthy(self):
         return self.is_alive() and self.is_ready()
@@ -290,19 +289,36 @@ class IndexCore(SyncObj):
     def __serialize(self, filename, raft_data):
         with self.__lock:
             try:
+                self.__logger.info('serializer has started')
+
                 # store the index files and raft logs to the snapshot file
                 with zipfile.ZipFile(filename, 'w', zipfile.ZIP_DEFLATED) as f:
                     for index_name in self.get_index_names():
-                        self.__commit_index(index_name)
+                        # self.__commit_index(index_name)
+                        self.__optimize_index(index_name)
 
-                        for index_filename in self.get_index_file_names(index_name=index_name):
-                            abs_index_path = os.path.join(self.__file_storage.folder, index_filename)
-                            f.write(abs_index_path, index_filename)
-                            self.__logger.debug('{0} has been stored in {1}'.format(abs_index_path, filename))
+                        with self.__get_writer(index_name).lock():
+                            # index files
+                            for index_filename in self.get_index_files(index_name):
+                                if self.__index_configs.get(index_name).get_storage_type() == "ram":
+                                    with self.__ram_storage.open_file(index_filename) as r:
+                                        f.writestr(index_filename, r.read())
+                                else:
+                                    f.write(os.path.join(self.__file_storage.folder, index_filename), index_filename)
+                                self.__logger.debug('{0} has stored in {1}'.format(index_filename, filename))
+
+                            # index config file
+                            f.write(os.path.join(self.__file_storage.folder, self.get_index_config_file(index_name)),
+                                    self.get_index_config_file(index_name))
+                            self.__logger.debug(
+                                '{0} has stored in {1}'.format(self.get_index_config_file(index_name), filename))
+
                     f.writestr('raft.bin', pickle.dumps(raft_data))
-                self.__logger.info('snapshot has been created')
+                self.__logger.info('snapshot has created')
             except Exception as ex:
                 self.__logger.error('failed to create snapshot: {0}'.format(ex))
+            finally:
+                self.__logger.info('serializer has stopped')
 
     # index deserializer
     def __deserialize(self, filename):
@@ -310,44 +326,96 @@ class IndexCore(SyncObj):
 
         with self.__lock:
             try:
+                self.__logger.info('deserializer has started')
+
                 with zipfile.ZipFile(filename, 'r') as zf:
-                    for member in zf.namelist():
-                        if member != 'raft.bin':
-                            zf.extract(member, path=self.__file_storage.folder)
-                            self.__logger.debug('{0} has been restored from {1}'.format(
-                                os.path.join(self.__file_storage.folder, member), filename))
-                    self.__logger.info('indices has been restored')
+                    # get file names in snapshot file
+                    filenames = list(zf.namelist())
+
+                    # get index names in snapshot file
+                    index_names = []
+                    pattern_toc = re.compile(r'^_(.+)_\d+\.toc$')
+                    for filename in filenames:
+                        match = pattern_toc.search(filename)
+                        if match and match.group(1) not in index_names:
+                            index_names.append(match.group(1))
+
+                    for index_name in index_names:
+                        # extract the index config first
+                        zf.extract(self.get_index_config_file(index_name), path=self.__file_storage.folder)
+                        index_config = pickle.loads(zf.read(self.get_index_config_file(index_name)))
+
+                        # get index files
+                        pattern_toc = re.compile(r'^_{0}_(\d+)\..+$'.format(index_name))  # ex) _myindex_0.toc
+                        pattern_seg = re.compile(
+                            r'^{0}_([a-z0-9]+)\..+$'.format(index_name))  # ex) myindex_zseabukc2nbpvh0u.seg
+                        pattern_lock = re.compile(r'^{0}_WRITELOCK$'.format(index_name))  # ex) myindex_WRITELOCK
+                        index_files = []
+                        for file_name in filenames:
+                            if re.match(pattern_toc, file_name):
+                                index_files.append(file_name)
+                            elif re.match(pattern_seg, file_name):
+                                index_files.append(file_name)
+                            elif re.match(pattern_lock, file_name):
+                                index_files.append(file_name)
+
+                        # extract the index files
+                        for index_file in index_files:
+                            if index_config.get_storage_type() == 'ram':
+                                with self.__ram_storage.create_file(index_file) as r:
+                                    r.write(zf.read(index_file))
+                            else:
+                                zf.extract(index_file, path=self.__file_storage.folder)
+
+                            self.__logger.debug('{0} has restored from {1}'.format(index_file, filename))
+
+                        self.__logger.info('{0} has restored'.format(index_name))
+
+                    # extract the raft data
                     raft_data = pickle.loads(zf.read('raft.bin'))
+                    self.__logger.info('raft.bin has restored')
             except Exception as ex:
                 self.__logger.error('failed to restore indices: {0}'.format(ex))
+            finally:
+                self.__logger.info('deserializer has stopped')
 
         return raft_data
 
-    def get_index_file_names(self, index_name=None):
+    def get_index_files(self, index_name):
         index_files = []
 
-        pattern_toc = re.compile(r'^_{0}_(\d+)\.toc$'.format(index_name))  # ex) _myindex_0.toc
-        pattern_seg = re.compile(r'^{0}_([a-z0-9]+)\.seg$'.format(index_name))  # ex) myindex_zseabukc2nbpvh0u.seg
+        pattern_toc = re.compile(r'^_{0}_(\d+)\..+$'.format(index_name))  # ex) _myindex_0.toc
+        pattern_seg = re.compile(r'^{0}_([a-z0-9]+)\..+$'.format(index_name))  # ex) myindex_zseabukc2nbpvh0u.seg
         pattern_lock = re.compile(r'^{0}_WRITELOCK$'.format(index_name))  # ex) myindex_WRITELOCK
 
-        for file_name in list(self.__file_storage.list()):
-            if index_name is not None:
-                if re.match(pattern_toc, file_name):
-                    index_files.append(file_name)
-                elif re.match(pattern_seg, file_name):
-                    index_files.append(file_name)
-                elif re.match(pattern_lock, file_name):
-                    index_files.append(file_name)
-            else:
+        if self.__index_configs.get(index_name).get_storage_type() == "ram":
+            storage = self.__ram_storage
+        else:
+            storage = self.__file_storage
+
+        for file_name in list(storage.list()):
+            if re.match(pattern_toc, file_name):
+                index_files.append(file_name)
+            elif re.match(pattern_seg, file_name):
+                index_files.append(file_name)
+            elif re.match(pattern_lock, file_name):
                 index_files.append(file_name)
 
         return index_files
+
+    def get_index_config_file(self, index_name):
+        return '{0}_CONFIG'.format(index_name)
 
     def get_index_names(self):
         index_names = []
 
         pattern_toc = re.compile(r'^_(.+)_\d+\.toc$')
+
         for filename in list(self.__file_storage.list()):
+            match = pattern_toc.search(filename)
+            if match and match.group(1) not in index_names:
+                index_names.append(match.group(1))
+        for filename in list(self.__ram_storage.list()):
             match = pattern_toc.search(filename)
             if match and match.group(1) not in index_names:
                 index_names.append(match.group(1))
@@ -355,7 +423,8 @@ class IndexCore(SyncObj):
         return index_names
 
     def is_index_exist(self, index_name):
-        return self.__file_storage.index_exists(indexname=index_name)
+        return self.__file_storage.index_exists(indexname=index_name) or self.__ram_storage.index_exists(
+            indexname=index_name)
 
     def is_index_open(self, index_name):
         return index_name in self.__indices
@@ -373,22 +442,29 @@ class IndexCore(SyncObj):
             # open the index
             index = self.__indices.get(index_name)
             if index is None:
+                self.__logger.info('opening {0}'.format(index_name))
+
                 if index_config is None:
-                    # set the index config from saved data
-                    with open(os.path.join(self.__file_storage.folder, '{0}_index_config.bin'.format(index_name)),
+                    # set saved index config
+                    with open(os.path.join(self.__file_storage.folder, self.get_index_config_file(index_name)),
                               'rb') as f:
                         self.__index_configs[index_name] = pickle.loads(f.read())
                 else:
-                    # set the index config from given data
+                    # set given index config
                     self.__index_configs[index_name] = index_config
 
-                index = self.__file_storage.open_index(indexname=index_name,
-                                                       schema=self.__index_configs[index_name].get_schema())
+                if self.__index_configs[index_name].get_storage_type() == 'ram':
+                    index = self.__ram_storage.open_index(indexname=index_name,
+                                                          schema=self.__index_configs[index_name].get_schema())
+                else:
+                    index = self.__file_storage.open_index(indexname=index_name,
+                                                           schema=self.__index_configs[index_name].get_schema())
                 self.__indices[index_name] = index
-                self.__logger.info('{0} was opened'.format(index_name))
 
-            # open the index writer
-            self.__open_writer(index_name)
+                self.__logger.info('{0} has opened'.format(index_name))
+
+                # open the index writer
+                self.__open_writer(index_name)
         except Exception as ex:
             self.__logger.error('failed to open {0}: {1}'.format(index_name, ex))
         finally:
@@ -412,8 +488,9 @@ class IndexCore(SyncObj):
             # close the index
             index = self.__indices.pop(index_name)
             if index is not None:
+                self.__logger.info('closing {0}'.format(index_name))
                 index.close()
-                self.__logger.info('{0} was closed'.format(index_name))
+                self.__logger.info('{0} has closed'.format(index_name))
         except Exception as ex:
             self.__logger.error('failed to close {0}: {1}'.format(index_name, ex))
         finally:
@@ -435,22 +512,28 @@ class IndexCore(SyncObj):
                 # open the index
                 index = self.__open_index(index_name, index_config=index_config)
             else:
+                self.__logger.info('creating {0}'.format(index_name))
+
                 # set index config
                 self.__index_configs[index_name] = index_config
 
                 # create the index
-                index = self.__file_storage.create_index(self.__index_configs[index_name].get_schema(),
-                                                         indexname=index_name)
+                if self.__index_configs[index_name].get_storage_type() == 'ram':
+                    index = self.__ram_storage.create_index(self.__index_configs[index_name].get_schema(),
+                                                            indexname=index_name)
+                else:
+                    index = self.__file_storage.create_index(self.__index_configs[index_name].get_schema(),
+                                                             indexname=index_name)
                 self.__indices[index_name] = index
-                self.__logger.info('{0} was created'.format(index_name))
+                self.__logger.info('{0} has created'.format(index_name))
+
+                # save the index config
+                with open(os.path.join(self.__file_storage.folder, self.get_index_config_file(index_name)),
+                          'wb') as f:
+                    f.write(pickle.dumps(index_config))
 
                 # open the index writer
                 self.__open_writer(index_name)
-
-                # save the schema in the index dir
-                with open(os.path.join(self.__file_storage.folder, '{0}_index_config.bin'.format(index_name)),
-                          'wb') as f:
-                    f.write(pickle.dumps(index_config))
         except Exception as ex:
             self.__logger.error('failed to create {0}: {1}'.format(index_name, ex))
         finally:
@@ -469,15 +552,18 @@ class IndexCore(SyncObj):
         index = self.__close_index(index_name)
 
         try:
+            self.__logger.info('deleting {0}'.format(index_name))
+
             # delete index files
-            for filename in self.get_index_file_names(index_name=index_name):
+            for filename in self.get_index_files(index_name):
                 self.__file_storage.delete_file(filename)
                 self.__logger.info('{0} was deleted'.format(filename))
-            self.__logger.info('{0} was deleted'.format(index_name))
+
+            self.__logger.info('{0} has deleted'.format(index_name))
 
             # delete the index config
             self.__index_configs.pop(index_name, None)
-            os.remove(os.path.join(self.__file_storage.folder, '{0}_index_config.bin'.format(index_name)))
+            os.remove(os.path.join(self.__file_storage.folder, self.get_index_config_file(index_name)))
         except Exception as ex:
             self.__logger.error('failed to delete {0}: {1}'.format(index_name, ex))
         finally:
@@ -507,8 +593,12 @@ class IndexCore(SyncObj):
         success = False
 
         try:
+            self.__logger.info('committing {0}'.format(index_name))
+
             self.__get_writer(index_name).commit()
-            self.__logger.info('{0} was committed'.format(index_name))
+
+            self.__logger.info('{0} has committed'.format(index_name))
+
             success = True
         except Exception as ex:
             self.__logger.error('failed to commit index {0}: {1}'.format(index_name, ex))
@@ -527,8 +617,12 @@ class IndexCore(SyncObj):
         success = False
 
         try:
+            self.__logger.info('rolling back {0}'.format(index_name))
+
             self.__get_writer(index_name).rollback()
-            self.__logger.info('{0} was rolled back'.format(index_name))
+
+            self.__logger.info('{0} has rolled back'.format(index_name))
+
             success = True
         except Exception as ex:
             self.__logger.error('failed to rollback index {0}: {1}'.format(index_name, ex))
@@ -547,8 +641,12 @@ class IndexCore(SyncObj):
         success = False
 
         try:
+            self.__logger.info('optimizing {0}'.format(index_name))
+
             self.__writers.get(index_name).optimize()
-            self.__logger.info('{0} was optimized'.format(index_name))
+
+            self.__logger.info('{0} has optimized'.format(index_name))
+
             success = True
         except Exception as ex:
             self.__logger.error('failed to optimize {0}: {1}'.format(index_name, ex))
@@ -575,6 +673,8 @@ class IndexCore(SyncObj):
 
     def __open_writer(self, index_name):
         try:
+            self.__logger.info('opening writer for {0}'.format(index_name))
+
             # open the index writer
             writer = IndexWriter(self.__indices.get(index_name),
                                  procs=self.__index_configs.get(index_name).get_writer_processors(),
@@ -584,7 +684,8 @@ class IndexCore(SyncObj):
                                  limit=self.__index_configs.get(index_name).get_writer_auto_commit_limit(),
                                  logger=self.__logger)
             self.__writers[index_name] = writer
-            self.__logger.info('writer for {0} was opened'.format(index_name))
+
+            self.__logger.info('writer for {0} has opened'.format(index_name))
         except Exception as ex:
             raise ex
 
@@ -592,11 +693,14 @@ class IndexCore(SyncObj):
 
     def __close_writer(self, index_name):
         try:
+            self.__logger.info('closing writer for {0}'.format(index_name))
+
             # close the index writer
             writer = self.__writers.pop(index_name) if index_name in self.__writers else None
             if writer is not None and not writer.is_closed():
                 writer.close()
-            self.__logger.info('writer for {0} was closed'.format(index_name))
+
+            self.__logger.info('writer for {0} has closed'.format(index_name))
         except Exception as ex:
             raise ex
 
@@ -634,10 +738,13 @@ class IndexCore(SyncObj):
         start_time = time.time()
 
         try:
+            self.__logger.info('putting documents to {0}'.format(index_name))
+
             count = self.__get_writer(index_name).update_documents(docs)
-            self.__logger.info('{0} documents ware put in {1}'.format(count, index_name))
+
+            self.__logger.info('{0} documents has put to {1}'.format(count, index_name))
         except Exception as ex:
-            self.__logger.error('failed to put documents in bulk to {0}: {1}'.format(index_name, ex))
+            self.__logger.error('failed to put documents to {0}: {1}'.format(index_name, ex))
             count = -1
         finally:
             self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
@@ -677,8 +784,12 @@ class IndexCore(SyncObj):
         start_time = time.time()
 
         try:
+            self.__logger.info('deleting documents from {0}'.format(index_name))
+
             count = self.__get_writer(index_name).delete_documents(doc_ids, doc_id_field=self.__index_configs.get(
                 index_name).get_doc_id_field())
+
+            self.__logger.info('{0} documents has deleted from {1}'.format(count, index_name))
         except Exception as ex:
             self.__logger.error('failed to delete documents in bulk to {0}: {1}'.format(index_name, ex))
             count = -1

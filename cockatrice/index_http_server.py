@@ -157,7 +157,7 @@ class IndexHTTPServer:
             self.__http_server_thread = IndexHTTPServerThread(self.__host, self.__port, self.__app,
                                                               logger=self.__logger)
             self.__http_server_thread.start()
-            self.__logger.info('HTTP server started')
+            self.__logger.info('HTTP server has started')
         except Exception as ex:
             self.__logger.critical(ex)
 
@@ -165,6 +165,8 @@ class IndexHTTPServer:
         self.__http_server_thread.shutdown()
 
         self.__grpc_channel.close()
+
+        self.__logger.info('HTTP server has stopped')
 
     def __record_http_log(self, req, resp):
         log_message = '{0} - {1} [{2}] "{3} {4} {5}" {6} {7} "{8}" "{9}"'.format(

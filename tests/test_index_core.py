@@ -481,16 +481,59 @@ class TestIndexCore(unittest.TestCase):
 
         # create snapshot
         self.index_core.create_snapshot(sync=True)
-        sleep(1)  # wait for snapshot file to be created
+        sleep(5)  # wait for snapshot file to be created
         self.assertTrue(os.path.exists(self.index_core.get_snapshot_file_name()))
 
         with zipfile.ZipFile(self.index_core.get_snapshot_file_name()) as f:
             self.assertTrue('raft.bin' in f.namelist())
-            self.assertTrue('test_file_index_WRITELOCK' in f.namelist())
             self.assertEqual(1,
                              len([n for n in f.namelist() if n.startswith('_test_file_index_') and n.endswith('.toc')]))
             self.assertEqual(1,
                              len([n for n in f.namelist() if n.startswith('test_file_index_') and n.endswith('.seg')]))
+            self.assertTrue('test_file_index_WRITELOCK' in f.namelist())
+            self.assertTrue('test_file_index_index_config.bin' in f.namelist())
+
+        # close index
+        self.index_core.close_index(index_name)
+
+    def test_create_snapshot_ram(self):
+        # read index config
+        with open(self.example_dir + '/index_config_ram.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
+        index_config = IndexConfig(index_config_dict)
+
+        # create file index
+        index_name = 'test_file_index'
+        self.index_core.create_index(index_name, index_config, sync=True)
+        self.assertTrue(self.index_core.is_index_exist(index_name))
+
+        with open(self.example_dir + '/bulk_put.json', 'r', encoding='utf-8') as file_obj:
+            test_docs = json.loads(file_obj.read(), encoding='utf-8')
+
+        # put documents in bulk
+        count = self.index_core.put_documents(index_name, test_docs, sync=True)
+        self.assertEqual(5, count)
+
+        # commit
+        success = self.index_core.commit_index(index_name, sync=True)
+        self.assertTrue(success)
+
+        # search documents
+        page = self.index_core.search_documents(index_name, 'search', search_field='text', page_num=1, page_len=10)
+        self.assertEqual(5, page.total)
+
+        # create snapshot
+        self.index_core.create_snapshot(sync=True)
+        sleep(5)  # wait for snapshot file to be created
+        self.assertTrue(os.path.exists(self.index_core.get_snapshot_file_name()))
+
+        with zipfile.ZipFile(self.index_core.get_snapshot_file_name()) as f:
+            self.assertTrue('raft.bin' in f.namelist())
+            self.assertEqual(1,
+                             len([n for n in f.namelist() if n.startswith('_test_file_index_') and n.endswith('.toc')]))
+            self.assertEqual(1,
+                             len([n for n in f.namelist() if n.startswith('test_file_index_') and n.endswith('.seg')]))
+            self.assertTrue('test_file_index_index_config.bin' in f.namelist())
 
         # close index
         self.index_core.close_index(index_name)

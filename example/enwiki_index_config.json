@@ -481,8 +481,16 @@
       }
     }
   },
-  "auto_commit": {
-    "period": 30,
-    "limit": 1000
+  "storage": {
+    "type": "ram"
+  },
+  "writer": {
+    "auto_commit": {
+      "period": 30,
+      "limit": 1000
+    },
+    "processors": 1,
+    "batch_size": 100,
+    "multi_segment": true
   }
 }
