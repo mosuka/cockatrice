@@ -30,10 +30,101 @@ from yaml.constructor import ConstructorError
 
 from cockatrice import NAME
 from cockatrice.indexer import Indexer
+from cockatrice.supervisor import Supervisor
 
 
-def start_indexer(host='localhost', port=7070, seed_addr=None, snapshot_file='/tmp/cockatrice/snapshot.zip',
-                  log_compaction_min_entries=5000, log_compaction_min_time=300, index_dir='/tmp/cockatrice/index',
+def start_supervisor(host='localhost', port=7070, seed_addr=None, snapshot_file='/tmp/cockatrice/supervise.zip',
+                     log_compaction_min_entries=5000, log_compaction_min_time=300,
+                     data_dir='/tmp/cockatrice/supervise', grpc_port=5050, grpc_max_workers=10, http_port=8080,
+                     log_level='DEBUG', log_file=None, log_file_max_bytes=512000000, log_file_backup_count=5,
+                     http_log_file=None, http_log_file_max_bytes=512000000, http_log_file_backup_count=5):
+    # create logger and handler
+    logger = getLogger(NAME)
+    log_handler = StreamHandler()
+
+    # determine log destination
+    if log_file is not None:
+        log_handler = RotatingFileHandler(log_file, 'a+', maxBytes=log_file_max_bytes,
+                                          backupCount=log_file_backup_count)
+
+    # determine log level
+    if log_level in ['CRITICAL', 'FATAL']:
+        logger.setLevel(CRITICAL)
+        log_handler.setLevel(CRITICAL)
+    elif log_level == 'ERROR':
+        logger.setLevel(ERROR)
+        log_handler.setLevel(ERROR)
+    elif log_level in ['WARNING', 'WARN']:
+        logger.setLevel(WARNING)
+        log_handler.setLevel(WARNING)
+    elif log_level == 'INFO':
+        logger.setLevel(INFO)
+        log_handler.setLevel(INFO)
+    elif log_level == 'DEBUG':
+        logger.setLevel(DEBUG)
+        log_handler.setLevel(DEBUG)
+    elif log_level == 'NOTSET':
+        logger.setLevel(NOTSET)
+        log_handler.setLevel(NOTSET)
+    else:
+        logger.setLevel(INFO)
+        log_handler.setLevel(INFO)
+
+    # set log format
+    handler_format = Formatter('%(asctime)s - %(levelname)s - %(pathname)s:%(lineno)d - %(message)s')
+    log_handler.setFormatter(handler_format)
+
+    # add log handler
+    logger.addHandler(log_handler)
+
+    # create http logger and handler
+    http_logger = getLogger(NAME + '_http')
+    http_log_handler = StreamHandler()
+
+    # determine http log destination
+    if http_log_file is not None:
+        http_log_handler = RotatingFileHandler(http_log_file, 'a+', maxBytes=http_log_file_max_bytes,
+                                               backupCount=http_log_file_backup_count)
+
+    # determine http log level
+    http_logger.setLevel(INFO)
+    http_log_handler.setLevel(INFO)
+
+    # set http log format
+    http_handler_format = Formatter('%(message)s')
+    http_log_handler.setFormatter(http_handler_format)
+
+    # add http log handler
+    http_logger.addHandler(http_log_handler)
+
+    # metrics registry
+    metrics_registry = CollectorRegistry()
+
+    # sync config
+    os.makedirs(os.path.dirname(snapshot_file), exist_ok=True)
+    conf = SyncObjConf()
+    conf.fullDumpFile = snapshot_file
+    conf.logCompactionMinEntries = log_compaction_min_entries
+    conf.logCompactionMinTime = log_compaction_min_time
+    conf.dynamicMembershipChange = True
+    conf.validate()
+
+    supervisor = None
+    try:
+        supervisor = Supervisor(host=host, port=port, seed_addr=seed_addr, conf=conf, data_dir=data_dir,
+                                grpc_port=grpc_port, grpc_max_workers=grpc_max_workers, http_port=http_port,
+                                logger=logger, http_logger=http_logger, metrics_registry=metrics_registry)
+        while True:
+            signal.pause()
+    except Exception as ex:
+        print(ex)
+    finally:
+        if supervisor is not None:
+            supervisor.stop()
+
+
+def start_indexer(host='localhost', port=7070, seed_addr=None, snapshot_file='/tmp/cockatrice/index.zip',
+                  log_compaction_min_entries=5000, log_compaction_min_time=300, data_dir='/tmp/cockatrice/index',
                   grpc_port=5050, grpc_max_workers=10, http_port=8080, log_level='DEBUG', log_file=None,
                   log_file_max_bytes=512000000, log_file_backup_count=5, http_log_file=None,
                   http_log_file_max_bytes=512000000, http_log_file_backup_count=5):
@@ -110,7 +201,7 @@ def start_indexer(host='localhost', port=7070, seed_addr=None, snapshot_file='/t
 
     indexer = None
     try:
-        indexer = Indexer(host=host, port=port, seed_addr=seed_addr, conf=conf, index_dir=index_dir,
+        indexer = Indexer(host=host, port=port, seed_addr=seed_addr, conf=conf, data_dir=data_dir,
                           grpc_port=grpc_port, grpc_max_workers=grpc_max_workers, http_port=http_port, logger=logger,
                           http_logger=http_logger, metrics_registry=metrics_registry)
         while True:

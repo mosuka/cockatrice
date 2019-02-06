@@ -23,3 +23,7 @@ def get_free_port():
         s.bind(('localhost', 0))
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         return s.getsockname()[1]
+
+
+def get_test_client(app, ues_cookies=True, **kwargs):
+    return app.test_client(ues_cookies, **kwargs)

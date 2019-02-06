@@ -19,8 +19,6 @@ from logging import getLogger
 
 from whoosh.writing import IndexWriter as WhooshIndexWriter
 
-from cockatrice.util.timer import RepeatedTimer
-
 
 class IndexWriter(WhooshIndexWriter):
     def __init__(self, index, procs=None, batchsize=100, subargs=None, multisegment=False, period=60, limit=10,
@@ -44,7 +42,7 @@ class IndexWriter(WhooshIndexWriter):
         self.__lock = threading.RLock()
 
         if self.__period:
-            self.autocommit_timer = RepeatedTimer(self.__period, self.commit)
+            self.autocommit_timer = threading.Timer(self.__period, self.commit)
             self.autocommit_timer.start()
             self.__logger.debug('timer for {0} were started'.format(self.__index.indexname))
 
@@ -127,10 +125,27 @@ class IndexWriter(WhooshIndexWriter):
 
         return count
 
-    def rollback(self):
+    def rollback(self, restart=True):
         with self.lock():
-            self.__writer.cancel()
-            self.__logger.debug('writer for {0} were rolled back the index'.format(self.__index.indexname))
+            if self.__period:
+                self.autocommit_timer.cancel()
+                self.__logger.debug('timer for {0} were stopped'.format(self.__index.indexname))
+
+            if not self.is_closed():
+                self.__counter = 0
+                self.__writer.cancel()
+                self.__logger.debug('writer for {0} were rolled back the index'.format(self.__index.indexname))
+
+            if restart:
+                self.__writer = self.__index.writer(proc=self.__procs, batchsize=self.__batchsize,
+                                                    subargs=self.__subargs, multisegment=self.__multisegment,
+                                                    **self.__kwargs)
+                self.__logger.debug('writer for {0} were recreated'.format(self.__index.indexname))
+
+                if self.__period:
+                    self.autocommit_timer = threading.Timer(self.__period, self.commit)
+                    self.autocommit_timer.start()
+                    self.__logger.debug('timer for {0} were restarted'.format(self.__index.indexname))
 
     def optimize(self):
         self.commit(optimize=True, restart=True)

@@ -60,14 +60,6 @@ class TestIndexGRPCServer(unittest.TestCase):
         log_handler.setFormatter(log_format)
         logger.addHandler(log_handler)
 
-        http_logger = getLogger(NAME + '_http')
-        http_log_handler = StreamHandler()
-        http_logger.setLevel(INFO)
-        http_log_handler.setLevel(INFO)
-        http_log_format = Formatter('%(message)s')
-        http_log_handler.setFormatter(http_log_format)
-        http_logger.addHandler(http_log_handler)
-
         metrics_registry = CollectorRegistry()
 
         conf = SyncObjConf(
@@ -76,7 +68,7 @@ class TestIndexGRPCServer(unittest.TestCase):
             dynamicMembershipChange=True
         )
 
-        self.index_core = IndexCore(host=host, port=port, peer_addrs=peer_addrs, conf=conf, index_dir=index_dir,
+        self.index_core = IndexCore(host=host, port=port, peer_addrs=peer_addrs, conf=conf, data_dir=index_dir,
                                     logger=logger, metrics_registry=metrics_registry)
         self.index_grpc_server = IndexGRPCServer(self.index_core, host=host, port=grpc_port, max_workers=10,
                                                  logger=logger, metrics_registry=metrics_registry)

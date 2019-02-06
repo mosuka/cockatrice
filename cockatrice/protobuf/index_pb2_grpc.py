@@ -4,6 +4,99 @@ import grpc
 from cockatrice.protobuf import index_pb2 as cockatrice_dot_protobuf_dot_index__pb2
 
 
+class SuperviseStub(object):
+  # missing associated documentation comment in .proto file
+  pass
+
+  def __init__(self, channel):
+    """Constructor.
+
+    Args:
+      channel: A grpc.Channel.
+    """
+    self.Put = channel.unary_unary(
+        '/protobuf.Supervise/Put',
+        request_serializer=cockatrice_dot_protobuf_dot_index__pb2.PutRequest.SerializeToString,
+        response_deserializer=cockatrice_dot_protobuf_dot_index__pb2.PutResponse.FromString,
+        )
+    self.Get = channel.unary_unary(
+        '/protobuf.Supervise/Get',
+        request_serializer=cockatrice_dot_protobuf_dot_index__pb2.GetRequest.SerializeToString,
+        response_deserializer=cockatrice_dot_protobuf_dot_index__pb2.GetResponse.FromString,
+        )
+    self.Delete = channel.unary_unary(
+        '/protobuf.Supervise/Delete',
+        request_serializer=cockatrice_dot_protobuf_dot_index__pb2.DeleteRequest.SerializeToString,
+        response_deserializer=cockatrice_dot_protobuf_dot_index__pb2.DeleteResponse.FromString,
+        )
+    self.Clear = channel.unary_unary(
+        '/protobuf.Supervise/Clear',
+        request_serializer=cockatrice_dot_protobuf_dot_index__pb2.ClearRequest.SerializeToString,
+        response_deserializer=cockatrice_dot_protobuf_dot_index__pb2.ClearResponse.FromString,
+        )
+
+
+class SuperviseServicer(object):
+  # missing associated documentation comment in .proto file
+  pass
+
+  def Put(self, request, context):
+    # missing associated documentation comment in .proto file
+    pass
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
+  def Get(self, request, context):
+    # missing associated documentation comment in .proto file
+    pass
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
+  def Delete(self, request, context):
+    # missing associated documentation comment in .proto file
+    pass
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
+  def Clear(self, request, context):
+    # missing associated documentation comment in .proto file
+    pass
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
+
+def add_SuperviseServicer_to_server(servicer, server):
+  rpc_method_handlers = {
+      'Put': grpc.unary_unary_rpc_method_handler(
+          servicer.Put,
+          request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.PutRequest.FromString,
+          response_serializer=cockatrice_dot_protobuf_dot_index__pb2.PutResponse.SerializeToString,
+      ),
+      'Get': grpc.unary_unary_rpc_method_handler(
+          servicer.Get,
+          request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.GetRequest.FromString,
+          response_serializer=cockatrice_dot_protobuf_dot_index__pb2.GetResponse.SerializeToString,
+      ),
+      'Delete': grpc.unary_unary_rpc_method_handler(
+          servicer.Delete,
+          request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.DeleteRequest.FromString,
+          response_serializer=cockatrice_dot_protobuf_dot_index__pb2.DeleteResponse.SerializeToString,
+      ),
+      'Clear': grpc.unary_unary_rpc_method_handler(
+          servicer.Clear,
+          request_deserializer=cockatrice_dot_protobuf_dot_index__pb2.ClearRequest.FromString,
+          response_serializer=cockatrice_dot_protobuf_dot_index__pb2.ClearResponse.SerializeToString,
+      ),
+  }
+  generic_handler = grpc.method_handlers_generic_handler(
+      'protobuf.Supervise', rpc_method_handlers)
+  server.add_generic_rpc_handlers((generic_handler,))
+
+
 class IndexStub(object):
   # missing associated documentation comment in .proto file
   pass

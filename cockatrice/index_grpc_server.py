@@ -181,7 +181,7 @@ class IndexServicer(IndexServicerImpl):
         response = OpenIndexResponse()
 
         try:
-            index_config = None if request.index_config == b'' else Schema(pickle.loads(request.index_config))
+            index_config = None if request.index_config == b'' else IndexConfig(pickle.loads(request.index_config))
             index = self.__index_core.open_index(request.index_name, index_config=index_config, sync=request.sync)
 
             if request.sync:
@@ -693,9 +693,9 @@ class IndexServicer(IndexServicerImpl):
 
 
 class IndexGRPCServer:
-    def __init__(self, index_server, host='localhost', port=5050, max_workers=10, logger=getLogger(),
+    def __init__(self, index_core, host='localhost', port=5050, max_workers=10, logger=getLogger(),
                  metrics_registry=CollectorRegistry()):
-        self.__index_server = index_server
+        self.__index_core = index_core
         self.__host = host
         self.__port = port
         self.__max_workers = max_workers
@@ -705,7 +705,7 @@ class IndexGRPCServer:
         self.__grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=self.__max_workers))
 
         add_IndexServicer_to_server(
-            IndexServicer(self.__index_server, logger=self.__logger, metrics_registry=self.__metrics_registry),
+            IndexServicer(self.__index_core, logger=self.__logger, metrics_registry=self.__metrics_registry),
             self.__grpc_server)
         self.__grpc_server.add_insecure_port('{0}:{1}'.format(self.__host, self.__port))
 

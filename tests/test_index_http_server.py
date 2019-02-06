@@ -31,7 +31,7 @@ from cockatrice import NAME
 from cockatrice.index_core import IndexCore
 from cockatrice.index_grpc_server import IndexGRPCServer
 from cockatrice.index_http_server import IndexHTTPServer
-from tests import get_free_port
+from tests import get_free_port, get_test_client
 
 
 class TestIndexHTTPServer(unittest.TestCase):
@@ -42,7 +42,7 @@ class TestIndexHTTPServer(unittest.TestCase):
         host = '0.0.0.0'
         port = get_free_port()
         peer_addrs = []
-        dump_file = self.temp_dir.name + '/snapshot.zip'
+        dump_file = self.temp_dir.name + '/index.zip'
 
         grpc_port = get_free_port()
         grpc_max_workers = 10
@@ -75,7 +75,7 @@ class TestIndexHTTPServer(unittest.TestCase):
             dynamicMembershipChange=True
         )
 
-        self.index_core = IndexCore(host=host, port=port, peer_addrs=peer_addrs, conf=conf, index_dir=index_dir,
+        self.index_core = IndexCore(host=host, port=port, peer_addrs=peer_addrs, conf=conf, data_dir=index_dir,
                                     logger=logger, metrics_registry=metrics_registry)
         self.index_grpc_server = IndexGRPCServer(self.index_core, host=host, port=grpc_port,
                                                  max_workers=grpc_max_workers, logger=logger,
@@ -83,7 +83,7 @@ class TestIndexHTTPServer(unittest.TestCase):
         self.index_http_server = IndexHTTPServer(grpc_port, host, http_port, logger=logger, http_logger=http_logger,
                                                  metrics_registry=metrics_registry)
 
-        self.test_client = self.index_http_server.get_test_client()
+        self.test_client = get_test_client(self.index_http_server.app)
 
     def tearDown(self):
         self.index_core.stop()

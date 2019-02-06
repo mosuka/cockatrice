@@ -29,105 +29,18 @@ from logging import getLogger
 import pysyncobj.pickle as pickle
 from prometheus_client.core import CollectorRegistry, Counter, Gauge, Histogram
 from pysyncobj import FAIL_REASON, replicated, SyncObj, SyncObjConf
-from pysyncobj.encryptor import getEncryptor
-from pysyncobj.poller import createPoller
-from pysyncobj.tcp_connection import TcpConnection
 from whoosh.filedb.filestore import FileStorage, RamStorage
 from whoosh.qparser import QueryParser
 
 from cockatrice import NAME
 from cockatrice.index_writer import IndexWriter
-from cockatrice.util.resolver import get_ipv4, parse_addr
-from cockatrice.util.timer import RepeatedTimer
-
-
-class IndexCoreCommand:
-    def __init__(self, cmd, args=None, bind_addr='localhost:7070', password=None, timeout=1):
-        try:
-            self.__result = None
-
-            self.__request = [cmd]
-            if args is not None:
-                self.__request.extend(args)
-
-            host, port = parse_addr(bind_addr)
-
-            self.__host = get_ipv4(host)
-            self.__port = int(port)
-            self.__password = password
-            self.__poller = createPoller('auto')
-            self.__connection = TcpConnection(self.__poller, onMessageReceived=self.__on_message_received,
-                                              onConnected=self.__on_connected, onDisconnected=self.__on_disconnected,
-                                              socket=None, timeout=10.0, sendBufferSize=2 ** 13, recvBufferSize=2 ** 13)
-            if self.__password is not None:
-                self.__connection.encryptor = getEncryptor(self.__password)
-            self.__is_connected = self.__connection.connect(self.__host, self.__port)
-            while self.__is_connected:
-                self.__poller.poll(timeout)
-        except Exception as ex:
-            raise ex
-
-    def __on_message_received(self, message):
-        if self.__connection.encryptor and not self.__connection.sendRandKey:
-            self.__connection.sendRandKey = message
-            self.__connection.send(self.__request)
-            return
-
-        self.__result = message
-        self.__connection.disconnect()
-
-    def __on_connected(self):
-        if self.__connection.encryptor:
-            self.__connection.recvRandKey = os.urandom(32)
-            self.__connection.send(self.__connection.recvRandKey)
-            return
-
-        self.__connection.send(self.__request)
-
-    def __on_disconnected(self):
-        self.__is_connected = False
-
-    def get_result(self):
-        return self.__result
-
-
-def execute(cmd, args=None, bind_addr='127.0.0.1:7070', password=None, timeout=1):
-    try:
-        response = IndexCoreCommand(cmd, args=args, bind_addr=bind_addr, password=password,
-                                    timeout=timeout).get_result()
-    except Exception as ex:
-        raise ex
-
-    return response
-
-
-def get_status(bind_addr='127.0.0.1:7070', password=None, timeout=1):
-    return execute('status', args=None, bind_addr=bind_addr, password=password, timeout=timeout)
-
-
-def add_node(node_name, bind_addr='127.0.0.1:7070', password=None, timeout=1):
-    return execute('add', args=[node_name], bind_addr=bind_addr, password=password, timeout=timeout)
-
-
-def delete_node(node_name, bind_addr='127.0.0.1:7070', password=None, timeout=1):
-    return execute('remove', args=[node_name], bind_addr=bind_addr, password=password, timeout=timeout)
-
-
-def get_snapshot(bind_addr='127.0.0.1:7070', password=None, timeout=1):
-    return execute('get_snapshot', args=None, bind_addr=bind_addr, password=password, timeout=timeout)
-
-
-def is_alive(bind_addr='127.0.0.1:7070', password=None, timeout=1):
-    return execute('is_alive', args=None, bind_addr=bind_addr, password=password, timeout=timeout) == 'True'
-
-
-def is_ready(bind_addr='127.0.0.1:7070', password=None, timeout=1):
-    return execute('is_ready', args=None, bind_addr=bind_addr, password=password, timeout=timeout) == 'True'
+from cockatrice.util.raft import RAFT_DATA_FILE
+from cockatrice.util.resolver import parse_addr
 
 
 class IndexCore(SyncObj):
     def __init__(self, host='localhost', port=7070, peer_addrs=None, conf=SyncObjConf(),
-                 index_dir='/tmp/cockatrice/index', logger=getLogger(), metrics_registry=CollectorRegistry()):
+                 data_dir='/tmp/cockatrice/index', logger=getLogger(), metrics_registry=CollectorRegistry()):
         self.__logger = logger
         self.__metrics_registry = metrics_registry
 
@@ -161,7 +74,7 @@ class IndexCore(SyncObj):
 
         self.__bind_addr = '{0}:{1}'.format(host, port)
         self.__peer_addrs = [] if peer_addrs is None else peer_addrs
-        self.__index_dir = index_dir
+        self.__data_dir = data_dir
         self.__conf = conf
         self.__conf.serializer = self.__serialize
         self.__conf.deserializer = self.__deserialize
@@ -171,8 +84,8 @@ class IndexCore(SyncObj):
         self.__index_configs = {}
         self.__writers = {}
 
-        os.makedirs(self.__index_dir, exist_ok=True)
-        self.__file_storage = FileStorage(self.__index_dir, supports_mmap=True, readonly=False, debug=False)
+        os.makedirs(self.__data_dir, exist_ok=True)
+        self.__file_storage = FileStorage(self.__data_dir, supports_mmap=True, readonly=False, debug=False)
         self.__ram_storage = RamStorage()
 
         super(IndexCore, self).__init__(self.__bind_addr, self.__peer_addrs, conf=self.__conf)
@@ -189,7 +102,8 @@ class IndexCore(SyncObj):
         for index_name in self.get_index_names():
             self.__open_index(index_name, index_config=None)
 
-        self.metrics_timer = RepeatedTimer(10, self.__record_metrics)
+        # record index metrics timer
+        self.metrics_timer = threading.Timer(10, self.__record_index_metrics)
         self.metrics_timer.start()
 
     def stop(self):
@@ -203,10 +117,7 @@ class IndexCore(SyncObj):
 
         self.__logger.info('index core has stopped')
 
-    def destroy(self):
-        super().destroy()
-
-    def __record_metrics(self):
+    def __record_index_metrics(self):
         for index_name in list(self.__indices.keys()):
             try:
                 self.__metrics_core_documents.labels(index_name=index_name).set(self.get_doc_count(index_name))
@@ -221,21 +132,6 @@ class IndexCore(SyncObj):
         self.__metrics_core_requests_duration_seconds.labels(
             func=func_name
         ).observe(time.time() - start_time)
-
-    def is_healthy(self):
-        return self.is_alive() and self.is_ready()
-
-    def is_alive(self):
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
-            alive = sock.connect_ex(parse_addr(self.__bind_addr)) == 0
-
-        return alive
-
-    def is_ready(self):
-        return self.isReady()
-
-    def get_addr(self):
-        return self.__bind_addr
 
     # override SyncObj.__utilityCallback
     def _SyncObj__utilityCallback(self, res, err, conn, cmd, node):
@@ -294,10 +190,9 @@ class IndexCore(SyncObj):
                 # store the index files and raft logs to the snapshot file
                 with zipfile.ZipFile(filename, 'w', zipfile.ZIP_DEFLATED) as f:
                     for index_name in self.get_index_names():
-                        # self.__commit_index(index_name)
-                        self.__optimize_index(index_name)
-
                         with self.__get_writer(index_name).lock():
+                            self.__optimize_index(index_name)
+
                             # index files
                             for index_filename in self.get_index_files(index_name):
                                 if self.__index_configs.get(index_name).get_storage_type() == "ram":
@@ -313,7 +208,9 @@ class IndexCore(SyncObj):
                             self.__logger.debug(
                                 '{0} has stored in {1}'.format(self.get_index_config_file(index_name), filename))
 
-                    f.writestr('raft.bin', pickle.dumps(raft_data))
+                    # store the raft data
+                    f.writestr(RAFT_DATA_FILE, pickle.dumps(raft_data))
+                    self.__logger.info('{0} has restored'.format(RAFT_DATA_FILE))
                 self.__logger.info('snapshot has created')
             except Exception as ex:
                 self.__logger.error('failed to create snapshot: {0}'.format(ex))
@@ -372,14 +269,29 @@ class IndexCore(SyncObj):
                         self.__logger.info('{0} has restored'.format(index_name))
 
                     # extract the raft data
-                    raft_data = pickle.loads(zf.read('raft.bin'))
-                    self.__logger.info('raft.bin has restored')
+                    raft_data = pickle.loads(zf.read(RAFT_DATA_FILE))
+                    self.__logger.info('{0} has restored', RAFT_DATA_FILE)
             except Exception as ex:
                 self.__logger.error('failed to restore indices: {0}'.format(ex))
             finally:
                 self.__logger.info('deserializer has stopped')
 
         return raft_data
+
+    def is_healthy(self):
+        return self.is_alive() and self.is_ready()
+
+    def is_alive(self):
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
+            alive = sock.connect_ex(parse_addr(self.__bind_addr)) == 0
+
+        return alive
+
+    def is_ready(self):
+        return self.isReady()
+
+    def get_addr(self):
+        return self.__bind_addr
 
     def get_index_files(self, index_name):
         index_files = []
@@ -403,7 +315,8 @@ class IndexCore(SyncObj):
 
         return index_files
 
-    def get_index_config_file(self, index_name):
+    @staticmethod
+    def get_index_config_file(index_name):
         return '{0}_CONFIG'.format(index_name)
 
     def get_index_names(self):
@@ -643,7 +556,7 @@ class IndexCore(SyncObj):
         try:
             self.__logger.info('optimizing {0}'.format(index_name))
 
-            self.__writers.get(index_name).optimize()
+            self.__get_writer(index_name).optimize()
 
             self.__logger.info('{0} has optimized'.format(index_name))
 

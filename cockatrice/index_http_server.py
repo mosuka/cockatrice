@@ -19,7 +19,6 @@ import json
 import time
 from http import HTTPStatus
 from logging import getLogger
-from threading import Thread
 
 import grpc
 import mimeparse
@@ -27,7 +26,6 @@ import yaml
 from flask import after_this_request, Flask, request, Response
 from prometheus_client.core import CollectorRegistry, Counter, Histogram
 from prometheus_client.exposition import CONTENT_TYPE_LATEST, generate_latest
-from werkzeug.serving import make_server
 from yaml.constructor import ConstructorError
 
 from cockatrice import NAME, VERSION
@@ -37,24 +35,9 @@ from cockatrice.protobuf.index_pb2 import CommitIndexRequest, CreateIndexRequest
     IsSnapshotExistRequest, OptimizeIndexRequest, PutDocumentRequest, PutDocumentsRequest, PutNodeRequest, \
     RollbackIndexRequest, SearchDocumentsRequest
 from cockatrice.protobuf.index_pb2_grpc import IndexStub
+from cockatrice.util.http import HTTPServerThread, make_response
 
 TRUE_STRINGS = ['true', 'yes', 'on', 't', 'y', '1']
-
-
-class IndexHTTPServerThread(Thread):
-    def __init__(self, host, port, app, logger=getLogger()):
-        self.__logger = logger
-
-        Thread.__init__(self)
-        self.server = make_server(host, port, app)
-        self.context = app.app_context()
-        self.context.push()
-
-    def run(self):
-        self.server.serve_forever()
-
-    def shutdown(self):
-        self.server.shutdown()
 
 
 class IndexHTTPServer:
@@ -68,45 +51,45 @@ class IndexHTTPServer:
         self.__host = host
         self.__port = port
 
-        self.__app = Flask('index_http_server')
-        self.__app.add_url_rule('/', endpoint='root', view_func=self.__root, methods=['GET'])
-        self.__app.add_url_rule('/indices/<index_name>', endpoint='get_index', view_func=self.__get_index,
-                                methods=['GET'])
-        self.__app.add_url_rule('/indices/<index_name>', endpoint='create_index', view_func=self.__create_index,
-                                methods=['PUT'])
-        self.__app.add_url_rule('/indices/<index_name>', endpoint='delete_index', view_func=self.__delete_index,
-                                methods=['DELETE'])
-        self.__app.add_url_rule('/indices/<index_name>/documents/<doc_id>', endpoint='get_document',
-                                view_func=self.__get_document, methods=['GET'])
-        self.__app.add_url_rule('/indices/<index_name>/documents/<doc_id>', endpoint='put_document',
-                                view_func=self.__put_document, methods=['PUT'])
-        self.__app.add_url_rule('/indices/<index_name>/documents/<doc_id>', endpoint='delete_document',
-                                view_func=self.__delete_document, methods=['DELETE'])
-        self.__app.add_url_rule('/indices/<index_name>/documents', endpoint='put_documents',
-                                view_func=self.__put_documents, methods=['PUT'])
-        self.__app.add_url_rule('/indices/<index_name>/documents', endpoint='delete_documents',
-                                view_func=self.__delete_documents, methods=['DELETE'])
-        self.__app.add_url_rule('/indices/<index_name>/search', endpoint='search_documents',
-                                view_func=self.__search_documents, methods=['GET', 'POST'])
-        self.__app.add_url_rule('/indices/<index_name>/optimize', endpoint='optimize_index',
-                                view_func=self.__optimize_index, methods=['GET'])
-        self.__app.add_url_rule('/indices/<index_name>/commit', endpoint='commit',
-                                view_func=self.__commit_index, methods=['GET'])
-        self.__app.add_url_rule('/indices/<index_name>/rollback', endpoint='rollback',
-                                view_func=self.__rollback_index, methods=['GET'])
-        self.__app.add_url_rule('/nodes/<node_name>', endpoint='put_node', view_func=self.__put_node, methods=['PUT'])
-        self.__app.add_url_rule('/nodes/<node_name>', endpoint='delete_node', view_func=self.__delete_node,
-                                methods=['DELETE'])
-        self.__app.add_url_rule('/snapshot', endpoint='get_snapshot', view_func=self.__get_snapshot, methods=['GET'])
-        self.__app.add_url_rule('/snapshot', endpoint='put_snapshot', view_func=self.__put_snapshot, methods=['PUT'])
-        self.__app.add_url_rule('/metrics', endpoint='metrics', view_func=self.__metrics, methods=['GET'])
-        self.__app.add_url_rule('/healthiness', endpoint='healthiness', view_func=self.__healthiness, methods=['GET'])
-        self.__app.add_url_rule('/liveness', endpoint='liveness', view_func=self.__liveness, methods=['GET'])
-        self.__app.add_url_rule('/readiness', endpoint='readiness', view_func=self.__readiness, methods=['GET'])
-        self.__app.add_url_rule('/status', endpoint='status', view_func=self.__get_status, methods=['GET'])
+        self.app = Flask('index_http_server')
+        self.app.add_url_rule('/', endpoint='root', view_func=self.__root, methods=['GET'])
+        self.app.add_url_rule('/indices/<index_name>', endpoint='get_index', view_func=self.__get_index,
+                              methods=['GET'])
+        self.app.add_url_rule('/indices/<index_name>', endpoint='create_index', view_func=self.__create_index,
+                              methods=['PUT'])
+        self.app.add_url_rule('/indices/<index_name>', endpoint='delete_index', view_func=self.__delete_index,
+                              methods=['DELETE'])
+        self.app.add_url_rule('/indices/<index_name>/documents/<doc_id>', endpoint='get_document',
+                              view_func=self.__get_document, methods=['GET'])
+        self.app.add_url_rule('/indices/<index_name>/documents/<doc_id>', endpoint='put_document',
+                              view_func=self.__put_document, methods=['PUT'])
+        self.app.add_url_rule('/indices/<index_name>/documents/<doc_id>', endpoint='delete_document',
+                              view_func=self.__delete_document, methods=['DELETE'])
+        self.app.add_url_rule('/indices/<index_name>/documents', endpoint='put_documents',
+                              view_func=self.__put_documents, methods=['PUT'])
+        self.app.add_url_rule('/indices/<index_name>/documents', endpoint='delete_documents',
+                              view_func=self.__delete_documents, methods=['DELETE'])
+        self.app.add_url_rule('/indices/<index_name>/search', endpoint='search_documents',
+                              view_func=self.__search_documents, methods=['GET', 'POST'])
+        self.app.add_url_rule('/indices/<index_name>/optimize', endpoint='optimize_index',
+                              view_func=self.__optimize_index, methods=['GET'])
+        self.app.add_url_rule('/indices/<index_name>/commit', endpoint='commit',
+                              view_func=self.__commit_index, methods=['GET'])
+        self.app.add_url_rule('/indices/<index_name>/rollback', endpoint='rollback',
+                              view_func=self.__rollback_index, methods=['GET'])
+        self.app.add_url_rule('/nodes/<node_name>', endpoint='put_node', view_func=self.__put_node, methods=['PUT'])
+        self.app.add_url_rule('/nodes/<node_name>', endpoint='delete_node', view_func=self.__delete_node,
+                              methods=['DELETE'])
+        self.app.add_url_rule('/snapshot', endpoint='get_snapshot', view_func=self.__get_snapshot, methods=['GET'])
+        self.app.add_url_rule('/snapshot', endpoint='put_snapshot', view_func=self.__put_snapshot, methods=['PUT'])
+        self.app.add_url_rule('/metrics', endpoint='metrics', view_func=self.__metrics, methods=['GET'])
+        self.app.add_url_rule('/healthiness', endpoint='healthiness', view_func=self.__healthiness, methods=['GET'])
+        self.app.add_url_rule('/liveness', endpoint='liveness', view_func=self.__liveness, methods=['GET'])
+        self.app.add_url_rule('/readiness', endpoint='readiness', view_func=self.__readiness, methods=['GET'])
+        self.app.add_url_rule('/status', endpoint='status', view_func=self.__get_status, methods=['GET'])
 
         # disable Flask default logger
-        self.__app.logger.disabled = True
+        self.app.logger.disabled = True
         getLogger('werkzeug').disabled = True
 
         # metrics
@@ -154,8 +137,7 @@ class IndexHTTPServer:
         self.__http_server_thread = None
         try:
             # run server
-            self.__http_server_thread = IndexHTTPServerThread(self.__host, self.__port, self.__app,
-                                                              logger=self.__logger)
+            self.__http_server_thread = HTTPServerThread(self.__host, self.__port, self.app, logger=self.__logger)
             self.__http_server_thread.start()
             self.__logger.info('HTTP server has started')
         except Exception as ex:
@@ -249,7 +231,7 @@ class IndexHTTPServer:
             charset = 'utf-8' if mime[2].get('charset') is None else mime[2].get('charset')
             if mime[1] == 'yaml':
                 index_config_dict = yaml.safe_load(request.data.decode(charset))
-            elif mime[1] in ['application/json']:
+            elif mime[1] == 'json':
                 index_config_dict = json.loads(request.data.decode(charset))
             else:
                 raise ValueError('unsupported format')
@@ -1248,19 +1230,3 @@ class IndexHTTPServer:
             self.__logger.error(ex)
 
         return resp
-
-    def get_test_client(self, ues_cookies=True, **kwargs):
-        return self.__app.test_client(ues_cookies, **kwargs)
-
-
-def make_response(data, output='json'):
-    resp = Response()
-
-    if output == 'json':
-        resp.data = json.dumps(data, indent=2)
-        resp.content_type = 'application/json; charset="UTF-8"'
-    elif output == 'yaml':
-        resp.data = yaml.safe_dump(data, default_flow_style=False, indent=2)
-        resp.content_type = 'application/yaml; charset="UTF-8"'
-
-    return resp
