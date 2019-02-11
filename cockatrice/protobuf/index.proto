@@ -14,56 +14,9 @@
 
 syntax = "proto3";
 
+import "cockatrice/protobuf/common.proto";
+
 package protobuf;
-
-message Status {
-    bool success = 1;
-    string message = 2;
-}
-
-service Supervise {
-    rpc Put (PutRequest) returns (PutResponse) {}
-    rpc Get (GetRequest) returns (GetResponse) {}
-    rpc Delete (DeleteRequest) returns (DeleteResponse) {}
-    rpc Clear (ClearRequest) returns (ClearResponse) {}
-}
-
-message PutRequest {
-    string key = 1;
-    bytes value = 2;
-    bool sync = 3;
-}
-
-message PutResponse {
-    Status status = 1;
-}
-
-message GetRequest {
-    string key = 1;
-}
-
-message GetResponse {
-    bytes value = 1;
-    Status status = 2;
-}
-
-message DeleteRequest {
-    string key = 1;
-    bool sync = 2;
-}
-
-message DeleteResponse {
-    bytes value = 1;
-    Status status = 2;
-}
-
-message ClearRequest {
-    bool sync = 1;
-}
-
-message ClearResponse {
-    Status status = 1;
-}
 
 service Index {
     rpc CreateIndex (CreateIndexRequest) returns (CreateIndexResponse) {}

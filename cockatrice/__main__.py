@@ -23,28 +23,28 @@ from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from cockatrice import VERSION
 from cockatrice.cli import add_node, commit, create_index, create_snapshot, delete_document, delete_documents, \
     delete_index, delete_node, get_document, get_index, get_snapshot, healthiness, liveness, optimize, put_document, \
-    put_documents, readiness, rollback, search, start_indexer, start_supervisor, status
+    put_documents, readiness, rollback, search, start_indexer, start_manager, status
 
 
 def signal_handler(signal, frame):
     sys.exit(0)
 
 
-def start_supervisor_handler(args):
-    start_supervisor(host=args.host, port=args.port, seed_addr=args.seed_addr, snapshot_file=args.snapshot_file,
-                     log_compaction_min_entries=args.log_compaction_min_entries,
-                     log_compaction_min_time=args.log_compaction_min_time, data_dir=args.supervise_dir,
-                     grpc_port=args.grpc_port, grpc_max_workers=args.grpc_max_workers, http_port=args.http_port,
-                     log_level=args.log_level, log_file=args.log_file, log_file_max_bytes=args.log_file_max_bytes,
-                     log_file_backup_count=args.log_file_backup_count, http_log_file=args.http_log_file,
-                     http_log_file_max_bytes=args.http_log_file_max_bytes,
-                     http_log_file_backup_count=args.http_log_file_backup_count)
+def start_manager_handler(args):
+    start_manager(host=args.host, port=args.port, peer_addr=args.peer_addr, snapshot_file=args.snapshot_file,
+                  log_compaction_min_entries=args.log_compaction_min_entries,
+                  log_compaction_min_time=args.log_compaction_min_time, data_dir=args.data_dir,
+                  grpc_port=args.grpc_port, grpc_max_workers=args.grpc_max_workers, http_port=args.http_port,
+                  log_level=args.log_level, log_file=args.log_file, log_file_max_bytes=args.log_file_max_bytes,
+                  log_file_backup_count=args.log_file_backup_count, http_log_file=args.http_log_file,
+                  http_log_file_max_bytes=args.http_log_file_max_bytes,
+                  http_log_file_backup_count=args.http_log_file_backup_count)
 
 
 def start_indexer_handler(args):
-    start_indexer(host=args.host, port=args.port, seed_addr=args.seed_addr, snapshot_file=args.snapshot_file,
+    start_indexer(host=args.host, port=args.port, peer_addr=args.peer_addr, snapshot_file=args.snapshot_file,
                   log_compaction_min_entries=args.log_compaction_min_entries,
-                  log_compaction_min_time=args.log_compaction_min_time, data_dir=args.index_dir,
+                  log_compaction_min_time=args.log_compaction_min_time, data_dir=args.data_dir,
                   grpc_port=args.grpc_port, grpc_max_workers=args.grpc_max_workers, http_port=args.http_port,
                   log_level=args.log_level, log_file=args.log_file, log_file_max_bytes=args.log_file_max_bytes,
                   log_file_backup_count=args.log_file_backup_count, http_log_file=args.http_log_file,
@@ -152,51 +152,51 @@ def main():
     start_subparser = parser_start.add_subparsers()
 
     # start supervisor
-    parser_start_supervisor = start_subparser.add_parser('supervisor', help='see `supervisor --help`',
-                                                         formatter_class=ArgumentDefaultsHelpFormatter)
-    parser_start_supervisor.add_argument('--host', dest='host', default='localhost', metavar='HOST', type=str,
-                                         help='the host address to listen on for peer traffic')
-    parser_start_supervisor.add_argument('--port', dest='port', default=7070, metavar='PORT', type=int,
-                                         help='the port to listen on for peer traffic')
-    parser_start_supervisor.add_argument('--seed-addr', dest='seed_addr', default=None, metavar='SEED_ADDR', type=str,
-                                         help='the address of the node in the existing cluster')
-    parser_start_supervisor.add_argument('--snapshot-file', dest='snapshot_file',
-                                         default='/tmp/cockatrice/supervise.zip',
-                                         metavar='SNAPSHOT_FILE', type=str,
-                                         help='file to store snapshot of all indices')
-    parser_start_supervisor.add_argument('--log-compaction-min-entries', dest='log_compaction_min_entries',
-                                         default=5000,
-                                         metavar='LOG_COMPACTION_MIN_ENTRIES', type=int,
-                                         help='log-compaction interval min entries')
-    parser_start_supervisor.add_argument('--log-compaction-min-time', dest='log_compaction_min_time', default=300,
-                                         metavar='LOG_COMPACTION_MIN_TIME', type=int,
-                                         help='log-compaction interval min time in seconds')
-    parser_start_supervisor.add_argument('--supervise-dir', dest='supervise_dir', default='/tmp/cockatrice/supervise',
-                                         metavar='SUPERVISE_DIR', type=str, help='supervise dir')
-    parser_start_supervisor.add_argument('--grpc-port', dest='grpc_port', default=5050, metavar='GRPC_PORT', type=int,
-                                         help='the port to listen on for gRPC traffic')
-    parser_start_supervisor.add_argument('--grpc-max-workers', dest='grpc_max_workers', default=10,
-                                         metavar='GRPC_MAX_WORKERS', type=int,
-                                         help='the number of workers for gRPC server')
-    parser_start_supervisor.add_argument('--http-port', dest='http_port', default=8080,
-                                         metavar='HTTP_PORT', type=int, help='the port to listen on for HTTP traffic')
-    parser_start_supervisor.add_argument('--log-level', dest='log_level', default='DEBUG', metavar='LOG_LEVEL',
-                                         type=str,
-                                         help='log level')
-    parser_start_supervisor.add_argument('--log-file', dest='log_file', default=None, metavar='LOG_FILE', type=str,
-                                         help='log file')
-    parser_start_supervisor.add_argument('--log-file-max-bytes', dest='log_file_max_bytes', default=512000000,
-                                         metavar='LOG_FILE_MAX_BYTES', type=int, help='log file max bytes')
-    parser_start_supervisor.add_argument('--log-file-backup-count', dest='log_file_backup_count', default=5,
-                                         metavar='LOG_FILE_BACKUP_COUNT', type=int, help='log file backup count')
-    parser_start_supervisor.add_argument('--http-log-file', dest='http_log_file', default=None, metavar='HTTP_LOG_FILE',
-                                         type=str, help='http log file')
-    parser_start_supervisor.add_argument('--http-log-file-max-bytes', dest='http_log_file_max_bytes', default=512000000,
-                                         metavar='HTTP_LOG_FILE_MAX_BYTES', type=int, help='http log file max bytes')
-    parser_start_supervisor.add_argument('--http-log-file-backup-count', dest='http_log_file_backup_count', default=5,
-                                         metavar='HTTP_LOG_FILE_BACKUP_COUNT', type=int,
-                                         help='http log file backup count')
-    parser_start_supervisor.set_defaults(handler=start_supervisor_handler)
+    parser_start_manager = start_subparser.add_parser('manager', help='see `manager --help`',
+                                                      formatter_class=ArgumentDefaultsHelpFormatter)
+    parser_start_manager.add_argument('--host', dest='host', default='localhost', metavar='HOST', type=str,
+                                      help='the host address to listen on for peer traffic')
+    parser_start_manager.add_argument('--port', dest='port', default=7070, metavar='PORT', type=int,
+                                      help='the port to listen on for peer traffic')
+    parser_start_manager.add_argument('--peer-addr', dest='peer_addr', default=None, metavar='PEER_ADDR', type=str,
+                                      help='the address of the peer node in the existing cluster')
+    parser_start_manager.add_argument('--snapshot-file', dest='snapshot_file',
+                                      default='/tmp/cockatrice/management.zip',
+                                      metavar='SNAPSHOT_FILE', type=str,
+                                      help='file to store snapshot of all indices')
+    parser_start_manager.add_argument('--log-compaction-min-entries', dest='log_compaction_min_entries',
+                                      default=5000,
+                                      metavar='LOG_COMPACTION_MIN_ENTRIES', type=int,
+                                      help='log-compaction interval min entries')
+    parser_start_manager.add_argument('--log-compaction-min-time', dest='log_compaction_min_time', default=300,
+                                      metavar='LOG_COMPACTION_MIN_TIME', type=int,
+                                      help='log-compaction interval min time in seconds')
+    parser_start_manager.add_argument('--data-dir', dest='data_dir', default='/tmp/cockatrice/management',
+                                      metavar='DATA_DIR', type=str, help='data dir')
+    parser_start_manager.add_argument('--grpc-port', dest='grpc_port', default=5050, metavar='GRPC_PORT', type=int,
+                                      help='the port to listen on for gRPC traffic')
+    parser_start_manager.add_argument('--grpc-max-workers', dest='grpc_max_workers', default=10,
+                                      metavar='GRPC_MAX_WORKERS', type=int,
+                                      help='the number of workers for gRPC server')
+    parser_start_manager.add_argument('--http-port', dest='http_port', default=8080,
+                                      metavar='HTTP_PORT', type=int, help='the port to listen on for HTTP traffic')
+    parser_start_manager.add_argument('--log-level', dest='log_level', default='DEBUG', metavar='LOG_LEVEL',
+                                      type=str,
+                                      help='log level')
+    parser_start_manager.add_argument('--log-file', dest='log_file', default=None, metavar='LOG_FILE', type=str,
+                                      help='log file')
+    parser_start_manager.add_argument('--log-file-max-bytes', dest='log_file_max_bytes', default=512000000,
+                                      metavar='LOG_FILE_MAX_BYTES', type=int, help='log file max bytes')
+    parser_start_manager.add_argument('--log-file-backup-count', dest='log_file_backup_count', default=5,
+                                      metavar='LOG_FILE_BACKUP_COUNT', type=int, help='log file backup count')
+    parser_start_manager.add_argument('--http-log-file', dest='http_log_file', default=None, metavar='HTTP_LOG_FILE',
+                                      type=str, help='http log file')
+    parser_start_manager.add_argument('--http-log-file-max-bytes', dest='http_log_file_max_bytes', default=512000000,
+                                      metavar='HTTP_LOG_FILE_MAX_BYTES', type=int, help='http log file max bytes')
+    parser_start_manager.add_argument('--http-log-file-backup-count', dest='http_log_file_backup_count', default=5,
+                                      metavar='HTTP_LOG_FILE_BACKUP_COUNT', type=int,
+                                      help='http log file backup count')
+    parser_start_manager.set_defaults(handler=start_manager_handler)
 
     # start indexer
     parser_start_indexer = start_subparser.add_parser('indexer', help='see `indexer --help`',
@@ -205,8 +205,8 @@ def main():
                                       help='the host address to listen on for peer traffic')
     parser_start_indexer.add_argument('--port', dest='port', default=7070, metavar='PORT', type=int,
                                       help='the port to listen on for peer traffic')
-    parser_start_indexer.add_argument('--seed-addr', dest='seed_addr', default=None, metavar='SEED_ADDR', type=str,
-                                      help='the address of the node in the existing cluster')
+    parser_start_indexer.add_argument('--peer-addr', dest='peer_addr', default=None, metavar='PEER_ADDR', type=str,
+                                      help='the address of the peer node in the existing cluster')
     parser_start_indexer.add_argument('--snapshot-file', dest='snapshot_file', default='/tmp/cockatrice/index.zip',
                                       metavar='SNAPSHOT_FILE', type=str, help='file to store snapshot of all indices')
     parser_start_indexer.add_argument('--log-compaction-min-entries', dest='log_compaction_min_entries', default=5000,
@@ -215,8 +215,8 @@ def main():
     parser_start_indexer.add_argument('--log-compaction-min-time', dest='log_compaction_min_time', default=300,
                                       metavar='LOG_COMPACTION_MIN_TIME', type=int,
                                       help='log-compaction interval min time in seconds')
-    parser_start_indexer.add_argument('--index-dir', dest='index_dir', default='/tmp/cockatrice/index',
-                                      metavar='INDEX_DIR', type=str, help='index dir')
+    parser_start_indexer.add_argument('--data-dir', dest='data_dir', default='/tmp/cockatrice/index',
+                                      metavar='DATA_DIR', type=str, help='data dir')
     parser_start_indexer.add_argument('--grpc-port', dest='grpc_port', default=5050, metavar='GRPC_PORT', type=int,
                                       help='the port to listen on for gRPC traffic')
     parser_start_indexer.add_argument('--grpc-max-workers', dest='grpc_max_workers', default=10,

@@ -18,7 +18,7 @@ import _pickle as pickle
 import os
 import unittest
 import zipfile
-from logging import ERROR, Formatter, getLogger, INFO, StreamHandler
+from logging import ERROR, Formatter, getLogger, INFO, NOTSET, StreamHandler
 from tempfile import TemporaryDirectory
 from time import sleep
 
@@ -28,8 +28,7 @@ from prometheus_client.core import CollectorRegistry
 from pysyncobj import SyncObjConf
 
 from cockatrice import NAME
-from cockatrice.index_core import IndexCore
-from cockatrice.index_grpc_server import IndexGRPCServer
+from cockatrice.indexer import Indexer
 from cockatrice.protobuf.index_pb2 import CloseIndexRequest, CommitIndexRequest, CreateIndexRequest, \
     CreateSnapshotRequest, DeleteDocumentRequest, DeleteDocumentsRequest, DeleteIndexRequest, DeleteNodeRequest, \
     GetDocumentRequest, GetIndexRequest, GetSnapshotRequest, GetStatusRequest, IsAliveRequest, IsReadyRequest, \
@@ -39,19 +38,23 @@ from cockatrice.protobuf.index_pb2_grpc import IndexStub
 from tests import get_free_port
 
 
-class TestIndexGRPCServer(unittest.TestCase):
+class TestIndexGRPCServicer(unittest.TestCase):
     def setUp(self):
         self.temp_dir = TemporaryDirectory()
         self.example_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '../example'))
 
         host = '0.0.0.0'
         port = get_free_port()
-        peer_addrs = []
-        snapshot_file = self.temp_dir.name + '/snapshot.zip'
+        seed_addr = None
+        conf = SyncObjConf(
+            fullDumpFile=self.temp_dir.name + '/index.zip',
+            logCompactionMinTime=300,
+            dynamicMembershipChange=True
+        )
+        data_dir = self.temp_dir.name + '/index'
         grpc_port = get_free_port()
-
-        index_dir = self.temp_dir.name + '/index'
-
+        grpc_max_workers = 10
+        http_port = get_free_port()
         logger = getLogger(NAME)
         log_handler = StreamHandler()
         logger.setLevel(ERROR)
@@ -59,27 +62,24 @@ class TestIndexGRPCServer(unittest.TestCase):
         log_format = Formatter('%(asctime)s - %(levelname)s - %(pathname)s:%(lineno)d - %(message)s')
         log_handler.setFormatter(log_format)
         logger.addHandler(log_handler)
-
+        http_logger = getLogger(NAME + '_http')
+        http_log_handler = StreamHandler()
+        http_logger.setLevel(NOTSET)
+        http_log_handler.setLevel(INFO)
+        http_log_format = Formatter('%(message)s')
+        http_log_handler.setFormatter(http_log_format)
+        http_logger.addHandler(http_log_handler)
         metrics_registry = CollectorRegistry()
 
-        conf = SyncObjConf(
-            fullDumpFile=snapshot_file,
-            logCompactionMinTime=300,
-            dynamicMembershipChange=True
-        )
-
-        self.index_core = IndexCore(host=host, port=port, peer_addrs=peer_addrs, conf=conf, data_dir=index_dir,
-                                    logger=logger, metrics_registry=metrics_registry)
-        self.index_grpc_server = IndexGRPCServer(self.index_core, host=host, port=grpc_port, max_workers=10,
-                                                 logger=logger, metrics_registry=metrics_registry)
+        self.index_core = Indexer(host=host, port=port, seed_addr=seed_addr, conf=conf, data_dir=data_dir,
+                                  grpc_port=grpc_port, grpc_max_workers=grpc_max_workers, http_port=http_port,
+                                  logger=logger, http_logger=http_logger, metrics_registry=metrics_registry)
 
         self.channel = grpc.insecure_channel('{0}:{1}'.format(host, grpc_port))
 
     def tearDown(self):
         self.channel.close()
-
         self.index_core.stop()
-        self.index_grpc_server.stop()
         self.temp_dir.cleanup()
 
     def test_create_index(self):

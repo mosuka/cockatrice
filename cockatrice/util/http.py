@@ -22,6 +22,8 @@ import yaml
 from flask import Response
 from werkzeug.serving import make_server
 
+TRUE_STRINGS = ['true', 'yes', 'on', 't', 'y', '1']
+
 
 def make_response(data, output='json'):
     resp = Response()
@@ -50,3 +52,20 @@ class HTTPServerThread(Thread):
 
     def shutdown(self):
         self.server.shutdown()
+
+
+class HTTPServer(Thread):
+    def __init__(self, host, port, servicer):
+        Thread.__init__(self)
+        self.server = make_server(host, port, servicer.app)
+        self.context = servicer.app.app_context()
+        self.context.push()
+
+    def run(self):
+        self.server.serve_forever()
+
+    def shutdown(self):
+        self.server.shutdown()
+
+    def stop(self):
+        self.shutdown()

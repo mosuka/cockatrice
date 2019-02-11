@@ -17,27 +17,26 @@
 import _pickle as pickle
 import inspect
 import time
-from concurrent import futures
 from logging import getLogger
 
-import grpc
 from prometheus_client.core import CollectorRegistry, Counter, Histogram
 from whoosh.scoring import BM25F
 
 from cockatrice import NAME
 from cockatrice.index_config import IndexConfig
+from cockatrice.protobuf.common_pb2 import Status
 from cockatrice.protobuf.index_pb2 import CloseIndexResponse, CommitIndexResponse, CreateIndexResponse, \
     CreateSnapshotResponse, DeleteDocumentResponse, DeleteDocumentsResponse, DeleteIndexResponse, DeleteNodeResponse, \
     GetDocumentResponse, GetIndexResponse, GetSnapshotResponse, GetStatusResponse, IsAliveResponse, IsHealthyResponse, \
     IsReadyResponse, IsSnapshotExistResponse, OpenIndexResponse, OptimizeIndexResponse, PutDocumentResponse, \
-    PutDocumentsResponse, PutNodeResponse, RollbackIndexResponse, SearchDocumentsResponse, Status
-from cockatrice.protobuf.index_pb2_grpc import add_IndexServicer_to_server, IndexServicer as IndexServicerImpl
+    PutDocumentsResponse, PutNodeResponse, RollbackIndexResponse, SearchDocumentsResponse
+from cockatrice.protobuf.index_pb2_grpc import IndexServicer
 from cockatrice.scoring import get_multi_weighting
 
 
-class IndexServicer(IndexServicerImpl):
-    def __init__(self, index_core, logger=getLogger(), metrics_registry=CollectorRegistry()):
-        self.__index_core = index_core
+class IndexGRPCServicer(IndexServicer):
+    def __init__(self, indexer, logger=getLogger(), metrics_registry=CollectorRegistry()):
+        self.__indexer = indexer
         self.__logger = logger
         self.__metrics_registry = metrics_registry
 
@@ -77,7 +76,7 @@ class IndexServicer(IndexServicerImpl):
 
         try:
             index_config = IndexConfig(pickle.loads(request.index_config))
-            index = self.__index_core.create_index(request.index_name, index_config, sync=request.sync)
+            index = self.__indexer.create_index(request.index_name, index_config, sync=request.sync)
 
             if request.sync:
                 if index is None:
@@ -113,7 +112,7 @@ class IndexServicer(IndexServicerImpl):
         response = GetIndexResponse()
 
         try:
-            index = self.__index_core.get_index(request.index_name)
+            index = self.__indexer.get_index(request.index_name)
             if index is None:
                 response.status.success = False
                 response.status.message = '{0} does not exist'.format(request.index_name)
@@ -145,7 +144,7 @@ class IndexServicer(IndexServicerImpl):
         response = DeleteIndexResponse()
 
         try:
-            index = self.__index_core.delete_index(request.index_name, sync=request.sync)
+            index = self.__indexer.delete_index(request.index_name, sync=request.sync)
 
             if request.sync:
                 if index is None:
@@ -182,7 +181,7 @@ class IndexServicer(IndexServicerImpl):
 
         try:
             index_config = None if request.index_config == b'' else IndexConfig(pickle.loads(request.index_config))
-            index = self.__index_core.open_index(request.index_name, index_config=index_config, sync=request.sync)
+            index = self.__indexer.open_index(request.index_name, index_config=index_config, sync=request.sync)
 
             if request.sync:
                 if index is None:
@@ -218,7 +217,7 @@ class IndexServicer(IndexServicerImpl):
         response = CloseIndexResponse()
 
         try:
-            index = self.__index_core.close_index(request.index_name, sync=request.sync)
+            index = self.__indexer.close_index(request.index_name, sync=request.sync)
 
             if request.sync:
                 if index is None:
@@ -254,7 +253,7 @@ class IndexServicer(IndexServicerImpl):
         response = CommitIndexResponse()
 
         try:
-            self.__index_core.commit_index(request.index_name, sync=request.sync)
+            self.__indexer.commit_index(request.index_name, sync=request.sync)
 
             response.status.success = True
             response.status.message = '{0} was successfully committed'.format(request.index_name)
@@ -272,7 +271,7 @@ class IndexServicer(IndexServicerImpl):
         response = RollbackIndexResponse()
 
         try:
-            self.__index_core.rollback_index(request.index_name, sync=request.sync)
+            self.__indexer.rollback_index(request.index_name, sync=request.sync)
 
             response.status.success = True
             response.status.message = '{0} was successfully rolled back'.format(request.index_name)
@@ -290,7 +289,7 @@ class IndexServicer(IndexServicerImpl):
         response = OptimizeIndexResponse()
 
         try:
-            index = self.__index_core.optimize_index(request.index_name, sync=request.sync)
+            index = self.__indexer.optimize_index(request.index_name, sync=request.sync)
 
             if request.sync:
                 if index is None:
@@ -326,8 +325,8 @@ class IndexServicer(IndexServicerImpl):
         response = PutDocumentResponse()
 
         try:
-            count = self.__index_core.put_document(request.index_name, request.doc_id, pickle.loads(request.fields),
-                                                   sync=request.sync)
+            count = self.__indexer.put_document(request.index_name, request.doc_id, pickle.loads(request.fields),
+                                                sync=request.sync)
             if request.sync:
                 response.count = count
                 if response.count > 0:
@@ -355,7 +354,7 @@ class IndexServicer(IndexServicerImpl):
         response = GetDocumentResponse()
 
         try:
-            results_page = self.__index_core.get_document(request.index_name, request.doc_id)
+            results_page = self.__indexer.get_document(request.index_name, request.doc_id)
 
             if results_page.total > 0:
                 fields = {}
@@ -382,7 +381,7 @@ class IndexServicer(IndexServicerImpl):
         response = DeleteDocumentResponse()
 
         try:
-            count = self.__index_core.delete_document(request.index_name, request.doc_id, sync=request.sync)
+            count = self.__indexer.delete_document(request.index_name, request.doc_id, sync=request.sync)
 
             if request.sync:
                 response.count = count
@@ -415,8 +414,8 @@ class IndexServicer(IndexServicerImpl):
         response = PutDocumentsResponse()
 
         try:
-            count = self.__index_core.put_documents(request.index_name, pickle.loads(request.docs),
-                                                    sync=request.sync)
+            count = self.__indexer.put_documents(request.index_name, pickle.loads(request.docs),
+                                                 sync=request.sync)
             if request.sync:
                 response.count = count
                 if response.count > 0:
@@ -444,8 +443,8 @@ class IndexServicer(IndexServicerImpl):
         response = DeleteDocumentsResponse()
 
         try:
-            count = self.__index_core.delete_documents(request.index_name, pickle.loads(request.doc_ids),
-                                                       sync=request.sync)
+            count = self.__indexer.delete_documents(request.index_name, pickle.loads(request.doc_ids),
+                                                    sync=request.sync)
             if request.sync:
                 response.count = count
                 if response.count > 0:
@@ -473,13 +472,13 @@ class IndexServicer(IndexServicerImpl):
         response = SearchDocumentsResponse()
 
         try:
-            search_field = request.search_field if request.search_field != '' else self.__index_core.get_schema(
+            search_field = request.search_field if request.search_field != '' else self.__indexer.get_schema(
                 request.index_name).get_default_search_field()
             weighting = BM25F if request.weighting == b'' else get_multi_weighting(pickle.loads(request.weighting))
 
-            results_page = self.__index_core.search_documents(request.index_name, request.query, search_field,
-                                                              request.page_num, page_len=request.page_len,
-                                                              weighting=weighting)
+            results_page = self.__indexer.search_documents(request.index_name, request.query, search_field,
+                                                           request.page_num, page_len=request.page_len,
+                                                           weighting=weighting)
 
             if results_page.pagecount >= request.page_num or results_page.total <= 0:
                 results = {
@@ -527,7 +526,7 @@ class IndexServicer(IndexServicerImpl):
         response = PutNodeResponse()
 
         try:
-            self.__index_core.addNodeToCluster(request.node_name)
+            self.__indexer.addNodeToCluster(request.node_name)
 
             response.status.success = True
             response.status.message = '{0} was successfully added to the cluster'.format(request.node_name)
@@ -545,7 +544,7 @@ class IndexServicer(IndexServicerImpl):
         response = DeleteNodeResponse()
 
         try:
-            self.__index_core.removeNodeFromCluster(request.node_name)
+            self.__indexer.removeNodeFromCluster(request.node_name)
 
             response.status.success = True
             response.status.message = '{0} was successfully deleted from the cluster'.format(request.node_name)
@@ -563,7 +562,7 @@ class IndexServicer(IndexServicerImpl):
         response = IsSnapshotExistResponse()
 
         try:
-            response.exist = self.__index_core.is_snapshot_exist()
+            response.exist = self.__indexer.is_snapshot_exist()
 
             response.status.success = True
             response.status.message = 'snapshot exists' if response.exist else 'snapshot does not exist'
@@ -581,7 +580,7 @@ class IndexServicer(IndexServicerImpl):
         response = CreateSnapshotResponse()
 
         try:
-            self.__index_core.create_snapshot(sync=request.sync)
+            self.__indexer.create_snapshot(sync=request.sync)
 
             response.status.success = True
             response.status.message = 'request was successfully accepted'
@@ -597,7 +596,7 @@ class IndexServicer(IndexServicerImpl):
         start_time = time.time()
 
         def get_snapshot_chunks(chunk_size=1024):
-            with self.__index_core.open_snapshot_file() as f:
+            with self.__indexer.open_snapshot_file() as f:
                 while True:
                     chunk = f.read(chunk_size)
                     if len(chunk) == 0:
@@ -605,7 +604,7 @@ class IndexServicer(IndexServicerImpl):
                     status = Status()
                     status.success = True
                     status.message = 'successfully got snapshot chunk'
-                    yield GetSnapshotResponse(name=self.__index_core.get_snapshot_file_name(), chunk=chunk,
+                    yield GetSnapshotResponse(name=self.__indexer.get_snapshot_file_name(), chunk=chunk,
                                               status=status)
 
         try:
@@ -625,7 +624,7 @@ class IndexServicer(IndexServicerImpl):
         response = IsHealthyResponse()
 
         try:
-            response.healthy = self.__index_core.is_healthy()
+            response.healthy = self.__indexer.is_healthy()
 
             response.status.success = True
             response.status.message = 'node is alive' if response.healthy else 'node is dead'
@@ -643,7 +642,7 @@ class IndexServicer(IndexServicerImpl):
         response = IsAliveResponse()
 
         try:
-            response.alive = self.__index_core.is_alive()
+            response.alive = self.__indexer.is_alive()
 
             response.status.success = True
             response.status.message = 'node is alive' if response.alive else 'node is dead'
@@ -661,7 +660,7 @@ class IndexServicer(IndexServicerImpl):
         response = IsReadyResponse()
 
         try:
-            response.ready = self.__index_core.is_ready()
+            response.ready = self.__indexer.is_ready()
 
             response.status.success = True
             response.status.message = 'cluster is ready' if response.ready else 'cluster not ready'
@@ -679,7 +678,7 @@ class IndexServicer(IndexServicerImpl):
         response = GetStatusResponse()
 
         try:
-            response.node_status = pickle.dumps(self.__index_core.getStatus())
+            response.node_status = pickle.dumps(self.__indexer.getStatus())
 
             response.status.success = True
             response.status.message = 'successfully got cluster status'
@@ -690,30 +689,3 @@ class IndexServicer(IndexServicerImpl):
             self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return response
-
-
-class IndexGRPCServer:
-    def __init__(self, index_core, host='localhost', port=5050, max_workers=10, logger=getLogger(),
-                 metrics_registry=CollectorRegistry()):
-        self.__index_core = index_core
-        self.__host = host
-        self.__port = port
-        self.__max_workers = max_workers
-        self.__logger = logger
-        self.__metrics_registry = metrics_registry
-
-        self.__grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=self.__max_workers))
-
-        add_IndexServicer_to_server(
-            IndexServicer(self.__index_core, logger=self.__logger, metrics_registry=self.__metrics_registry),
-            self.__grpc_server)
-        self.__grpc_server.add_insecure_port('{0}:{1}'.format(self.__host, self.__port))
-
-        self.__grpc_server.start()
-
-        self.__logger.info('gRPC server has started')
-
-    def stop(self):
-        self.__grpc_server.stop(grace=0.0)
-
-        self.__logger.info('gRPC server has stopped')

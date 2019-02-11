@@ -107,3 +107,16 @@ def is_alive(bind_addr='127.0.0.1:7070', password=None, timeout=1):
 
 def is_ready(bind_addr='127.0.0.1:7070', password=None, timeout=1):
     return execute('is_ready', args=None, bind_addr=bind_addr, password=password, timeout=timeout) == 'True'
+
+
+def get_peers(seed_addr):
+    status_result = get_status(bind_addr=seed_addr, timeout=0.5)
+
+    peer_addrs = [status_result['self']]
+    for k in status_result.keys():
+        if k.startswith('partner_node_status_server_'):
+            partner_addr = k[len('partner_node_status_server_'):]
+            if partner_addr not in peer_addrs:
+                peer_addrs.append(partner_addr)
+
+    return peer_addrs

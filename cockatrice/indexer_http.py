@@ -14,42 +14,72 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import _pickle as pickle
 import json
 import time
 from http import HTTPStatus
+from json import JSONDecodeError
 from logging import getLogger
 
-import grpc
 import mimeparse
 import yaml
 from flask import after_this_request, Flask, request, Response
 from prometheus_client.core import CollectorRegistry, Counter, Histogram
 from prometheus_client.exposition import CONTENT_TYPE_LATEST, generate_latest
+from whoosh.scoring import BM25F
 from yaml.constructor import ConstructorError
 
 from cockatrice import NAME, VERSION
-from cockatrice.protobuf.index_pb2 import CommitIndexRequest, CreateIndexRequest, CreateSnapshotRequest, \
-    DeleteDocumentRequest, DeleteDocumentsRequest, DeleteIndexRequest, DeleteNodeRequest, GetDocumentRequest, \
-    GetIndexRequest, GetSnapshotRequest, GetStatusRequest, IsAliveRequest, IsHealthyRequest, IsReadyRequest, \
-    IsSnapshotExistRequest, OptimizeIndexRequest, PutDocumentRequest, PutDocumentsRequest, PutNodeRequest, \
-    RollbackIndexRequest, SearchDocumentsRequest
-from cockatrice.protobuf.index_pb2_grpc import IndexStub
-from cockatrice.util.http import HTTPServerThread, make_response
-
-TRUE_STRINGS = ['true', 'yes', 'on', 't', 'y', '1']
+from cockatrice.index_config import IndexConfig
+from cockatrice.scoring import get_multi_weighting
+from cockatrice.util.http import make_response, TRUE_STRINGS
 
 
-class IndexHTTPServer:
-    def __init__(self, grpc_port=5050, host='localhost', port=8080, logger=getLogger(), http_logger=getLogger(),
+class IndexHTTPServicer:
+    def __init__(self, indexer, logger=getLogger(), http_logger=getLogger(),
                  metrics_registry=CollectorRegistry()):
+        self.__indexer = indexer
         self.__logger = logger
         self.__http_logger = http_logger
         self.__metrics_registry = metrics_registry
 
-        self.__grpc_port = grpc_port
-        self.__host = host
-        self.__port = port
+        # metrics
+        self.__metrics_http_requests_total = Counter(
+            '{0}_index_http_requests_total'.format(NAME),
+            'The number of requests.',
+            [
+                'method',
+                'endpoint',
+                'status_code'
+            ],
+            registry=self.__metrics_registry
+        )
+        self.__metrics_http_requests_bytes_total = Counter(
+            '{0}_index_http_requests_bytes_total'.format(NAME),
+            'A summary of the invocation requests bytes.',
+            [
+                'method',
+                'endpoint'
+            ],
+            registry=self.__metrics_registry
+        )
+        self.__metrics_http_responses_bytes_total = Counter(
+            '{0}_index_http_responses_bytes_total'.format(NAME),
+            'A summary of the invocation responses bytes.',
+            [
+                'method',
+                'endpoint'
+            ],
+            registry=self.__metrics_registry
+        )
+        self.__metrics_http_requests_duration_seconds = Histogram(
+            '{0}_index_http_requests_duration_seconds'.format(NAME),
+            'The invocation duration in seconds.',
+            [
+                'method',
+                'endpoint'
+            ],
+            registry=self.__metrics_registry
+        )
 
         self.app = Flask('index_http_server')
         self.app.add_url_rule('/', endpoint='root', view_func=self.__root, methods=['GET'])
@@ -91,105 +121,6 @@ class IndexHTTPServer:
         # disable Flask default logger
         self.app.logger.disabled = True
         getLogger('werkzeug').disabled = True
-
-        # metrics
-        self.__metrics_http_requests_total = Counter(
-            '{0}_index_http_requests_total'.format(NAME),
-            'The number of requests.',
-            [
-                'method',
-                'endpoint',
-                'status_code'
-            ],
-            registry=self.__metrics_registry
-        )
-        self.__metrics_http_requests_bytes_total = Counter(
-            '{0}_index_http_requests_bytes_total'.format(NAME),
-            'A summary of the invocation requests bytes.',
-            [
-                'method',
-                'endpoint'
-            ],
-            registry=self.__metrics_registry
-        )
-        self.__metrics_http_responses_bytes_total = Counter(
-            '{0}_index_http_responses_bytes_total'.format(NAME),
-            'A summary of the invocation responses bytes.',
-            [
-                'method',
-                'endpoint'
-            ],
-            registry=self.__metrics_registry
-        )
-        self.__metrics_http_requests_duration_seconds = Histogram(
-            '{0}_index_http_requests_duration_seconds'.format(NAME),
-            'The invocation duration in seconds.',
-            [
-                'method',
-                'endpoint'
-            ],
-            registry=self.__metrics_registry
-        )
-
-        self.__grpc_channel = grpc.insecure_channel('{0}:{1}'.format(self.__host, self.__grpc_port))
-        self.__index_stub = IndexStub(self.__grpc_channel)
-
-        self.__http_server_thread = None
-        try:
-            # run server
-            self.__http_server_thread = HTTPServerThread(self.__host, self.__port, self.app, logger=self.__logger)
-            self.__http_server_thread.start()
-            self.__logger.info('HTTP server has started')
-        except Exception as ex:
-            self.__logger.critical(ex)
-
-    def stop(self):
-        self.__http_server_thread.shutdown()
-
-        self.__grpc_channel.close()
-
-        self.__logger.info('HTTP server has stopped')
-
-    def __record_http_log(self, req, resp):
-        log_message = '{0} - {1} [{2}] "{3} {4} {5}" {6} {7} "{8}" "{9}"'.format(
-            req.remote_addr,
-            req.remote_user if req.remote_user is not None else '-',
-            time.strftime('%d/%b/%Y %H:%M:%S +0000', time.gmtime()),
-            req.method,
-            req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else ''),
-            req.environ.get('SERVER_PROTOCOL'),
-            resp.status_code,
-            resp.content_length,
-            req.referrer if req.referrer is not None else '-',
-            req.user_agent
-        )
-        self.__http_logger.info(log_message)
-
-        return
-
-    def __record_http_metrics(self, start_time, req, resp):
-        self.__metrics_http_requests_total.labels(
-            method=req.method,
-            endpoint=req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else ''),
-            status_code=resp.status_code.value
-        ).inc()
-
-        self.__metrics_http_requests_bytes_total.labels(
-            method=req.method,
-            endpoint=req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else '')
-        ).inc(req.content_length if req.content_length is not None else 0)
-
-        self.__metrics_http_responses_bytes_total.labels(
-            method=req.method,
-            endpoint=req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else '')
-        ).inc(resp.content_length if resp.content_length is not None else 0)
-
-        self.__metrics_http_requests_duration_seconds.labels(
-            method=req.method,
-            endpoint=req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else '')
-        ).observe(time.time() - start_time)
-
-        return
 
     def __root(self):
         start_time = time.time()
@@ -243,22 +174,14 @@ class IndexHTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            rpc_req = CreateIndexRequest()
-            rpc_req.index_name = index_name
-            rpc_req.index_config = pickle.dumps(index_config_dict)
-            rpc_req.sync = sync
-
-            rpc_resp = self.__index_stub.CreateIndex(rpc_req)
+            index_config = IndexConfig(index_config_dict)
+            self.__indexer.create_index(index_name, index_config, sync=sync)
 
             if sync:
-                if rpc_resp.status.success:
-                    status_code = HTTPStatus.CREATED
-                else:
-                    data['error'] = '{0}'.format(rpc_resp.status.message)
-                    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+                status_code = HTTPStatus.CREATED
             else:
                 status_code = HTTPStatus.ACCEPTED
-        except (yaml.constructor.ConstructorError, json.decoder.JSONDecodeError, ValueError) as ex:
+        except (ConstructorError, JSONDecodeError, ValueError) as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.BAD_REQUEST
             self.__logger.error(ex)
@@ -292,33 +215,25 @@ class IndexHTTPServer:
         status_code = None
 
         try:
-            rpc_req = GetIndexRequest()
-            rpc_req.index_name = index_name
-
-            rpc_resp = self.__index_stub.GetIndex(rpc_req)
-
-            if rpc_resp.status.success:
-                data['index_stats'] = {
-                    'name': rpc_resp.index_stats.name,
-                    'doc_count': rpc_resp.index_stats.doc_count,
-                    'doc_count_all': rpc_resp.index_stats.doc_count_all,
-                    'last_modified': rpc_resp.index_stats.last_modified,
-                    'latest_generation': rpc_resp.index_stats.latest_generation,
-                    'version': rpc_resp.index_stats.version,
+            index = self.__indexer.get_index(index_name)
+            if index is None:
+                status_code = HTTPStatus.NOT_FOUND
+            else:
+                data['index'] = {
+                    'name': index.indexname,
+                    'doc_count': index.doc_count(),
+                    'doc_count_all': index.doc_count_all(),
+                    'last_modified': index.latest_generation(),
+                    'latest_generation': index.last_modified(),
+                    'version': index.version,
                     'storage': {
-                        'folder': rpc_resp.index_stats.storage.folder,
-                        'supports_mmap': rpc_resp.index_stats.storage.supports_mmap,
-                        'readonly': rpc_resp.index_stats.storage.readonly,
-                        'files': [file for file in rpc_resp.index_stats.storage.files]
+                        'folder': index.storage.folder,
+                        'supports_mmap': index.storage.supports_mmap,
+                        'readonly': index.storage.readonly,
+                        'files': list(index.storage.list())
                     }
                 }
                 status_code = HTTPStatus.OK
-            else:
-                data['error'] = '{0}'.format(rpc_resp.status.message)
-                if '{0} does not exist'.format(rpc_req.index_name) == rpc_resp.status.message:
-                    status_code = HTTPStatus.NOT_FOUND
-                else:
-                    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
         except Exception as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.INTERNAL_SERVER_ERROR
@@ -353,18 +268,10 @@ class IndexHTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            rpc_req = DeleteIndexRequest()
-            rpc_req.index_name = index_name
-            rpc_req.sync = sync
-
-            rpc_resp = self.__index_stub.DeleteIndex(rpc_req)
+            self.__indexer.delete_index(index_name, sync=sync)
 
             if sync:
-                if rpc_resp.status.success:
-                    status_code = HTTPStatus.OK
-                else:
-                    data['error'] = '{0}'.format(rpc_resp.status.message)
-                    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+                status_code = HTTPStatus.OK
             else:
                 status_code = HTTPStatus.ACCEPTED
         except Exception as ex:
@@ -401,18 +308,10 @@ class IndexHTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            rpc_req = CommitIndexRequest()
-            rpc_req.index_name = index_name
-            rpc_req.sync = sync
-
-            rpc_resp = self.__index_stub.CommitIndex(rpc_req)
+            self.__indexer.commit_index(index_name, sync=sync)
 
             if sync:
-                if rpc_resp.status.success:
-                    status_code = HTTPStatus.OK
-                else:
-                    data['error'] = '{0}'.format(rpc_resp.status.message)
-                    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+                status_code = HTTPStatus.OK
             else:
                 status_code = HTTPStatus.ACCEPTED
         except Exception as ex:
@@ -449,18 +348,10 @@ class IndexHTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            rpc_req = RollbackIndexRequest()
-            rpc_req.index_name = index_name
-            rpc_req.sync = sync
-
-            rpc_resp = self.__index_stub.RollbackIndex(rpc_req)
+            self.__indexer.rollback_index(index_name, sync=sync)
 
             if sync:
-                if rpc_resp.status.success:
-                    status_code = HTTPStatus.OK
-                else:
-                    data['error'] = '{0}'.format(rpc_resp.status.message)
-                    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+                status_code = HTTPStatus.OK
             else:
                 status_code = HTTPStatus.ACCEPTED
         except Exception as ex:
@@ -497,18 +388,10 @@ class IndexHTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            rpc_req = OptimizeIndexRequest()
-            rpc_req.index_name = index_name
-            rpc_req.sync = sync
-
-            rpc_resp = self.__index_stub.OptimizeIndex(rpc_req)
+            self.__indexer.optimize_index(index_name, sync=sync)
 
             if sync:
-                if rpc_resp.status.success:
-                    status_code = HTTPStatus.OK
-                else:
-                    data['error'] = '{0}'.format(rpc_resp.status.message)
-                    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+                status_code = HTTPStatus.OK
             else:
                 status_code = HTTPStatus.ACCEPTED
         except Exception as ex:
@@ -557,23 +440,17 @@ class IndexHTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            rpc_req = PutDocumentRequest()
-            rpc_req.index_name = index_name
-            rpc_req.doc_id = doc_id
-            rpc_req.fields = pickle.dumps(fields_dict)
-            rpc_req.sync = sync
-
-            rpc_resp = self.__index_stub.PutDocument(rpc_req)
+            count = self.__indexer.put_document(index_name, doc_id, fields_dict, sync=sync)
 
             if sync:
-                if rpc_resp.status.success:
+                if count > 0:
+                    data['count'] = count
                     status_code = HTTPStatus.CREATED
                 else:
-                    data['error'] = '{0}'.format(rpc_resp.status.message)
                     status_code = HTTPStatus.INTERNAL_SERVER_ERROR
             else:
                 status_code = HTTPStatus.ACCEPTED
-        except (yaml.constructor.ConstructorError, json.decoder.JSONDecodeError, ValueError) as ex:
+        except (ConstructorError, JSONDecodeError, ValueError) as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.BAD_REQUEST
             self.__logger.error(ex)
@@ -607,21 +484,16 @@ class IndexHTTPServer:
         status_code = None
 
         try:
-            rpc_req = GetDocumentRequest()
-            rpc_req.index_name = index_name
-            rpc_req.doc_id = doc_id
+            results_page = self.__indexer.get_document(index_name, doc_id)
 
-            rpc_resp = self.__index_stub.GetDocument(rpc_req)
-
-            if rpc_resp.status.success:
-                data['fields'] = pickle.loads(rpc_resp.fields)
+            if results_page.total > 0:
+                fields = {}
+                for i in results_page.results[0].iteritems():
+                    fields[i[0]] = i[1]
+                data['fields'] = fields
                 status_code = HTTPStatus.OK
             else:
-                data['error'] = '{0}'.format(rpc_resp.status.message)
-                if '{0} does not exist in {1}'.format(rpc_req.doc_id, rpc_req.index_name) == rpc_resp.status.message:
-                    status_code = HTTPStatus.NOT_FOUND
-                else:
-                    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+                status_code = HTTPStatus.NOT_FOUND
         except Exception as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.INTERNAL_SERVER_ERROR
@@ -656,23 +528,15 @@ class IndexHTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            rpc_req = DeleteDocumentRequest()
-            rpc_req.index_name = index_name
-            rpc_req.doc_id = doc_id
-            rpc_req.sync = sync
-
-            rpc_resp = self.__index_stub.DeleteDocument(rpc_req)
+            count = self.__indexer.delete_document(index_name, doc_id, sync=sync)
 
             if sync:
-                if rpc_resp.status.success:
+                if count > 0:
                     status_code = HTTPStatus.OK
+                elif count == 0:
+                    status_code = HTTPStatus.NOT_FOUND
                 else:
-                    data['error'] = '{0}'.format(rpc_resp.status.message)
-                    if '{0} does not exist in {1}'.format(rpc_req.doc_id,
-                                                          rpc_req.index_name) == rpc_resp.status.message:
-                        status_code = HTTPStatus.NOT_FOUND
-                    else:
-                        status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+                    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
             else:
                 status_code = HTTPStatus.ACCEPTED
         except Exception as ex:
@@ -718,23 +582,17 @@ class IndexHTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            rpc_req = PutDocumentsRequest()
-            rpc_req.index_name = index_name
-            rpc_req.docs = pickle.dumps(docs_dict)
-            rpc_req.sync = sync
-
-            rpc_resp = self.__index_stub.PutDocuments(rpc_req)
+            count = self.__indexer.put_documents(index_name, docs_dict, sync=sync)
 
             if sync:
-                if rpc_resp.status.success:
-                    data['count'] = rpc_resp.count
+                if count > 0:
+                    data['count'] = count
                     status_code = HTTPStatus.CREATED
                 else:
-                    data['error'] = '{0}'.format(rpc_resp.status.message)
                     status_code = HTTPStatus.INTERNAL_SERVER_ERROR
             else:
                 status_code = HTTPStatus.ACCEPTED
-        except (yaml.constructor.ConstructorError, json.decoder.JSONDecodeError, ValueError) as ex:
+        except (ConstructorError, JSONDecodeError, ValueError) as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.BAD_REQUEST
             self.__logger.error(ex)
@@ -781,23 +639,17 @@ class IndexHTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            rpc_req = DeleteDocumentsRequest()
-            rpc_req.index_name = index_name
-            rpc_req.doc_ids = pickle.dumps(doc_ids_list)
-            rpc_req.sync = sync
-
-            rpc_resp = self.__index_stub.DeleteDocuments(rpc_req)
+            count = self.__indexer.delete_documents(index_name, doc_ids_list, sync=sync)
 
             if sync:
-                if rpc_resp.status.success:
-                    data['count'] = rpc_resp.count
+                if count > 0:
+                    data['count'] = count
                     status_code = HTTPStatus.OK
                 else:
-                    data['error'] = '{0}'.format(rpc_resp.status.message)
                     status_code = HTTPStatus.INTERNAL_SERVER_ERROR
             else:
                 status_code = HTTPStatus.ACCEPTED
-        except (yaml.constructor.ConstructorError, json.decoder.JSONDecodeError, ValueError) as ex:
+        except (ConstructorError, JSONDecodeError, ValueError) as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.BAD_REQUEST
             self.__logger.error(ex)
@@ -831,31 +683,54 @@ class IndexHTTPServer:
         status_code = None
 
         try:
-            rpc_req = SearchDocumentsRequest()
-            rpc_req.index_name = index_name
-            rpc_req.query = request.args.get('query', default='', type=str)
-            rpc_req.search_field = request.args.get('search_field', default='', type=str)
-            rpc_req.page_num = request.args.get('page_num', default=1, type=int)
-            rpc_req.page_len = request.args.get('page_len', default=10, type=int)
+            query = request.args.get('query', default='', type=str)
+            search_field = request.args.get('search_field', default='', type=str)
+            page_num = request.args.get('page_num', default=1, type=int)
+            page_len = request.args.get('page_len', default=10, type=int)
+            weighting = BM25F
             if len(request.data) > 0:
                 mime = mimeparse.parse_mime_type(request.headers.get('Content-Type'))
                 charset = 'utf-8' if mime[2].get('charset') is None else mime[2].get('charset')
                 if mime[1] == 'yaml':
-                    rpc_req.weighting = pickle.dumps(yaml.safe_load(request.data.decode(charset)))
+                    weighting = get_multi_weighting(yaml.safe_load(request.data.decode(charset)))
                 elif mime[1] == 'json':
-                    rpc_req.weighting = pickle.dumps(json.loads(request.data.decode(charset)))
+                    weighting = get_multi_weighting(json.loads(request.data.decode(charset)))
                 else:
                     raise ValueError('unsupported format')
 
-            rpc_resp = self.__index_stub.SearchDocuments(rpc_req)
+            results_page = self.__indexer.search_documents(index_name, query, search_field, page_num,
+                                                           page_len=page_len, weighting=weighting)
 
-            if rpc_resp.status.success:
-                data['results'] = pickle.loads(rpc_resp.results)
+            if results_page.pagecount >= page_num or results_page.total <= 0:
+                results = {
+                    'is_last_page': results_page.is_last_page(),
+                    'page_count': results_page.pagecount,
+                    'page_len': results_page.pagelen,
+                    'page_num': results_page.pagenum,
+                    'total': results_page.total,
+                    'offset': results_page.offset
+                }
+                hits = []
+                for result in results_page.results[results_page.offset:]:
+                    fields = {}
+                    for item in result.iteritems():
+                        fields[item[0]] = item[1]
+                    hit = {
+                        'fields': fields,
+                        'doc_num': result.docnum,
+                        'score': result.score,
+                        'rank': result.rank,
+                        'pos': result.pos
+                    }
+                    hits.append(hit)
+                results['hits'] = hits
+
+                data['results'] = results
                 status_code = HTTPStatus.OK
             else:
-                data['error'] = '{0}'.format(rpc_resp.status.message)
-                status_code = HTTPStatus.INTERNAL_SERVER_ERROR
-        except (yaml.constructor.ConstructorError, json.decoder.JSONDecodeError, ValueError) as ex:
+                data['error'] = 'page_num must be <= {0}'.format(results_page.pagecount)
+                status_code = HTTPStatus.BAD_REQUEST
+        except (ConstructorError, JSONDecodeError, ValueError) as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.BAD_REQUEST
             self.__logger.error(ex)
@@ -887,17 +762,11 @@ class IndexHTTPServer:
 
         data = {}
         status_code = None
+
         try:
-            rpc_req = PutNodeRequest()
-            rpc_req.node_name = node_name
+            self.__indexer.addNodeToCluster(node_name)
 
-            rpc_resp = self.__index_stub.PutNode(rpc_req)
-
-            if rpc_resp.status.success:
-                status_code = HTTPStatus.OK
-            else:
-                data['error'] = '{0}'.format(rpc_resp.status.message)
-                status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            status_code = HTTPStatus.OK
         except Exception as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.INTERNAL_SERVER_ERROR
@@ -928,14 +797,8 @@ class IndexHTTPServer:
         status_code = None
 
         try:
-            rpc_resp = self.__index_stub.GetStatus(GetStatusRequest())
-
-            if rpc_resp.status.success:
-                data['node_status'] = pickle.loads(rpc_resp.node_status)
-                status_code = HTTPStatus.OK
-            else:
-                data['error'] = '{0}'.format(rpc_resp.status.message)
-                status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            data['node_status'] = self.__indexer.getStatus()
+            status_code = HTTPStatus.OK
         except Exception as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.INTERNAL_SERVER_ERROR
@@ -966,16 +829,9 @@ class IndexHTTPServer:
         status_code = None
 
         try:
-            rpc_req = DeleteNodeRequest()
-            rpc_req.node_name = node_name
+            self.__indexer.removeNodeFromCluster(node_name)
 
-            rpc_resp = self.__index_stub.DeleteNode(rpc_req)
-
-            if rpc_resp.status.success:
-                status_code = HTTPStatus.OK
-            else:
-                data['error'] = '{0}'.format(rpc_resp.status.message)
-                status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            status_code = HTTPStatus.OK
         except Exception as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.INTERNAL_SERVER_ERROR
@@ -1010,16 +866,9 @@ class IndexHTTPServer:
             if request.args.get('sync', default='', type=str).lower() in TRUE_STRINGS:
                 sync = True
 
-            rpc_req = CreateSnapshotRequest()
-            rpc_req.sync = sync
+            self.__indexer.create_snapshot(sync=sync)
 
-            rpc_resp = self.__index_stub.CreateSnapshot(rpc_req)
-
-            if rpc_resp.status.success:
-                status_code = HTTPStatus.ACCEPTED
-            else:
-                data['error'] = '{0}'.format(rpc_resp.status.message)
-                status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            status_code = HTTPStatus.ACCEPTED
         except Exception as ex:
             data['error'] = '{0}'.format(ex.args[0])
             status_code = HTTPStatus.INTERNAL_SERVER_ERROR
@@ -1047,27 +896,17 @@ class IndexHTTPServer:
             return response
 
         try:
-            rpc_req = IsSnapshotExistRequest()
-            rpc_resp = self.__index_stub.IsSnapshotExist(rpc_req)
+            if self.__indexer.is_snapshot_exist():
+                def generate():
+                    with self.__indexer.open_snapshot_file() as f:
+                        chunk = f.read(1024)
+                        yield chunk
 
-            if rpc_resp.status.success:
-                if rpc_resp.exist:
-                    rpc_req = GetSnapshotRequest()
-                    rpc_req.chunk_size = 1024
-
-                    rpc_resp = self.__index_stub.GetSnapshot(rpc_req)
-
-                    def generate():
-                        for snapshot in rpc_resp:
-                            yield snapshot.chunk
-
-                    resp = Response(generate(), status=HTTPStatus.OK, mimetype='application/zip', headers={
-                        'Content-Disposition': 'attachment; filename=snapshot.zip'
-                    })
-                else:
-                    resp = Response(status=HTTPStatus.NOT_FOUND)
+                resp = Response(generate(), status=HTTPStatus.OK, mimetype='application/zip', headers={
+                    'Content-Disposition': 'attachment; filename=snapshot.zip'
+                })
             else:
-                resp = Response(status=HTTPStatus.INTERNAL_SERVER_ERROR)
+                resp = Response(status=HTTPStatus.NOT_FOUND)
         except Exception as ex:
             resp = Response(status=HTTPStatus.INTERNAL_SERVER_ERROR)
             self.__logger.error(ex)
@@ -1087,20 +926,14 @@ class IndexHTTPServer:
         status_code = None
 
         try:
-            rpc_req = IsHealthyRequest()
+            healthy = self.__indexer.is_healthy()
 
-            rpc_resp = self.__index_stub.IsHealthy(rpc_req)
-
-            if rpc_resp.status.success:
-                data['healthy'] = rpc_resp.healthy
-                if rpc_resp.healthy:
-                    status_code = HTTPStatus.OK
-                else:
-                    status_code = HTTPStatus.SERVICE_UNAVAILABLE
-                    data['error'] = '{0}'.format(rpc_resp.status.message)
+            data['healthy'] = healthy
+            if healthy:
+                status_code = HTTPStatus.OK
             else:
-                data['error'] = '{0}'.format(rpc_resp.status.message)
-                status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+                status_code = HTTPStatus.SERVICE_UNAVAILABLE
+                data['error'] = 'node is not healthy'
         except Exception as ex:
             data['healthy'] = False
             data['error'] = '{0}'.format(ex.args[0])
@@ -1132,20 +965,14 @@ class IndexHTTPServer:
         status_code = None
 
         try:
-            rpc_req = IsAliveRequest()
+            alive = self.__indexer.is_alive()
 
-            rpc_resp = self.__index_stub.IsAlive(rpc_req)
-
-            if rpc_resp.status.success:
-                data['liveness'] = rpc_resp.alive
-                if rpc_resp.alive:
-                    status_code = HTTPStatus.OK
-                else:
-                    status_code = HTTPStatus.SERVICE_UNAVAILABLE
-                    data['error'] = '{0}'.format(rpc_resp.status.message)
+            data['liveness'] = alive
+            if alive:
+                status_code = HTTPStatus.OK
             else:
-                data['error'] = '{0}'.format(rpc_resp.status.message)
-                status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+                status_code = HTTPStatus.SERVICE_UNAVAILABLE
+                data['error'] = 'node is not alive'
         except Exception as ex:
             data['liveness'] = False
             data['error'] = '{0}'.format(ex.args[0])
@@ -1177,20 +1004,14 @@ class IndexHTTPServer:
         status_code = None
 
         try:
-            rpc_req = IsReadyRequest()
+            ready = self.__indexer.is_ready()
 
-            rpc_resp = self.__index_stub.IsReady(rpc_req)
-
-            if rpc_resp.status.success:
-                data['readiness'] = rpc_resp.ready
-                if rpc_resp.ready:
-                    status_code = HTTPStatus.OK
-                else:
-                    status_code = HTTPStatus.SERVICE_UNAVAILABLE
-                    data['error'] = '{0}'.format(rpc_resp.status.message)
+            data['readiness'] = ready
+            if ready:
+                status_code = HTTPStatus.OK
             else:
-                data['error'] = '{0}'.format(rpc_resp.status.message)
-                status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+                status_code = HTTPStatus.SERVICE_UNAVAILABLE
+                data['error'] = 'node is not ready'
         except Exception as ex:
             data['readiness'] = False
             data['error'] = '{0}'.format(ex.args[0])
@@ -1230,3 +1051,44 @@ class IndexHTTPServer:
             self.__logger.error(ex)
 
         return resp
+
+    def __record_http_log(self, req, resp):
+        log_message = '{0} - {1} [{2}] "{3} {4} {5}" {6} {7} "{8}" "{9}"'.format(
+            req.remote_addr,
+            req.remote_user if req.remote_user is not None else '-',
+            time.strftime('%d/%b/%Y %H:%M:%S +0000', time.gmtime()),
+            req.method,
+            req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else ''),
+            req.environ.get('SERVER_PROTOCOL'),
+            resp.status_code,
+            resp.content_length,
+            req.referrer if req.referrer is not None else '-',
+            req.user_agent
+        )
+        self.__http_logger.info(log_message)
+
+        return
+
+    def __record_http_metrics(self, start_time, req, resp):
+        self.__metrics_http_requests_total.labels(
+            method=req.method,
+            endpoint=req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else ''),
+            status_code=resp.status_code.value
+        ).inc()
+
+        self.__metrics_http_requests_bytes_total.labels(
+            method=req.method,
+            endpoint=req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else '')
+        ).inc(req.content_length if req.content_length is not None else 0)
+
+        self.__metrics_http_responses_bytes_total.labels(
+            method=req.method,
+            endpoint=req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else '')
+        ).inc(resp.content_length if resp.content_length is not None else 0)
+
+        self.__metrics_http_requests_duration_seconds.labels(
+            method=req.method,
+            endpoint=req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else '')
+        ).observe(time.time() - start_time)
+
+        return

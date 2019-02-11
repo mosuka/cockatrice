@@ -15,47 +15,52 @@
 # limitations under the License.
 
 import unittest
-from logging import ERROR, Formatter, getLogger, INFO, StreamHandler
+from logging import ERROR, Formatter, getLogger, INFO, NOTSET, StreamHandler
 from tempfile import TemporaryDirectory
 
 from prometheus_client.core import CollectorRegistry
 from pysyncobj import SyncObjConf
 
-import cockatrice
-from cockatrice.supervise_core import SuperviseCore
+from cockatrice import NAME
+from cockatrice.manager import Manager
 from tests import get_free_port
 
 
-class TestSuperviseCore(unittest.TestCase):
+class TestManager(unittest.TestCase):
     def setUp(self):
         self.temp_dir = TemporaryDirectory()
 
         host = '0.0.0.0'
         port = get_free_port()
-        peer_addrs = []
-        snapshot_file = self.temp_dir.name + '/federation.zip'
-
-        federation_dir = self.temp_dir.name + '/federation'
-
-        logger = getLogger(cockatrice.NAME)
+        seed_addr = None
+        conf = SyncObjConf(
+            fullDumpFile=self.temp_dir.name + '/supervise.zip',
+            logCompactionMinTime=300,
+            dynamicMembershipChange=True
+        )
+        data_dir = self.temp_dir.name + '/supervise'
+        grpc_port = get_free_port()
+        grpc_max_workers = 10
+        http_port = get_free_port()
+        logger = getLogger(NAME)
         log_handler = StreamHandler()
         logger.setLevel(ERROR)
         log_handler.setLevel(INFO)
         log_format = Formatter('%(asctime)s - %(levelname)s - %(pathname)s:%(lineno)d - %(message)s')
         log_handler.setFormatter(log_format)
         logger.addHandler(log_handler)
-
+        http_logger = getLogger(NAME + '_http')
+        http_log_handler = StreamHandler()
+        http_logger.setLevel(NOTSET)
+        http_log_handler.setLevel(INFO)
+        http_log_format = Formatter('%(message)s')
+        http_log_handler.setFormatter(http_log_format)
+        http_logger.addHandler(http_log_handler)
         metrics_registry = CollectorRegistry()
 
-        conf = SyncObjConf(
-            fullDumpFile=snapshot_file,
-            logCompactionMinTime=300,
-            dynamicMembershipChange=True
-        )
-
-        self.supervise_core = SuperviseCore(host=host, port=port, peer_addrs=peer_addrs, conf=conf,
-                                            data_dir=federation_dir, logger=logger,
-                                            metrics_registry=metrics_registry)
+        self.supervise_core = Manager(host=host, port=port, seed_addr=seed_addr, conf=conf, data_dir=data_dir,
+                                      grpc_port=grpc_port, grpc_max_workers=grpc_max_workers, http_port=http_port,
+                                      logger=logger, http_logger=http_logger, metrics_registry=metrics_registry)
 
     def tearDown(self):
         self.supervise_core.stop()

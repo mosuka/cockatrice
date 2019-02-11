@@ -2,6 +2,7 @@ Cockatrice Change Log
 
 ==================== Cockatrice 0.7.2 ====================
 
+* Add manager node
 * Implement RAM Storage
 * Migrate Schema class to IndexConfig class
 * Add index writer

@@ -16,54 +16,102 @@
 
 import os
 import socket
-import threading
 import time
 import zipfile
+from concurrent import futures
 from contextlib import closing
 from logging import getLogger
+from threading import RLock, Thread
 
+import grpc
 import pysyncobj.pickle as pickle
 from locked_dict.locked_dict import LockedDict
 from prometheus_client.core import CollectorRegistry
 from pysyncobj import replicated, SyncObj, SyncObjConf
 
-from cockatrice.util.raft import RAFT_DATA_FILE
+from cockatrice.manager_grpc import ManagementGRPCServicer
+from cockatrice.manager_http import ManagementHTTPServicer
+from cockatrice.protobuf.management_pb2_grpc import add_ManagementServicer_to_server
+from cockatrice.util.http import HTTPServer
+from cockatrice.util.raft import add_node, get_peers, RAFT_DATA_FILE
 from cockatrice.util.resolver import parse_addr
 
 
-class SuperviseCore(SyncObj):
-    def __init__(self, host='localhost', port=7070, peer_addrs=None, conf=SyncObjConf(),
-                 data_dir='/tmp/cockatrice/supervise', logger=getLogger(), metrics_registry=CollectorRegistry()):
+class Manager(SyncObj):
+    def __init__(self, host='localhost', port=7070, seed_addr=None, conf=SyncObjConf(),
+                 data_dir='/tmp/cockatrice/management', grpc_port=5050, grpc_max_workers=10, http_port=8080,
+                 logger=getLogger(), http_logger=getLogger(), metrics_registry=CollectorRegistry()):
+
+        self.__host = host
+        self.__port = port
+        self.__seed_addr = seed_addr
+        self.__conf = conf
+        self.__data_dir = data_dir
+        self.__grpc_port = grpc_port
+        self.__grpc_max_workers = grpc_max_workers
+        self.__http_port = http_port
         self.__logger = logger
+        self.__http_logger = http_logger
         self.__metrics_registry = metrics_registry
 
-        self.__lock = threading.RLock()
-
-        self.__bind_addr = '{0}:{1}'.format(host, port)
-        self.__peer_addrs = [] if peer_addrs is None else peer_addrs
-        self.__data_dir = data_dir
-        self.__conf = conf
+        self.__self_addr = '{0}:{1}'.format(self.__host, self.__port)
+        self.__peer_addrs = [] if self.__seed_addr is None else get_peers(self.__seed_addr)
+        self.__other_addrs = [peer_addr for peer_addr in self.__peer_addrs if peer_addr != self.__self_addr]
         self.__conf.serializer = self.__serialize
         self.__conf.deserializer = self.__deserialize
         self.__conf.validate()
 
         self.__data = LockedDict()
+        self.__lock = RLock()
 
+        # add this node to the cluster
+        if self.__self_addr not in self.__peer_addrs and self.__seed_addr is not None:
+            Thread(target=add_node,
+                   kwargs={'node_name': self.__self_addr, 'bind_addr': self.__seed_addr, 'timeout': 0.5}).start()
+
+        # create data dir
         os.makedirs(self.__data_dir, exist_ok=True)
 
-        super(SuperviseCore, self).__init__(self.__bind_addr, self.__peer_addrs, conf=self.__conf)
-        self.__logger.info('supervise core has started')
-
-        # waiting for the preparation to be completed
+        # start node
+        super(Manager, self).__init__(self.__self_addr, self.__other_addrs, conf=self.__conf)
+        self.__logger.info('state machine has started')
         while not self.isReady():
             # recovering data
-            self.__logger.debug('waiting for the cluster ready')
+            self.__logger.debug('waiting for cluster ready')
             time.sleep(1)
-        self.__logger.info('supervise core ready')
+        self.__logger.info('cluster ready')
+
+        # start gRPC
+        self.__grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=self.__grpc_max_workers))
+        add_ManagementServicer_to_server(
+            ManagementGRPCServicer(self, logger=self.__logger, metrics_registry=self.__metrics_registry),
+            self.__grpc_server)
+        self.__grpc_server.add_insecure_port('{0}:{1}'.format(self.__host, self.__grpc_port))
+        self.__grpc_server.start()
+        self.__logger.info('gRPC server has started')
+
+        # start HTTP server
+        self.__http_servicer = ManagementHTTPServicer(self, self.__logger, self.__http_logger, self.__metrics_registry)
+        self.__http_server = HTTPServer(self.__host, self.__http_port, self.__http_servicer)
+        self.__http_server.start()
+        self.__logger.info('HTTP server has started')
+
+        self.__logger.info('supervisor has started')
 
     def stop(self):
+        # stop HTTP server
+        self.__http_server.stop()
+        self.__logger.info('HTTP server has stopped')
+
+        # stop gRPC server
+        self.__grpc_server.stop(grace=0.0)
+        self.__logger.info('gRPC server has stopped')
+
+        # stop node
         self.destroy()
-        self.__logger.info('supervise core has stopped')
+        self.__logger.info('state machine has stopped')
+
+        self.__logger.info('supervisor has stopped')
 
     # serializer
     def __serialize(self, filename, raft_data):
@@ -115,7 +163,7 @@ class SuperviseCore(SyncObj):
 
     def is_alive(self):
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
-            alive = sock.connect_ex(parse_addr(self.__bind_addr)) == 0
+            alive = sock.connect_ex(parse_addr(self.__self_addr)) == 0
         return alive
 
     def is_ready(self):

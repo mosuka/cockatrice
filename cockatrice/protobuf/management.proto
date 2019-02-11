@@ -1,0 +1,63 @@
+//  Copyright (c) 2019 Minoru Osuka
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// 		http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+import "cockatrice/protobuf/common.proto";
+
+package protobuf;
+
+service Management {
+    rpc Put (PutRequest) returns (PutResponse) {}
+    rpc Get (GetRequest) returns (GetResponse) {}
+    rpc Delete (DeleteRequest) returns (DeleteResponse) {}
+    rpc Clear (ClearRequest) returns (ClearResponse) {}
+}
+
+message PutRequest {
+    string key = 1;
+    bytes value = 2;
+    bool sync = 3;
+}
+
+message PutResponse {
+    Status status = 1;
+}
+
+message GetRequest {
+    string key = 1;
+}
+
+message GetResponse {
+    bytes value = 1;
+    Status status = 2;
+}
+
+message DeleteRequest {
+    string key = 1;
+    bool sync = 2;
+}
+
+message DeleteResponse {
+    bytes value = 1;
+    Status status = 2;
+}
+
+message ClearRequest {
+    bool sync = 1;
+}
+
+message ClearResponse {
+    Status status = 1;
+}

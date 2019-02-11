@@ -17,7 +17,7 @@
 import _pickle as pickle
 import os
 import unittest
-from logging import ERROR, Formatter, getLogger, INFO, StreamHandler
+from logging import ERROR, Formatter, getLogger, INFO, NOTSET, StreamHandler
 from tempfile import TemporaryDirectory
 
 import grpc
@@ -25,28 +25,29 @@ from prometheus_client.core import CollectorRegistry
 from pysyncobj import SyncObjConf
 
 from cockatrice import NAME
-from cockatrice.protobuf.index_pb2 import ClearRequest, DeleteRequest, GetRequest, PutRequest
-from cockatrice.protobuf.index_pb2_grpc import SuperviseStub
-from cockatrice.supervise_core import SuperviseCore
-from cockatrice.supervise_grpc_server import SuperviseGRPCServer
+from cockatrice.manager import Manager
+from cockatrice.protobuf.management_pb2 import ClearRequest, DeleteRequest, GetRequest, PutRequest
+from cockatrice.protobuf.management_pb2_grpc import ManagementStub
 from tests import get_free_port
 
 
-class TestSuperviseGRPCServer(unittest.TestCase):
+class TestManagementGRPCServicer(unittest.TestCase):
     def setUp(self):
         self.temp_dir = TemporaryDirectory()
         self.example_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '../example'))
 
         host = '0.0.0.0'
         port = get_free_port()
-        peer_addrs = []
-        snapshot_file = self.temp_dir.name + '/snapshot.zip'
-
+        seed_addr = None
+        conf = SyncObjConf(
+            fullDumpFile=self.temp_dir.name + '/supervise.zip',
+            logCompactionMinTime=300,
+            dynamicMembershipChange=True
+        )
+        data_dir = self.temp_dir.name + '/supervise'
         grpc_port = get_free_port()
         grpc_max_workers = 10
-
-        federation_dir = self.temp_dir.name + '/federation'
-
+        http_port = get_free_port()
         logger = getLogger(NAME)
         log_handler = StreamHandler()
         logger.setLevel(ERROR)
@@ -54,54 +55,48 @@ class TestSuperviseGRPCServer(unittest.TestCase):
         log_format = Formatter('%(asctime)s - %(levelname)s - %(pathname)s:%(lineno)d - %(message)s')
         log_handler.setFormatter(log_format)
         logger.addHandler(log_handler)
-
+        http_logger = getLogger(NAME + '_http')
+        http_log_handler = StreamHandler()
+        http_logger.setLevel(NOTSET)
+        http_log_handler.setLevel(INFO)
+        http_log_format = Formatter('%(message)s')
+        http_log_handler.setFormatter(http_log_format)
+        http_logger.addHandler(http_log_handler)
         metrics_registry = CollectorRegistry()
 
-        conf = SyncObjConf(
-            fullDumpFile=snapshot_file,
-            logCompactionMinTime=300,
-            dynamicMembershipChange=True
-        )
-
-        self.supervise_core = SuperviseCore(host=host, port=port, peer_addrs=peer_addrs, conf=conf,
-                                            data_dir=federation_dir, logger=logger,
-                                            metrics_registry=metrics_registry)
-        self.supervise_grpc_server = SuperviseGRPCServer(self.supervise_core, host=host, port=grpc_port,
-                                                         max_workers=grpc_max_workers, logger=logger,
-                                                         metrics_registry=metrics_registry)
+        self.supervise_core = Manager(host=host, port=port, seed_addr=seed_addr, conf=conf, data_dir=data_dir,
+                                      grpc_port=grpc_port, grpc_max_workers=grpc_max_workers, http_port=http_port,
+                                      logger=logger, http_logger=http_logger, metrics_registry=metrics_registry)
 
         self.channel = grpc.insecure_channel('{0}:{1}'.format(host, grpc_port))
+        self.stub = ManagementStub(self.channel)
 
     def tearDown(self):
         self.channel.close()
 
         self.supervise_core.stop()
-        self.supervise_grpc_server.stop()
+
         self.temp_dir.cleanup()
 
     def test_put(self):
-        stub = SuperviseStub(self.channel)
-
         # put
         request = PutRequest()
         request.key = '/f1/c1/n1'
         request.value = pickle.dumps({'grpc_addr': '127.0.0.1:5050', 'http_addr': '127.0.0.1:8080'})
         request.sync = True
 
-        response = stub.Put(request)
+        response = self.stub.Put(request)
 
         self.assertEqual(True, response.status.success)
 
     def test_get(self):
-        stub = SuperviseStub(self.channel)
-
         # put
         request = PutRequest()
         request.key = '/f1/c1/n1'
         request.value = pickle.dumps({'grpc_addr': '127.0.0.1:5050', 'http_addr': '127.0.0.1:8080'})
         request.sync = True
 
-        response = stub.Put(request)
+        response = self.stub.Put(request)
 
         self.assertEqual(True, response.status.success)
 
@@ -109,7 +104,7 @@ class TestSuperviseGRPCServer(unittest.TestCase):
         request = GetRequest()
         request.key = '/f1/c1/n1'
 
-        response = stub.Get(request)
+        response = self.stub.Get(request)
 
         self.assertEqual(True, response.status.success)
         self.assertEqual({'grpc_addr': '127.0.0.1:5050', 'http_addr': '127.0.0.1:8080'}, pickle.loads(response.value))
@@ -118,21 +113,19 @@ class TestSuperviseGRPCServer(unittest.TestCase):
         request = GetRequest()
         request.key = '/f1/c1/n1/grpc_addr'
 
-        response = stub.Get(request)
+        response = self.stub.Get(request)
 
         self.assertEqual(True, response.status.success)
         self.assertEqual('127.0.0.1:5050', pickle.loads(response.value))
 
     def test_delete(self):
-        stub = SuperviseStub(self.channel)
-
         # put
         request = PutRequest()
         request.key = '/f1/c1/n1'
         request.value = pickle.dumps({'grpc_addr': '127.0.0.1:5050', 'http_addr': '127.0.0.1:8080'})
         request.sync = True
 
-        response = stub.Put(request)
+        response = self.stub.Put(request)
 
         self.assertTrue(response.status.success)
 
@@ -140,7 +133,7 @@ class TestSuperviseGRPCServer(unittest.TestCase):
         request = GetRequest()
         request.key = '/f1/c1/n1'
 
-        response = stub.Get(request)
+        response = self.stub.Get(request)
 
         self.assertTrue(response.status.success)
         self.assertEqual({'grpc_addr': '127.0.0.1:5050', 'http_addr': '127.0.0.1:8080'}, pickle.loads(response.value))
@@ -149,7 +142,7 @@ class TestSuperviseGRPCServer(unittest.TestCase):
         request = GetRequest()
         request.key = '/f1/c1/n1/grpc_addr'
 
-        response = stub.Get(request)
+        response = self.stub.Get(request)
 
         self.assertTrue(response.status.success)
         self.assertEqual('127.0.0.1:5050', pickle.loads(response.value))
@@ -159,7 +152,7 @@ class TestSuperviseGRPCServer(unittest.TestCase):
         request.key = '/f1/c1/n1/grpc_addr'
         request.sync = True
 
-        response = stub.Delete(request)
+        response = self.stub.Delete(request)
 
         self.assertTrue(response.status.success)
         self.assertEqual('127.0.0.1:5050', pickle.loads(response.value))
@@ -168,7 +161,7 @@ class TestSuperviseGRPCServer(unittest.TestCase):
         request = GetRequest()
         request.key = '/f1/c1/n1/grpc_addr'
 
-        response = stub.Get(request)
+        response = self.stub.Get(request)
 
         self.assertFalse(response.status.success)
 
@@ -177,7 +170,7 @@ class TestSuperviseGRPCServer(unittest.TestCase):
         request.key = '/'
         request.sync = True
 
-        response = stub.Delete(request)
+        response = self.stub.Delete(request)
 
         self.assertTrue(response.status.success)
 
@@ -185,21 +178,19 @@ class TestSuperviseGRPCServer(unittest.TestCase):
         request = GetRequest()
         request.key = '/'
 
-        response = stub.Get(request)
+        response = self.stub.Get(request)
 
         self.assertTrue(response.status.success)
         self.assertEqual({}, pickle.loads(response.value))
 
     def test_clear(self):
-        stub = SuperviseStub(self.channel)
-
         # put
         request = PutRequest()
         request.key = '/f1/c1/n1'
         request.value = pickle.dumps({'grpc_addr': '127.0.0.1:5050', 'http_addr': '127.0.0.1:8080'})
         request.sync = True
 
-        response = stub.Put(request)
+        response = self.stub.Put(request)
 
         self.assertTrue(response.status.success)
 
@@ -207,7 +198,7 @@ class TestSuperviseGRPCServer(unittest.TestCase):
         request = GetRequest()
         request.key = '/f1/c1/n1'
 
-        response = stub.Get(request)
+        response = self.stub.Get(request)
 
         self.assertTrue(response.status.success)
         self.assertEqual({'grpc_addr': '127.0.0.1:5050', 'http_addr': '127.0.0.1:8080'}, pickle.loads(response.value))
@@ -216,7 +207,7 @@ class TestSuperviseGRPCServer(unittest.TestCase):
         request = ClearRequest()
         request.sync = True
 
-        response = stub.Clear(request)
+        response = self.stub.Clear(request)
 
         self.assertTrue(response.status.success)
 
@@ -224,7 +215,7 @@ class TestSuperviseGRPCServer(unittest.TestCase):
         request = GetRequest()
         request.key = '/'
 
-        response = stub.Get(request)
+        response = self.stub.Get(request)
 
         self.assertTrue(response.status.success)
         self.assertEqual({}, pickle.loads(response.value))

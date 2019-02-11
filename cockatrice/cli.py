@@ -30,14 +30,14 @@ from yaml.constructor import ConstructorError
 
 from cockatrice import NAME
 from cockatrice.indexer import Indexer
-from cockatrice.supervisor import Supervisor
+from cockatrice.manager import Manager
 
 
-def start_supervisor(host='localhost', port=7070, seed_addr=None, snapshot_file='/tmp/cockatrice/supervise.zip',
-                     log_compaction_min_entries=5000, log_compaction_min_time=300,
-                     data_dir='/tmp/cockatrice/supervise', grpc_port=5050, grpc_max_workers=10, http_port=8080,
-                     log_level='DEBUG', log_file=None, log_file_max_bytes=512000000, log_file_backup_count=5,
-                     http_log_file=None, http_log_file_max_bytes=512000000, http_log_file_backup_count=5):
+def start_manager(host='localhost', port=7070, peer_addr=None, snapshot_file='/tmp/cockatrice/management.zip',
+                  log_compaction_min_entries=5000, log_compaction_min_time=300,
+                  data_dir='/tmp/cockatrice/management', grpc_port=5050, grpc_max_workers=10, http_port=8080,
+                  log_level='DEBUG', log_file=None, log_file_max_bytes=512000000, log_file_backup_count=5,
+                  http_log_file=None, http_log_file_max_bytes=512000000, http_log_file_backup_count=5):
     # create logger and handler
     logger = getLogger(NAME)
     log_handler = StreamHandler()
@@ -111,9 +111,9 @@ def start_supervisor(host='localhost', port=7070, seed_addr=None, snapshot_file=
 
     supervisor = None
     try:
-        supervisor = Supervisor(host=host, port=port, seed_addr=seed_addr, conf=conf, data_dir=data_dir,
-                                grpc_port=grpc_port, grpc_max_workers=grpc_max_workers, http_port=http_port,
-                                logger=logger, http_logger=http_logger, metrics_registry=metrics_registry)
+        supervisor = Manager(host=host, port=port, seed_addr=peer_addr, conf=conf, data_dir=data_dir,
+                             grpc_port=grpc_port, grpc_max_workers=grpc_max_workers, http_port=http_port,
+                             logger=logger, http_logger=http_logger, metrics_registry=metrics_registry)
         while True:
             signal.pause()
     except Exception as ex:
@@ -123,7 +123,7 @@ def start_supervisor(host='localhost', port=7070, seed_addr=None, snapshot_file=
             supervisor.stop()
 
 
-def start_indexer(host='localhost', port=7070, seed_addr=None, snapshot_file='/tmp/cockatrice/index.zip',
+def start_indexer(host='localhost', port=7070, peer_addr=None, snapshot_file='/tmp/cockatrice/index.zip',
                   log_compaction_min_entries=5000, log_compaction_min_time=300, data_dir='/tmp/cockatrice/index',
                   grpc_port=5050, grpc_max_workers=10, http_port=8080, log_level='DEBUG', log_file=None,
                   log_file_max_bytes=512000000, log_file_backup_count=5, http_log_file=None,
@@ -201,7 +201,7 @@ def start_indexer(host='localhost', port=7070, seed_addr=None, snapshot_file='/t
 
     indexer = None
     try:
-        indexer = Indexer(host=host, port=port, seed_addr=seed_addr, conf=conf, data_dir=data_dir,
+        indexer = Indexer(host=host, port=port, seed_addr=peer_addr, conf=conf, data_dir=data_dir,
                           grpc_port=grpc_port, grpc_max_workers=grpc_max_workers, http_port=http_port, logger=logger,
                           http_logger=http_logger, metrics_registry=metrics_registry)
         while True:
