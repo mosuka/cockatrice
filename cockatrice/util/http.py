@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import json
+import time
 from logging import getLogger
 from threading import Thread
 
@@ -23,6 +24,20 @@ from flask import Response
 from werkzeug.serving import make_server
 
 TRUE_STRINGS = ['true', 'yes', 'on', 't', 'y', '1']
+
+
+def record_log(req, resp, logger=getLogger()):
+    logger.info('{0} - {1} [{2}] "{3} {4} {5}" {6} {7} "{8}" "{9}"'.format(
+        req.remote_addr,
+        req.remote_user if req.remote_user is not None else '-',
+        time.strftime('%d/%b/%Y %H:%M:%S +0000', time.gmtime()),
+        req.method,
+        req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else ''),
+        req.environ.get('SERVER_PROTOCOL'),
+        resp.status_code,
+        resp.content_length,
+        req.referrer if req.referrer is not None else '-',
+        req.user_agent))
 
 
 def make_response(data, output='json'):

@@ -27,7 +27,7 @@ from prometheus_client.core import CollectorRegistry, Counter, Histogram
 from yaml.constructor import ConstructorError
 
 from cockatrice import NAME
-from cockatrice.util.http import make_response, TRUE_STRINGS
+from cockatrice.util.http import make_response, record_log, TRUE_STRINGS
 
 
 class ManagementHTTPServicer:
@@ -39,8 +39,8 @@ class ManagementHTTPServicer:
         self.__metrics_registry = metrics_registry
 
         # metrics
-        self.__metrics_http_requests_total = Counter(
-            '{0}_supervise_http_requests_total'.format(NAME),
+        self.__metrics_requests_total = Counter(
+            '{0}_manager_http_requests_total'.format(NAME),
             'The number of requests.',
             [
                 'method',
@@ -49,8 +49,17 @@ class ManagementHTTPServicer:
             ],
             registry=self.__metrics_registry
         )
-        self.__metrics_http_requests_bytes_total = Counter(
-            '{0}_suopervise_http_requests_bytes_total'.format(NAME),
+        self.__metrics_requests_duration_seconds = Histogram(
+            '{0}_manager_http_requests_duration_seconds'.format(NAME),
+            'The invocation duration in seconds.',
+            [
+                'method',
+                'endpoint'
+            ],
+            registry=self.__metrics_registry
+        )
+        self.__metrics_requests_bytes_total = Counter(
+            '{0}_manager_http_requests_bytes_total'.format(NAME),
             'A summary of the invocation requests bytes.',
             [
                 'method',
@@ -58,18 +67,9 @@ class ManagementHTTPServicer:
             ],
             registry=self.__metrics_registry
         )
-        self.__metrics_http_responses_bytes_total = Counter(
-            '{0}_supervise_http_responses_bytes_total'.format(NAME),
+        self.__metrics_responses_bytes_total = Counter(
+            '{0}_manager_http_responses_bytes_total'.format(NAME),
             'A summary of the invocation responses bytes.',
-            [
-                'method',
-                'endpoint'
-            ],
-            registry=self.__metrics_registry
-        )
-        self.__metrics_http_requests_duration_seconds = Histogram(
-            '{0}_supervise_http_requests_duration_seconds'.format(NAME),
-            'The invocation duration in seconds.',
             [
                 'method',
                 'endpoint'
@@ -90,13 +90,37 @@ class ManagementHTTPServicer:
         self.app.logger.disabled = True
         getLogger('werkzeug').disabled = True
 
+    def __record_metrics(self, start_time, req, resp):
+        self.__metrics_requests_total.labels(
+            method=req.method,
+            endpoint=req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else ''),
+            status_code=resp.status_code.value
+        ).inc()
+
+        self.__metrics_requests_bytes_total.labels(
+            method=req.method,
+            endpoint=req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else '')
+        ).inc(req.content_length if req.content_length is not None else 0)
+
+        self.__metrics_responses_bytes_total.labels(
+            method=req.method,
+            endpoint=req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else '')
+        ).inc(resp.content_length if resp.content_length is not None else 0)
+
+        self.__metrics_requests_duration_seconds.labels(
+            method=req.method,
+            endpoint=req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else '')
+        ).observe(time.time() - start_time)
+
+        return
+
     def __put(self, key=''):
         start_time = time.time()
 
         @after_this_request
         def to_do_after_this_request(response):
-            self.__record_http_log(request, response)
-            self.__record_http_metrics(start_time, request, response)
+            record_log(request, response, logger=self.__http_logger)
+            self.__record_metrics(start_time, request, response)
             return response
 
         data = {}
@@ -149,8 +173,8 @@ class ManagementHTTPServicer:
 
         @after_this_request
         def to_do_after_this_request(response):
-            self.__record_http_log(request, response)
-            self.__record_http_metrics(start_time, request, response)
+            record_log(request, response, logger=self.__http_logger)
+            self.__record_metrics(start_time, request, response)
             return response
 
         data = {}
@@ -186,8 +210,8 @@ class ManagementHTTPServicer:
 
         @after_this_request
         def to_do_after_this_request(response):
-            self.__record_http_log(request, response)
-            self.__record_http_metrics(start_time, request, response)
+            record_log(request, response, logger=self.__http_logger)
+            self.__record_metrics(start_time, request, response)
             return response
 
         data = {}
@@ -220,44 +244,3 @@ class ManagementHTTPServicer:
         resp.status_code = status_code
 
         return resp
-
-    def __record_http_log(self, req, resp):
-        log_message = '{0} - {1} [{2}] "{3} {4} {5}" {6} {7} "{8}" "{9}"'.format(
-            req.remote_addr,
-            req.remote_user if req.remote_user is not None else '-',
-            time.strftime('%d/%b/%Y %H:%M:%S +0000', time.gmtime()),
-            req.method,
-            req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else ''),
-            req.environ.get('SERVER_PROTOCOL'),
-            resp.status_code,
-            resp.content_length,
-            req.referrer if req.referrer is not None else '-',
-            req.user_agent
-        )
-        self.__http_logger.info(log_message)
-
-        return
-
-    def __record_http_metrics(self, start_time, req, resp):
-        self.__metrics_http_requests_total.labels(
-            method=req.method,
-            endpoint=req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else ''),
-            status_code=resp.status_code.value
-        ).inc()
-
-        self.__metrics_http_requests_bytes_total.labels(
-            method=req.method,
-            endpoint=req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else '')
-        ).inc(req.content_length if req.content_length is not None else 0)
-
-        self.__metrics_http_responses_bytes_total.labels(
-            method=req.method,
-            endpoint=req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else '')
-        ).inc(resp.content_length if resp.content_length is not None else 0)
-
-        self.__metrics_http_requests_duration_seconds.labels(
-            method=req.method,
-            endpoint=req.path + ('?{0}'.format(req.query_string.decode('utf-8')) if len(req.query_string) > 0 else '')
-        ).observe(time.time() - start_time)
-
-        return

@@ -26,9 +26,10 @@ from threading import RLock, Thread
 import grpc
 import pysyncobj.pickle as pickle
 from locked_dict.locked_dict import LockedDict
-from prometheus_client.core import CollectorRegistry
+from prometheus_client.core import CollectorRegistry, Counter, Histogram
 from pysyncobj import replicated, SyncObj, SyncObjConf
 
+from cockatrice import NAME
 from cockatrice.manager_grpc import ManagementGRPCServicer
 from cockatrice.manager_http import ManagementHTTPServicer
 from cockatrice.protobuf.management_pb2_grpc import add_ManagementServicer_to_server
@@ -53,6 +54,24 @@ class Manager(SyncObj):
         self.__logger = logger
         self.__http_logger = http_logger
         self.__metrics_registry = metrics_registry
+
+        # metrics
+        self.__metrics_requests_total = Counter(
+            '{0}_manager_requests_total'.format(NAME),
+            'The number of requests.',
+            [
+                'func'
+            ],
+            registry=self.__metrics_registry
+        )
+        self.__metrics_requests_duration_seconds = Histogram(
+            '{0}_manager_requests_duration_seconds'.format(NAME),
+            'The invocation duration in seconds.',
+            [
+                'func'
+            ],
+            registry=self.__metrics_registry
+        )
 
         self.__self_addr = '{0}:{1}'.format(self.__host, self.__port)
         self.__peer_addrs = [] if self.__seed_addr is None else get_peers(self.__seed_addr)
@@ -112,6 +131,15 @@ class Manager(SyncObj):
         self.__logger.info('state machine has stopped')
 
         self.__logger.info('supervisor has stopped')
+
+    def __record_metrics(self, start_time, func_name):
+        self.__metrics_requests_total.labels(
+            func=func_name
+        ).inc()
+
+        self.__metrics_requests_duration_seconds.labels(
+            func=func_name
+        ).observe(time.time() - start_time)
 
     # serializer
     def __serialize(self, filename, raft_data):
@@ -178,50 +206,73 @@ class Manager(SyncObj):
         return {keys[0]: value}
 
     def __put(self, key, value):
-        if key == '/':
-            self.__data.update(value)
-        else:
-            self.__data.update(self.__key_value_to_dict(key, value))
+        start_time = time.time()
+
+        try:
+            if key == '/':
+                self.__data.update(value)
+            else:
+                self.__data.update(self.__key_value_to_dict(key, value))
+        finally:
+            self.__record_metrics(start_time, 'put')
 
     @replicated
     def put(self, key, value):
         self.__put(key, value)
 
     def get(self, key):
-        value = self.__data
-        keys = [k for k in key.split('/') if k != '']
+        start_time = time.time()
 
-        for k in keys:
-            value = value.get(k, None)
-            if value is None:
-                return None
+        try:
+            value = self.__data
+            keys = [k for k in key.split('/') if k != '']
+
+            for k in keys:
+                value = value.get(k, None)
+                if value is None:
+                    return None
+        finally:
+            self.__record_metrics(start_time, 'get')
 
         return value
 
     def __delete(self, key):
-        if key == '/':
-            self.__clear()
-        else:
-            keys = [k for k in key.split('/') if k != '']
-            value = self.__data
+        start_time = time.time()
 
-            i = 0
-            while i < len(keys):
-                if len(keys[i:]) == 1:
-                    return value.pop(keys[i], None)
+        try:
+            if key == '/':
+                value = dict(self.__data)
+                self.__clear()
+            else:
+                keys = [k for k in key.split('/') if k != '']
+                value = self.__data
 
-                value = value.get(keys[i], None)
-                if value is None:
-                    return None
+                i = 0
+                while i < len(keys):
+                    if len(keys[i:]) == 1:
+                        return value.pop(keys[i], None)
 
-                i += 1
+                    value = value.get(keys[i], None)
+                    if value is None:
+                        return None
+
+                    i += 1
+        finally:
+            self.__record_metrics(start_time, 'delete')
+
+        return value
 
     @replicated
     def delete(self, key):
         return self.__delete(key)
 
     def __clear(self):
-        self.__data.clear()
+        start_time = time.time()
+
+        try:
+            self.__data.clear()
+        finally:
+            self.__record_metrics(start_time, 'clear')
 
     @replicated
     def clear(self):

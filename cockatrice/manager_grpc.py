@@ -15,7 +15,6 @@
 # limitations under the License.
 
 import _pickle as pickle
-import inspect
 import time
 from logging import getLogger
 
@@ -33,16 +32,16 @@ class ManagementGRPCServicer(ManagementServicer):
         self.__metrics_registry = metrics_registry
 
         # metrics
-        self.__metrics_grpc_requests_total = Counter(
-            '{0}_supervise_grpc_requests_total'.format(NAME),
+        self.__metrics_requests_total = Counter(
+            '{0}_manager_grpc_requests_total'.format(NAME),
             'The number of requests.',
             [
                 'func'
             ],
             registry=self.__metrics_registry
         )
-        self.__metrics_grpc_requests_duration_seconds = Histogram(
-            '{0}_supervise_grpc_requests_duration_seconds'.format(NAME),
+        self.__metrics_requests_duration_seconds = Histogram(
+            '{0}_manager_grpc_requests_duration_seconds'.format(NAME),
             'The invocation duration in seconds.',
             [
                 'func'
@@ -50,12 +49,12 @@ class ManagementGRPCServicer(ManagementServicer):
             registry=self.__metrics_registry
         )
 
-    def __record_grpc_metrics(self, start_time, func_name):
-        self.__metrics_grpc_requests_total.labels(
+    def __record_metrics(self, start_time, func_name):
+        self.__metrics_requests_total.labels(
             func=func_name
         ).inc()
 
-        self.__metrics_grpc_requests_duration_seconds.labels(
+        self.__metrics_requests_duration_seconds.labels(
             func=func_name
         ).observe(time.time() - start_time)
 
@@ -79,7 +78,7 @@ class ManagementGRPCServicer(ManagementServicer):
             response.status.success = False
             response.status.message = str(ex)
         finally:
-            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+            self.__record_metrics(start_time, 'put')
 
         return response
 
@@ -102,7 +101,7 @@ class ManagementGRPCServicer(ManagementServicer):
             response.status.success = False
             response.status.message = ex.args[0]
         finally:
-            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+            self.__record_metrics(start_time, 'get')
 
         return response
 
@@ -134,7 +133,7 @@ class ManagementGRPCServicer(ManagementServicer):
             response.status.success = False
             response.status.message = str(ex)
         finally:
-            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+            self.__record_metrics(start_time, 'get')
 
         return response
 
@@ -156,6 +155,6 @@ class ManagementGRPCServicer(ManagementServicer):
             response.status.success = False
             response.status.message = str(ex)
         finally:
-            self.__record_grpc_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+            self.__record_metrics(start_time, 'clear')
 
         return response

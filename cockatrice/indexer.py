@@ -16,7 +16,6 @@
 
 import copy
 import functools
-import inspect
 import os
 import re
 import socket
@@ -63,23 +62,23 @@ class Indexer(SyncObj):
 
         # metrics
         self.__metrics_core_documents = Gauge(
-            '{0}_index_core_documents'.format(NAME),
+            '{0}_indexer_index_documents'.format(NAME),
             'The number of documents.',
             [
                 'index_name',
             ],
             registry=self.__metrics_registry
         )
-        self.__metrics_core_requests_total = Counter(
-            '{0}_index_core_requests_total'.format(NAME),
+        self.__metrics_requests_total = Counter(
+            '{0}_indexer_requests_total'.format(NAME),
             'The number of requests.',
             [
                 'func'
             ],
             registry=self.__metrics_registry
         )
-        self.__metrics_core_requests_duration_seconds = Histogram(
-            '{0}_index_core_requests_duration_seconds'.format(NAME),
+        self.__metrics_requests_duration_seconds = Histogram(
+            '{0}_indexer_requests_duration_seconds'.format(NAME),
             'The invocation duration in seconds.',
             [
                 'func'
@@ -169,12 +168,12 @@ class Indexer(SyncObj):
             except Exception as ex:
                 self.__logger.error(ex)
 
-    def __record_core_metrics(self, start_time, func_name):
-        self.__metrics_core_requests_total.labels(
+    def __record_metrics(self, start_time, func_name):
+        self.__metrics_requests_total.labels(
             func=func_name
         ).inc()
 
-        self.__metrics_core_requests_duration_seconds.labels(
+        self.__metrics_requests_duration_seconds.labels(
             func=func_name
         ).observe(time.time() - start_time)
 
@@ -426,7 +425,7 @@ class Indexer(SyncObj):
         except Exception as ex:
             self.__logger.error('failed to open {0}: {1}'.format(index_name, ex))
         finally:
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+            self.__record_metrics(start_time, 'open_index')
 
         return index
 
@@ -452,7 +451,7 @@ class Indexer(SyncObj):
         except Exception as ex:
             self.__logger.error('failed to close {0}: {1}'.format(index_name, ex))
         finally:
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+            self.__record_metrics(start_time, 'close_index')
 
         return index
 
@@ -461,41 +460,41 @@ class Indexer(SyncObj):
         return self.__create_index(index_name, index_config)
 
     def __create_index(self, index_name, index_config):
+        if self.is_index_exist(index_name):
+            # open the index
+            return self.__open_index(index_name, index_config=index_config)
+
         start_time = time.time()
 
         index = None
 
         try:
-            if self.is_index_exist(index_name):
-                # open the index
-                index = self.__open_index(index_name, index_config=index_config)
+            self.__logger.info('creating {0}'.format(index_name))
+
+            # set index config
+            self.__index_configs[index_name] = index_config
+
+            # create the index
+            if self.__index_configs[index_name].get_storage_type() == 'ram':
+                index = self.__ram_storage.create_index(self.__index_configs[index_name].get_schema(),
+                                                        indexname=index_name)
             else:
-                self.__logger.info('creating {0}'.format(index_name))
+                index = self.__file_storage.create_index(self.__index_configs[index_name].get_schema(),
+                                                         indexname=index_name)
+            self.__indices[index_name] = index
+            self.__logger.info('{0} has created'.format(index_name))
 
-                # set index config
-                self.__index_configs[index_name] = index_config
+            # save the index config
+            with open(os.path.join(self.__file_storage.folder, self.get_index_config_file(index_name)),
+                      'wb') as f:
+                f.write(pickle.dumps(index_config))
 
-                # create the index
-                if self.__index_configs[index_name].get_storage_type() == 'ram':
-                    index = self.__ram_storage.create_index(self.__index_configs[index_name].get_schema(),
-                                                            indexname=index_name)
-                else:
-                    index = self.__file_storage.create_index(self.__index_configs[index_name].get_schema(),
-                                                             indexname=index_name)
-                self.__indices[index_name] = index
-                self.__logger.info('{0} has created'.format(index_name))
-
-                # save the index config
-                with open(os.path.join(self.__file_storage.folder, self.get_index_config_file(index_name)),
-                          'wb') as f:
-                    f.write(pickle.dumps(index_config))
-
-                # open the index writer
-                self.__open_writer(index_name)
+            # open the index writer
+            self.__open_writer(index_name)
         except Exception as ex:
             self.__logger.error('failed to create {0}: {1}'.format(index_name, ex))
         finally:
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+            self.__record_metrics(start_time, 'create_index')
 
         return index
 
@@ -504,10 +503,10 @@ class Indexer(SyncObj):
         return self.__delete_index(index_name)
 
     def __delete_index(self, index_name):
-        start_time = time.time()
-
         # close index
         index = self.__close_index(index_name)
+
+        start_time = time.time()
 
         try:
             self.__logger.info('deleting {0}'.format(index_name))
@@ -525,7 +524,7 @@ class Indexer(SyncObj):
         except Exception as ex:
             self.__logger.error('failed to delete {0}: {1}'.format(index_name, ex))
         finally:
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+            self.__record_metrics(start_time, 'delete_index')
 
         return index
 
@@ -537,7 +536,7 @@ class Indexer(SyncObj):
         except Exception as ex:
             raise ex
         finally:
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+            self.__record_metrics(start_time, 'get_index')
 
         return index
 
@@ -561,7 +560,8 @@ class Indexer(SyncObj):
         except Exception as ex:
             self.__logger.error('failed to commit index {0}: {1}'.format(index_name, ex))
         finally:
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+            # self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+            self.__record_metrics(start_time, 'commit_index')
 
         return success
 
@@ -585,7 +585,8 @@ class Indexer(SyncObj):
         except Exception as ex:
             self.__logger.error('failed to rollback index {0}: {1}'.format(index_name, ex))
         finally:
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+            # self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+            self.__record_metrics(start_time, 'rollback_index')
 
         return success
 
@@ -609,7 +610,7 @@ class Indexer(SyncObj):
         except Exception as ex:
             self.__logger.error('failed to optimize {0}: {1}'.format(index_name, ex))
         finally:
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+            self.__record_metrics(start_time, 'optimize_index')
 
         return success
 
@@ -705,13 +706,11 @@ class Indexer(SyncObj):
             self.__logger.error('failed to put documents to {0}: {1}'.format(index_name, ex))
             count = -1
         finally:
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+            self.__record_metrics(start_time, 'put_documents')
 
         return count
 
     def get_document(self, index_name, doc_id):
-        start_time = time.time()
-
         try:
             results_page = self.search_documents(index_name, doc_id,
                                                  self.__index_configs.get(index_name).get_doc_id_field(), 1,
@@ -722,8 +721,6 @@ class Indexer(SyncObj):
                 self.__logger.info('{0} did not exist in {1}'.format(doc_id, index_name))
         except Exception as ex:
             raise ex
-        finally:
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
 
         return results_page
 
@@ -752,7 +749,7 @@ class Indexer(SyncObj):
             self.__logger.error('failed to delete documents in bulk to {0}: {1}'.format(index_name, ex))
             count = -1
         finally:
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+            self.__record_metrics(start_time, 'delete_documents')
 
         return count
 
@@ -768,7 +765,7 @@ class Indexer(SyncObj):
         except Exception as ex:
             raise ex
         finally:
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+            self.__record_metrics(start_time, 'search_documents')
 
         return results_page
 
@@ -777,12 +774,7 @@ class Indexer(SyncObj):
         self.__create_snapshot()
 
     def __create_snapshot(self):
-        start_time = time.time()
-
-        try:
-            self.forceLogCompaction()
-        finally:
-            self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
+        self.forceLogCompaction()
 
     def get_snapshot_file_name(self):
         return self.__conf.fullDumpFile

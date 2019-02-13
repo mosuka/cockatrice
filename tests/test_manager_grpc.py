@@ -64,9 +64,9 @@ class TestManagementGRPCServicer(unittest.TestCase):
         http_logger.addHandler(http_log_handler)
         metrics_registry = CollectorRegistry()
 
-        self.supervise_core = Manager(host=host, port=port, seed_addr=seed_addr, conf=conf, data_dir=data_dir,
-                                      grpc_port=grpc_port, grpc_max_workers=grpc_max_workers, http_port=http_port,
-                                      logger=logger, http_logger=http_logger, metrics_registry=metrics_registry)
+        self.manager = Manager(host=host, port=port, seed_addr=seed_addr, conf=conf, data_dir=data_dir,
+                               grpc_port=grpc_port, grpc_max_workers=grpc_max_workers, http_port=http_port,
+                               logger=logger, http_logger=http_logger, metrics_registry=metrics_registry)
 
         self.channel = grpc.insecure_channel('{0}:{1}'.format(host, grpc_port))
         self.stub = ManagementStub(self.channel)
@@ -74,7 +74,7 @@ class TestManagementGRPCServicer(unittest.TestCase):
     def tearDown(self):
         self.channel.close()
 
-        self.supervise_core.stop()
+        self.manager.stop()
 
         self.temp_dir.cleanup()
 

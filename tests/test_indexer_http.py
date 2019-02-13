@@ -66,15 +66,15 @@ class TestIndexHTTPServicer(unittest.TestCase):
         http_logger.addHandler(http_log_handler)
         metrics_registry = CollectorRegistry()
 
-        self.index_core = Indexer(host=host, port=port, seed_addr=seed_addr, conf=conf, data_dir=data_dir,
-                                  grpc_port=grpc_port, grpc_max_workers=grpc_max_workers, http_port=http_port,
-                                  logger=logger, http_logger=http_logger, metrics_registry=metrics_registry)
+        self.indexer = Indexer(host=host, port=port, seed_addr=seed_addr, conf=conf, data_dir=data_dir,
+                               grpc_port=grpc_port, grpc_max_workers=grpc_max_workers, http_port=http_port,
+                               logger=logger, http_logger=http_logger, metrics_registry=metrics_registry)
 
         self.host = host
         self.port = http_port
 
     def tearDown(self):
-        self.index_core.stop()
+        self.indexer.stop()
         self.temp_dir.cleanup()
 
     def test_root(self):

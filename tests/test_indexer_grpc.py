@@ -71,15 +71,15 @@ class TestIndexGRPCServicer(unittest.TestCase):
         http_logger.addHandler(http_log_handler)
         metrics_registry = CollectorRegistry()
 
-        self.index_core = Indexer(host=host, port=port, seed_addr=seed_addr, conf=conf, data_dir=data_dir,
-                                  grpc_port=grpc_port, grpc_max_workers=grpc_max_workers, http_port=http_port,
-                                  logger=logger, http_logger=http_logger, metrics_registry=metrics_registry)
+        self.indexer = Indexer(host=host, port=port, seed_addr=seed_addr, conf=conf, data_dir=data_dir,
+                               grpc_port=grpc_port, grpc_max_workers=grpc_max_workers, http_port=http_port,
+                               logger=logger, http_logger=http_logger, metrics_registry=metrics_registry)
 
         self.channel = grpc.insecure_channel('{0}:{1}'.format(host, grpc_port))
 
     def tearDown(self):
         self.channel.close()
-        self.index_core.stop()
+        self.indexer.stop()
         self.temp_dir.cleanup()
 
     def test_create_index(self):
@@ -739,7 +739,7 @@ class TestIndexGRPCServicer(unittest.TestCase):
         response = stub.CreateSnapshot(request)
         sleep(1)  # wait for snapshot file to be created
         self.assertEqual(True, response.status.success)
-        self.assertEqual(True, os.path.exists(self.index_core.get_snapshot_file_name()))
+        self.assertEqual(True, os.path.exists(self.indexer.get_snapshot_file_name()))
 
         # snapshot exists
         request = IsSnapshotExistRequest()
@@ -750,16 +750,16 @@ class TestIndexGRPCServicer(unittest.TestCase):
     def test_create_snapshot(self):
         stub = IndexStub(self.channel)
 
-        self.assertEqual(False, os.path.exists(self.index_core.get_snapshot_file_name()))
+        self.assertEqual(False, os.path.exists(self.indexer.get_snapshot_file_name()))
 
         # create snapshot
         request = CreateSnapshotRequest()
         response = stub.CreateSnapshot(request)
         sleep(1)  # wait for snapshot file to be created
         self.assertEqual(True, response.status.success)
-        self.assertEqual(True, os.path.exists(self.index_core.get_snapshot_file_name()))
+        self.assertEqual(True, os.path.exists(self.indexer.get_snapshot_file_name()))
 
-        with zipfile.ZipFile(self.index_core.get_snapshot_file_name()) as f:
+        with zipfile.ZipFile(self.indexer.get_snapshot_file_name()) as f:
             self.assertEqual(['raft.bin'], f.namelist())
 
     def test_get_snapshot(self):
@@ -770,9 +770,9 @@ class TestIndexGRPCServicer(unittest.TestCase):
         response = stub.CreateSnapshot(request)
         sleep(1)  # wait for snapshot file to be created
         self.assertEqual(True, response.status.success)
-        self.assertEqual(True, os.path.exists(self.index_core.get_snapshot_file_name()))
+        self.assertEqual(True, os.path.exists(self.indexer.get_snapshot_file_name()))
 
-        with zipfile.ZipFile(self.index_core.get_snapshot_file_name()) as f:
+        with zipfile.ZipFile(self.indexer.get_snapshot_file_name()) as f:
             self.assertEqual(['raft.bin'], f.namelist())
 
         # get snapshot

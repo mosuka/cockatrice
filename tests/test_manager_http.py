@@ -63,22 +63,22 @@ class TestManagementHTTPServicer(unittest.TestCase):
         http_logger.addHandler(http_log_handler)
         metrics_registry = CollectorRegistry()
 
-        self.supervise_core = Manager(host=host, port=port, seed_addr=seed_addr, conf=conf, data_dir=data_dir,
-                                      grpc_port=grpc_port, grpc_max_workers=grpc_max_workers, http_port=http_port,
-                                      logger=logger, http_logger=http_logger, metrics_registry=metrics_registry)
+        self.manager = Manager(host=host, port=port, seed_addr=seed_addr, conf=conf, data_dir=data_dir,
+                               grpc_port=grpc_port, grpc_max_workers=grpc_max_workers, http_port=http_port,
+                               logger=logger, http_logger=http_logger, metrics_registry=metrics_registry)
 
         self.host = host
         self.port = http_port
 
     def tearDown(self):
-        self.supervise_core.stop()
+        self.manager.stop()
         self.temp_dir.cleanup()
 
     def test_put(self):
         data = '{"a": {"b": {"c": 1, "d": 2}}}'
 
         # put data
-        response = requests.put('http://{0}:{1}/config?sync=True'.format(self.host, self.port),
+        response = requests.put('http://{0}:{1}/data?sync=True'.format(self.host, self.port),
                                 headers={'Content-Type': 'application/json'}, data=data.encode('utf-8'))
 
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
@@ -87,12 +87,12 @@ class TestManagementHTTPServicer(unittest.TestCase):
         data = '{"a": {"b": {"c": 1, "d": 2}}}'
 
         # put data
-        response = requests.put('http://{0}:{1}/config?sync=True'.format(self.host, self.port),
+        response = requests.put('http://{0}:{1}/data?sync=True'.format(self.host, self.port),
                                 headers={'Content-Type': 'application/json'}, data=data.encode('utf-8'))
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
 
         # get data
-        response = requests.get('http://{0}:{1}/config/a/b/c'.format(self.host, self.port))
+        response = requests.get('http://{0}:{1}/data/a/b/c'.format(self.host, self.port))
         self.assertEqual(HTTPStatus.OK, response.status_code)
         resp_data = json.loads(response.text)
         self.assertEqual(1, resp_data['value'])
@@ -101,28 +101,28 @@ class TestManagementHTTPServicer(unittest.TestCase):
         data = '{"a": {"b": {"c": 1, "d": 2}}}'
 
         # put data
-        response = requests.put('http://{0}:{1}/config?sync=True'.format(self.host, self.port),
+        response = requests.put('http://{0}:{1}/data?sync=True'.format(self.host, self.port),
                                 headers={'Content-Type': 'application/json'}, data=data.encode('utf-8'))
         self.assertEqual(HTTPStatus.CREATED, response.status_code)
 
         # get data
-        response = requests.get('http://{0}:{1}/config/a/b/c'.format(self.host, self.port))
+        response = requests.get('http://{0}:{1}/data/a/b/c'.format(self.host, self.port))
         self.assertEqual(HTTPStatus.OK, response.status_code)
         resp_data = json.loads(response.text)
         self.assertEqual(1, resp_data['value'])
 
         # delete data
-        response = requests.delete('http://{0}:{1}/config/a/b/c?sync=True'.format(self.host, self.port))
+        response = requests.delete('http://{0}:{1}/data/a/b/c?sync=True'.format(self.host, self.port))
         self.assertEqual(HTTPStatus.OK, response.status_code)
 
         # get data
-        response = requests.get('http://{0}:{1}/config/a/b/c'.format(self.host, self.port))
+        response = requests.get('http://{0}:{1}/data/a/b/c'.format(self.host, self.port))
         self.assertEqual(HTTPStatus.NOT_FOUND, response.status_code)
 
         # delete data
-        response = requests.delete('http://{0}:{1}/config?sync=True'.format(self.host, self.port))
+        response = requests.delete('http://{0}:{1}/data?sync=True'.format(self.host, self.port))
         self.assertEqual(HTTPStatus.OK, response.status_code)
 
         # get data
-        response = requests.get('http://{0}:{1}/config'.format(self.host, self.port))
+        response = requests.get('http://{0}:{1}/data'.format(self.host, self.port))
         self.assertEqual(HTTPStatus.OK, response.status_code)
