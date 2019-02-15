@@ -424,7 +424,7 @@ filters:
 # define storage settings
 #
 storage:
-  type: "ram"  # "ram" or "file"
+  type: "file"  # "ram" or "file"
 
 #
 # define writer settings
