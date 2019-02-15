@@ -33,7 +33,6 @@ from whoosh.filedb.filestore import FileStorage, RamStorage
 from whoosh.qparser import QueryParser
 
 from cockatrice import NAME
-from cockatrice.index_writer import IndexWriter
 from cockatrice.indexer_grpc import IndexGRPCServicer
 from cockatrice.indexer_http import IndexHTTPServicer
 from cockatrice.protobuf.index_pb2_grpc import add_IndexServicer_to_server
@@ -199,7 +198,7 @@ class Indexer(RaftNode):
                 # store the index files and raft logs to the snapshot file
                 with zipfile.ZipFile(filename, 'w', zipfile.ZIP_DEFLATED) as f:
                     for index_name in self.get_index_names():
-                        # self.__commit_index(index_name)
+                        self.__commit_index(index_name)
 
                         # with self.__get_writer(index_name).writelock:
                         # with self.__indices[index_name].lock('WRITELOCK'):
@@ -491,6 +490,9 @@ class Indexer(RaftNode):
         return index
 
     def get_index(self, index_name):
+        return self.__get_index(index_name)
+
+    def __get_index(self, index_name):
         start_time = time.time()
 
         try:
@@ -501,6 +503,50 @@ class Indexer(RaftNode):
             self.__record_metrics(start_time, 'get_index')
 
         return index
+
+    def __open_writer(self, index_name):
+        writer = None
+
+        try:
+            writer = self.__writers.get(index_name, None)
+            if writer is None or writer.is_closed:
+                self.__logger.info('opening writer for {0}'.format(index_name))
+                writer = self.__indices.get(index_name).writer()
+                self.__writers[index_name] = writer
+                self.__logger.info('writer for {0} has opened'.format(index_name))
+        except Exception as ex:
+            self.__logger.error('failed to open writer for {0}: {1}'.format(index_name, ex))
+
+        return writer
+
+    def __close_writer(self, index_name):
+        writer = None
+
+        try:
+            # close the index
+            writer = self.__writers.pop(index_name, None)
+            if writer is not None:
+                self.__logger.info('closing writer for {0}'.format(index_name))
+                writer.commit()
+                self.__logger.info('writer for {0} has closed'.format(index_name))
+        except Exception as ex:
+            self.__logger.error('failed to close writer for {0}: {1}'.format(index_name, ex))
+
+        return writer
+
+    def __get_writer(self, index_name):
+        return self.__writers.get(index_name, None)
+
+    def __get_searcher(self, index_name, weighting=None):
+        try:
+            if weighting is None:
+                searcher = self.__indices.get(index_name).searcher()
+            else:
+                searcher = self.__indices.get(index_name).searcher(weighting=weighting)
+        except Exception as ex:
+            raise ex
+
+        return searcher
 
     @replicated
     def commit_index(self, index_name):
@@ -515,7 +561,7 @@ class Indexer(RaftNode):
             self.__logger.info('committing {0}'.format(index_name))
 
             self.__get_writer(index_name).commit()
-            # self.__open_writer(index_name)
+            self.__open_writer(index_name)  # reopen writer
 
             self.__logger.info('{0} has committed'.format(index_name))
 
@@ -539,9 +585,8 @@ class Indexer(RaftNode):
         try:
             self.__logger.info('rolling back {0}'.format(index_name))
 
-            self.__get_writer(index_name).rollback()
-            # self.__get_writer(index_name).cancel()
-            # self.__open_writer(index_name)
+            self.__get_writer(index_name).cancel()
+            self.__open_writer(index_name)  # reopen writer
 
             self.__logger.info('{0} has rolled back'.format(index_name))
 
@@ -565,10 +610,8 @@ class Indexer(RaftNode):
         try:
             self.__logger.info('optimizing {0}'.format(index_name))
 
-            self.__get_writer(index_name).optimize()
-            # self.__get_writer(index_name).commit(optimize=True, merge=False)
-            # self.__get_writer(index_name).commit()
-            # self.__open_writer(index_name)
+            self.__get_writer(index_name).commit(optimize=True, merge=False)
+            self.__open_writer(index_name)  # reopen writer
 
             self.__logger.info('{0} has optimized'.format(index_name))
 
@@ -596,66 +639,6 @@ class Indexer(RaftNode):
 
         return schema
 
-    def __open_writer(self, index_name):
-        try:
-            self.__logger.info('opening writer for {0}'.format(index_name))
-
-            # open the index writer
-            writer = IndexWriter(self.__indices.get(index_name),
-                                 procs=self.__index_configs.get(index_name).get_writer_processors(),
-                                 batchsize=self.__index_configs.get(index_name).get_writer_batch_size(),
-                                 multisegment=self.__index_configs.get(index_name).get_writer_multi_segment(),
-                                 period=self.__index_configs.get(index_name).get_writer_auto_commit_period(),
-                                 limit=self.__index_configs.get(index_name).get_writer_auto_commit_limit(),
-                                 logger=self.__logger)
-            # writer = BufferedWriter(self.__indices.get(index_name),
-            #                         period=self.__index_configs.get(index_name).get_writer_auto_commit_period(),
-            #                         limit=self.__index_configs.get(index_name).get_writer_auto_commit_limit(),
-            #                         writerargs={'proc': 1, }, commitargs=None)
-            # writer = self.__indices.get(index_name).writer(
-            #     procs=self.__index_configs.get(index_name).get_writer_processors(),
-            #     batchsize=self.__index_configs.get(index_name).get_writer_batch_size(),
-            #     multisegment=self.__index_configs.get(index_name).get_writer_multi_segment())
-            self.__writers[index_name] = writer
-
-            self.__logger.info('writer for {0} has opened'.format(index_name))
-        except Exception as ex:
-            raise ex
-
-        return writer
-
-    def __close_writer(self, index_name):
-        try:
-            self.__logger.info('closing writer for {0}'.format(index_name))
-
-            # close the index writer
-            writer = self.__writers.pop(index_name) if index_name in self.__writers else None
-            # if writer is not None and not writer.is_closed:
-            # if writer is not None:
-            if writer is not None and not writer.is_closed():
-                writer.close()
-                # writer.commit()
-
-            self.__logger.info('writer for {0} has closed'.format(index_name))
-        except Exception as ex:
-            raise ex
-
-        return writer
-
-    def __get_writer(self, index_name):
-        return self.__writers.get(index_name, None)
-
-    def __get_searcher(self, index_name, weighting=None):
-        try:
-            if weighting is None:
-                searcher = self.__indices.get(index_name).searcher()
-            else:
-                searcher = self.__indices.get(index_name).searcher(weighting=weighting)
-        except Exception as ex:
-            raise ex
-
-        return searcher
-
     @replicated
     def put_document(self, index_name, doc_id, fields):
         return self.__put_document(index_name, doc_id, fields)
@@ -676,11 +659,12 @@ class Indexer(RaftNode):
         try:
             self.__logger.info('putting documents to {0}'.format(index_name))
 
-            count = self.__get_writer(index_name).update_documents(docs)
-            # count = 0
-            # for doc in docs:
-            #     self.__get_writer(index_name).update_document(**doc)
-            #     count += 1
+            # count = self.__get_writer(index_name).update_documents(docs)
+
+            count = 0
+            for doc in docs:
+                self.__get_writer(index_name).update_document(**doc)
+                count += 1
 
             self.__logger.info('{0} documents has put to {1}'.format(count, index_name))
         except Exception as ex:
@@ -722,13 +706,13 @@ class Indexer(RaftNode):
         try:
             self.__logger.info('deleting documents from {0}'.format(index_name))
 
-            count = self.__get_writer(index_name).delete_documents(doc_ids, doc_id_field=self.__index_configs.get(
-                index_name).get_doc_id_field())
+            # count = self.__get_writer(index_name).delete_documents(doc_ids, doc_id_field=self.__index_configs.get(
+            #     index_name).get_doc_id_field())
 
-            # count = 0
-            # for doc_id in doc_ids:
-            #     count += self.__get_writer(index_name).delete_by_term(
-            #         self.__index_configs.get(index_name).get_doc_id_field(), doc_id)
+            count = 0
+            for doc_id in doc_ids:
+                count += self.__get_writer(index_name).delete_by_term(
+                    self.__index_configs.get(index_name).get_doc_id_field(), doc_id)
 
             self.__logger.info('{0} documents has deleted from {1}'.format(count, index_name))
         except Exception as ex:
