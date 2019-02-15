@@ -427,35 +427,36 @@ class Indexer(RaftNode):
 
         index = None
 
-        try:
-            self.__logger.info('creating {0}'.format(index_name))
+        with self.__lock:
+            try:
+                self.__logger.info('creating {0}'.format(index_name))
 
-            # set index config
-            self.__index_configs[index_name] = index_config
+                # set index config
+                self.__index_configs[index_name] = index_config
 
-            self.__logger.debug(self.__index_configs[index_name].get_storage_type())
+                self.__logger.debug(self.__index_configs[index_name].get_storage_type())
 
-            # create the index
-            if self.__index_configs[index_name].get_storage_type() == 'ram':
-                index = self.__ram_storage.create_index(self.__index_configs[index_name].get_schema(),
-                                                        indexname=index_name)
-            else:
-                index = self.__file_storage.create_index(self.__index_configs[index_name].get_schema(),
-                                                         indexname=index_name)
-            self.__indices[index_name] = index
-            self.__logger.info('{0} has created'.format(index_name))
+                # create the index
+                if self.__index_configs[index_name].get_storage_type() == 'ram':
+                    index = self.__ram_storage.create_index(self.__index_configs[index_name].get_schema(),
+                                                            indexname=index_name)
+                else:
+                    index = self.__file_storage.create_index(self.__index_configs[index_name].get_schema(),
+                                                             indexname=index_name)
+                self.__indices[index_name] = index
+                self.__logger.info('{0} has created'.format(index_name))
 
-            # save the index config
-            with open(os.path.join(self.__file_storage.folder, self.get_index_config_file(index_name)),
-                      'wb') as f:
-                f.write(pickle.dumps(index_config))
+                # save the index config
+                with open(os.path.join(self.__file_storage.folder, self.get_index_config_file(index_name)),
+                          'wb') as f:
+                    f.write(pickle.dumps(index_config))
 
-            # open the index writer
-            self.__open_writer(index_name)
-        except Exception as ex:
-            self.__logger.error('failed to create {0}: {1}'.format(index_name, ex))
-        finally:
-            self.__record_metrics(start_time, 'create_index')
+                # open the index writer
+                self.__open_writer(index_name)
+            except Exception as ex:
+                self.__logger.error('failed to create {0}: {1}'.format(index_name, ex))
+            finally:
+                self.__record_metrics(start_time, 'create_index')
 
         return index
 
@@ -469,23 +470,24 @@ class Indexer(RaftNode):
 
         start_time = time.time()
 
-        try:
-            self.__logger.info('deleting {0}'.format(index_name))
+        with self.__lock:
+            try:
+                self.__logger.info('deleting {0}'.format(index_name))
 
-            # delete index files
-            for filename in self.get_index_files(index_name):
-                self.__file_storage.delete_file(filename)
-                self.__logger.info('{0} was deleted'.format(filename))
+                # delete index files
+                for filename in self.get_index_files(index_name):
+                    self.__file_storage.delete_file(filename)
+                    self.__logger.info('{0} was deleted'.format(filename))
 
-            self.__logger.info('{0} has deleted'.format(index_name))
+                self.__logger.info('{0} has deleted'.format(index_name))
 
-            # delete the index config
-            self.__index_configs.pop(index_name, None)
-            os.remove(os.path.join(self.__file_storage.folder, self.get_index_config_file(index_name)))
-        except Exception as ex:
-            self.__logger.error('failed to delete {0}: {1}'.format(index_name, ex))
-        finally:
-            self.__record_metrics(start_time, 'delete_index')
+                # delete the index config
+                self.__index_configs.pop(index_name, None)
+                os.remove(os.path.join(self.__file_storage.folder, self.get_index_config_file(index_name)))
+            except Exception as ex:
+                self.__logger.error('failed to delete {0}: {1}'.format(index_name, ex))
+            finally:
+                self.__record_metrics(start_time, 'delete_index')
 
         return index
 
@@ -557,19 +559,20 @@ class Indexer(RaftNode):
 
         success = False
 
-        try:
-            self.__logger.info('committing {0}'.format(index_name))
+        with self.__lock:
+            try:
+                self.__logger.info('committing {0}'.format(index_name))
 
-            self.__get_writer(index_name).commit()
-            self.__open_writer(index_name)  # reopen writer
+                self.__get_writer(index_name).commit()
+                self.__open_writer(index_name)  # reopen writer
 
-            self.__logger.info('{0} has committed'.format(index_name))
+                self.__logger.info('{0} has committed'.format(index_name))
 
-            success = True
-        except Exception as ex:
-            self.__logger.error('failed to commit index {0}: {1}'.format(index_name, ex))
-        finally:
-            self.__record_metrics(start_time, 'commit_index')
+                success = True
+            except Exception as ex:
+                self.__logger.error('failed to commit index {0}: {1}'.format(index_name, ex))
+            finally:
+                self.__record_metrics(start_time, 'commit_index')
 
         return success
 
@@ -582,19 +585,20 @@ class Indexer(RaftNode):
 
         success = False
 
-        try:
-            self.__logger.info('rolling back {0}'.format(index_name))
+        with self.__lock:
+            try:
+                self.__logger.info('rolling back {0}'.format(index_name))
 
-            self.__get_writer(index_name).cancel()
-            self.__open_writer(index_name)  # reopen writer
+                self.__get_writer(index_name).cancel()
+                self.__open_writer(index_name)  # reopen writer
 
-            self.__logger.info('{0} has rolled back'.format(index_name))
+                self.__logger.info('{0} has rolled back'.format(index_name))
 
-            success = True
-        except Exception as ex:
-            self.__logger.error('failed to rollback index {0}: {1}'.format(index_name, ex))
-        finally:
-            self.__record_metrics(start_time, 'rollback_index')
+                success = True
+            except Exception as ex:
+                self.__logger.error('failed to rollback index {0}: {1}'.format(index_name, ex))
+            finally:
+                self.__record_metrics(start_time, 'rollback_index')
 
         return success
 
@@ -607,19 +611,20 @@ class Indexer(RaftNode):
 
         success = False
 
-        try:
-            self.__logger.info('optimizing {0}'.format(index_name))
+        with self.__lock:
+            try:
+                self.__logger.info('optimizing {0}'.format(index_name))
 
-            self.__get_writer(index_name).commit(optimize=True, merge=False)
-            self.__open_writer(index_name)  # reopen writer
+                self.__get_writer(index_name).commit(optimize=True, merge=False)
+                self.__open_writer(index_name)  # reopen writer
 
-            self.__logger.info('{0} has optimized'.format(index_name))
+                self.__logger.info('{0} has optimized'.format(index_name))
 
-            success = True
-        except Exception as ex:
-            self.__logger.error('failed to optimize {0}: {1}'.format(index_name, ex))
-        finally:
-            self.__record_metrics(start_time, 'optimize_index')
+                success = True
+            except Exception as ex:
+                self.__logger.error('failed to optimize {0}: {1}'.format(index_name, ex))
+            finally:
+                self.__record_metrics(start_time, 'optimize_index')
 
         return success
 
@@ -656,22 +661,23 @@ class Indexer(RaftNode):
     def __put_documents(self, index_name, docs):
         start_time = time.time()
 
-        try:
-            self.__logger.info('putting documents to {0}'.format(index_name))
+        with self.__lock:
+            try:
+                self.__logger.info('putting documents to {0}'.format(index_name))
 
-            # count = self.__get_writer(index_name).update_documents(docs)
+                # count = self.__get_writer(index_name).update_documents(docs)
 
-            count = 0
-            for doc in docs:
-                self.__get_writer(index_name).update_document(**doc)
-                count += 1
+                count = 0
+                for doc in docs:
+                    self.__get_writer(index_name).update_document(**doc)
+                    count += 1
 
-            self.__logger.info('{0} documents has put to {1}'.format(count, index_name))
-        except Exception as ex:
-            self.__logger.error('failed to put documents to {0}: {1}'.format(index_name, ex))
-            count = -1
-        finally:
-            self.__record_metrics(start_time, 'put_documents')
+                self.__logger.info('{0} documents has put to {1}'.format(count, index_name))
+            except Exception as ex:
+                self.__logger.error('failed to put documents to {0}: {1}'.format(index_name, ex))
+                count = -1
+            finally:
+                self.__record_metrics(start_time, 'put_documents')
 
         return count
 
@@ -703,23 +709,24 @@ class Indexer(RaftNode):
     def __delete_documents(self, index_name, doc_ids):
         start_time = time.time()
 
-        try:
-            self.__logger.info('deleting documents from {0}'.format(index_name))
+        with self.__lock:
+            try:
+                self.__logger.info('deleting documents from {0}'.format(index_name))
 
-            # count = self.__get_writer(index_name).delete_documents(doc_ids, doc_id_field=self.__index_configs.get(
-            #     index_name).get_doc_id_field())
+                # count = self.__get_writer(index_name).delete_documents(doc_ids, doc_id_field=self.__index_configs.get(
+                #     index_name).get_doc_id_field())
 
-            count = 0
-            for doc_id in doc_ids:
-                count += self.__get_writer(index_name).delete_by_term(
-                    self.__index_configs.get(index_name).get_doc_id_field(), doc_id)
+                count = 0
+                for doc_id in doc_ids:
+                    count += self.__get_writer(index_name).delete_by_term(
+                        self.__index_configs.get(index_name).get_doc_id_field(), doc_id)
 
-            self.__logger.info('{0} documents has deleted from {1}'.format(count, index_name))
-        except Exception as ex:
-            self.__logger.error('failed to delete documents in bulk to {0}: {1}'.format(index_name, ex))
-            count = -1
-        finally:
-            self.__record_metrics(start_time, 'delete_documents')
+                self.__logger.info('{0} documents has deleted from {1}'.format(count, index_name))
+            except Exception as ex:
+                self.__logger.error('failed to delete documents in bulk to {0}: {1}'.format(index_name, ex))
+                count = -1
+            finally:
+                self.__record_metrics(start_time, 'delete_documents')
 
         return count
 
@@ -753,9 +760,10 @@ class Indexer(RaftNode):
         return os.path.exists(self.get_snapshot_file_name())
 
     def open_snapshot_file(self):
-        try:
-            file = open(self.get_snapshot_file_name(), mode='rb')
-        except Exception as ex:
-            raise ex
+        with self.__lock:
+            try:
+                file = open(self.get_snapshot_file_name(), mode='rb')
+            except Exception as ex:
+                raise ex
 
         return file
