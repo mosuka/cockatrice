@@ -15,21 +15,20 @@
 # limitations under the License.
 
 import copy
-import functools
 import os
 import re
-import socket
 import time
 import zipfile
 from concurrent import futures
-from contextlib import closing
+from http import HTTPStatus
 from logging import getLogger
 from threading import RLock, Thread, Timer
 
 import grpc
 import pysyncobj.pickle as pickle
+import requests
 from prometheus_client.core import CollectorRegistry, Counter, Gauge, Histogram
-from pysyncobj import FAIL_REASON, replicated, SyncObj, SyncObjConf
+from pysyncobj import replicated, SyncObjConf
 from whoosh.filedb.filestore import FileStorage, RamStorage
 from whoosh.qparser import QueryParser
 
@@ -39,11 +38,10 @@ from cockatrice.indexer_grpc import IndexGRPCServicer
 from cockatrice.indexer_http import IndexHTTPServicer
 from cockatrice.protobuf.index_pb2_grpc import add_IndexServicer_to_server
 from cockatrice.util.http import HTTPServer
-from cockatrice.util.raft import add_node, get_peers, RAFT_DATA_FILE
-from cockatrice.util.resolver import parse_addr
+from cockatrice.util.raft import add_node, get_leader, get_metadata, get_peers, RAFT_DATA_FILE, RaftNode
 
 
-class Indexer(SyncObj):
+class Indexer(RaftNode):
     def __init__(self, host='localhost', port=7070, seed_addr=None, conf=SyncObjConf(),
                  data_dir='/tmp/cockatrice/index', grpc_port=5050, grpc_max_workers=10, http_port=8080,
                  logger=getLogger(), http_logger=getLogger(), metrics_registry=CollectorRegistry()):
@@ -87,7 +85,7 @@ class Indexer(SyncObj):
         )
 
         self.__self_addr = '{0}:{1}'.format(self.__host, self.__port)
-        self.__peer_addrs = [] if self.__seed_addr is None else get_peers(self.__seed_addr)
+        self.__peer_addrs = [] if self.__seed_addr is None else get_peers(bind_addr=self.__seed_addr, timeout=10)
         self.__other_addrs = [peer_addr for peer_addr in self.__peer_addrs if peer_addr != self.__self_addr]
         self.__conf.serializer = self.__serialize
         self.__conf.deserializer = self.__deserialize
@@ -98,18 +96,33 @@ class Indexer(SyncObj):
         self.__writers = {}
         self.__lock = RLock()
 
-        # add this node to the cluster
-        if self.__self_addr not in self.__peer_addrs and self.__seed_addr is not None:
-            Thread(target=add_node,
-                   kwargs={'node_name': self.__self_addr, 'bind_addr': self.__seed_addr, 'timeout': 0.5}).start()
-
         # create data dir
         os.makedirs(self.__data_dir, exist_ok=True)
         self.__file_storage = FileStorage(self.__data_dir, supports_mmap=True, readonly=False, debug=False)
         self.__ram_storage = RamStorage()
 
+        # if seed addr specified and self node does not exist in the cluster, add self node to the cluster
+        if self.__seed_addr is not None and self.__self_addr not in self.__peer_addrs:
+            Thread(target=add_node,
+                   kwargs={'node_name': self.__self_addr, 'bind_addr': self.__seed_addr, 'timeout': 10}).start()
+
+        # copy snapshot from the leader node
+        if self.__seed_addr is not None:
+            try:
+                metadata = get_metadata(bind_addr=get_leader(bind_addr=self.__seed_addr, timeout=10), timeout=10)
+                response = requests.get('http://{0}/snapshot'.format(metadata['http_addr']))
+                if response.status_code == HTTPStatus.OK:
+                    with open(self.__conf.fullDumpFile, 'wb') as f:
+                        f.write(response.content)
+            except Exception as ex:
+                self.__logger.error('failed to copy snapshot: {0}'.format(ex))
+
         # start node
-        super(Indexer, self).__init__(self.__self_addr, self.__peer_addrs, conf=self.__conf)
+        metadata = {
+            'grpc_addr': '{0}:{1}'.format(self.__host, self.__grpc_port),
+            'http_addr': '{0}:{1}'.format(self.__host, self.__http_port)
+        }
+        super(Indexer, self).__init__(self.__self_addr, self.__peer_addrs, conf=self.__conf, metadata=metadata)
         self.__logger.info('state machine has started')
         while not self.isReady():
             # recovering data
@@ -177,54 +190,6 @@ class Indexer(SyncObj):
             func=func_name
         ).observe(time.time() - start_time)
 
-    # override SyncObj.__utilityCallback
-    def _SyncObj__utilityCallback(self, res, err, conn, cmd, node):
-        cmdResult = 'FAIL'
-        if err == FAIL_REASON.SUCCESS:
-            cmdResult = 'SUCCESS'
-        conn.send(cmdResult + ' ' + cmd + ' ' + node)
-
-    # override SyncObj.__onUtilityMessage
-    def _SyncObj__onUtilityMessage(self, conn, message):
-        try:
-            if message[0] == 'status':
-                conn.send(self.getStatus())
-                return True
-            elif message[0] == 'add':
-                self.addNodeToCluster(message[1],
-                                      callback=functools.partial(self._SyncObj__utilityCallback, conn=conn, cmd='ADD',
-                                                                 node=message[1]))
-                return True
-            elif message[0] == 'remove':
-                if message[1] == self.__selfNodeAddr:
-                    conn.send('FAIL REMOVE ' + message[1])
-                else:
-                    self.removeNodeFromCluster(message[1],
-                                               callback=functools.partial(self._SyncObj__utilityCallback, conn=conn,
-                                                                          cmd='REMOVE', node=message[1]))
-                return True
-            elif message[0] == 'set_version':
-                self.setCodeVersion(message[1],
-                                    callback=functools.partial(self._SyncObj__utilityCallback, conn=conn,
-                                                               cmd='SET_VERSION', node=str(message[1])))
-                return True
-            elif message[0] == 'get_snapshot':
-                if os.path.exists(self.__conf.fullDumpFile):
-                    with open(self.__conf.fullDumpFile, 'rb') as f:
-                        conn.send(f.read())
-                else:
-                    conn.send('')
-                return True
-            elif message[0] == 'is_alive':
-                conn.send(str(self.is_alive()))
-                return True
-            elif message[0] == 'is_ready':
-                conn.send(str(self.isReady()))
-                return True
-        except Exception as e:
-            conn.send(str(e))
-            return True
-
     # index serializer
     def __serialize(self, filename, raft_data):
         with self.__lock:
@@ -234,23 +199,24 @@ class Indexer(SyncObj):
                 # store the index files and raft logs to the snapshot file
                 with zipfile.ZipFile(filename, 'w', zipfile.ZIP_DEFLATED) as f:
                     for index_name in self.get_index_names():
-                        with self.__get_writer(index_name).lock():
-                            self.__optimize_index(index_name)
+                        # self.__commit_index(index_name)
 
-                            # index files
-                            for index_filename in self.get_index_files(index_name):
-                                if self.__index_configs.get(index_name).get_storage_type() == "ram":
-                                    with self.__ram_storage.open_file(index_filename) as r:
-                                        f.writestr(index_filename, r.read())
-                                else:
-                                    f.write(os.path.join(self.__file_storage.folder, index_filename), index_filename)
-                                self.__logger.debug('{0} has stored in {1}'.format(index_filename, filename))
+                        # with self.__get_writer(index_name).writelock:
+                        # with self.__indices[index_name].lock('WRITELOCK'):
+                        # index files
+                        for index_filename in self.get_index_files(index_name):
+                            if self.__index_configs.get(index_name).get_storage_type() == "ram":
+                                with self.__ram_storage.open_file(index_filename) as r:
+                                    f.writestr(index_filename, r.read())
+                            else:
+                                f.write(os.path.join(self.__file_storage.folder, index_filename), index_filename)
+                            self.__logger.debug('{0} has stored in {1}'.format(index_filename, filename))
 
-                            # index config file
-                            f.write(os.path.join(self.__file_storage.folder, self.get_index_config_file(index_name)),
-                                    self.get_index_config_file(index_name))
-                            self.__logger.debug(
-                                '{0} has stored in {1}'.format(self.get_index_config_file(index_name), filename))
+                        # index config file
+                        f.write(os.path.join(self.__file_storage.folder, self.get_index_config_file(index_name)),
+                                self.get_index_config_file(index_name))
+                        self.__logger.debug(
+                            '{0} has stored in {1}'.format(self.get_index_config_file(index_name), filename))
 
                     # store the raft data
                     f.writestr(RAFT_DATA_FILE, pickle.dumps(raft_data))
@@ -263,8 +229,6 @@ class Indexer(SyncObj):
 
     # index deserializer
     def __deserialize(self, filename):
-        raft_data = None
-
         with self.__lock:
             try:
                 self.__logger.info('deserializer has started')
@@ -315,21 +279,17 @@ class Indexer(SyncObj):
                     # extract the raft data
                     raft_data = pickle.loads(zf.read(RAFT_DATA_FILE))
                     self.__logger.info('{0} has restored'.format(RAFT_DATA_FILE))
+                    return raft_data
             except Exception as ex:
                 self.__logger.error('failed to restore indices: {0}'.format(ex))
             finally:
                 self.__logger.info('deserializer has stopped')
 
-        return raft_data
-
     def is_healthy(self):
-        return self.is_alive() and self.is_ready()
+        return self.isHealthy()
 
     def is_alive(self):
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
-            alive = sock.connect_ex(parse_addr(self.__self_addr)) == 0
-
-        return alive
+        return self.isAlive()
 
     def is_ready(self):
         return self.isReady()
@@ -474,6 +434,8 @@ class Indexer(SyncObj):
             # set index config
             self.__index_configs[index_name] = index_config
 
+            self.__logger.debug(self.__index_configs[index_name].get_storage_type())
+
             # create the index
             if self.__index_configs[index_name].get_storage_type() == 'ram':
                 index = self.__ram_storage.create_index(self.__index_configs[index_name].get_schema(),
@@ -553,6 +515,7 @@ class Indexer(SyncObj):
             self.__logger.info('committing {0}'.format(index_name))
 
             self.__get_writer(index_name).commit()
+            # self.__open_writer(index_name)
 
             self.__logger.info('{0} has committed'.format(index_name))
 
@@ -560,7 +523,6 @@ class Indexer(SyncObj):
         except Exception as ex:
             self.__logger.error('failed to commit index {0}: {1}'.format(index_name, ex))
         finally:
-            # self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
             self.__record_metrics(start_time, 'commit_index')
 
         return success
@@ -578,6 +540,8 @@ class Indexer(SyncObj):
             self.__logger.info('rolling back {0}'.format(index_name))
 
             self.__get_writer(index_name).rollback()
+            # self.__get_writer(index_name).cancel()
+            # self.__open_writer(index_name)
 
             self.__logger.info('{0} has rolled back'.format(index_name))
 
@@ -585,7 +549,6 @@ class Indexer(SyncObj):
         except Exception as ex:
             self.__logger.error('failed to rollback index {0}: {1}'.format(index_name, ex))
         finally:
-            # self.__record_core_metrics(start_time, inspect.getframeinfo(inspect.currentframe())[2])
             self.__record_metrics(start_time, 'rollback_index')
 
         return success
@@ -603,6 +566,9 @@ class Indexer(SyncObj):
             self.__logger.info('optimizing {0}'.format(index_name))
 
             self.__get_writer(index_name).optimize()
+            # self.__get_writer(index_name).commit(optimize=True, merge=False)
+            # self.__get_writer(index_name).commit()
+            # self.__open_writer(index_name)
 
             self.__logger.info('{0} has optimized'.format(index_name))
 
@@ -642,6 +608,14 @@ class Indexer(SyncObj):
                                  period=self.__index_configs.get(index_name).get_writer_auto_commit_period(),
                                  limit=self.__index_configs.get(index_name).get_writer_auto_commit_limit(),
                                  logger=self.__logger)
+            # writer = BufferedWriter(self.__indices.get(index_name),
+            #                         period=self.__index_configs.get(index_name).get_writer_auto_commit_period(),
+            #                         limit=self.__index_configs.get(index_name).get_writer_auto_commit_limit(),
+            #                         writerargs={'proc': 1, }, commitargs=None)
+            # writer = self.__indices.get(index_name).writer(
+            #     procs=self.__index_configs.get(index_name).get_writer_processors(),
+            #     batchsize=self.__index_configs.get(index_name).get_writer_batch_size(),
+            #     multisegment=self.__index_configs.get(index_name).get_writer_multi_segment())
             self.__writers[index_name] = writer
 
             self.__logger.info('writer for {0} has opened'.format(index_name))
@@ -656,8 +630,11 @@ class Indexer(SyncObj):
 
             # close the index writer
             writer = self.__writers.pop(index_name) if index_name in self.__writers else None
+            # if writer is not None and not writer.is_closed:
+            # if writer is not None:
             if writer is not None and not writer.is_closed():
                 writer.close()
+                # writer.commit()
 
             self.__logger.info('writer for {0} has closed'.format(index_name))
         except Exception as ex:
@@ -700,6 +677,10 @@ class Indexer(SyncObj):
             self.__logger.info('putting documents to {0}'.format(index_name))
 
             count = self.__get_writer(index_name).update_documents(docs)
+            # count = 0
+            # for doc in docs:
+            #     self.__get_writer(index_name).update_document(**doc)
+            #     count += 1
 
             self.__logger.info('{0} documents has put to {1}'.format(count, index_name))
         except Exception as ex:
@@ -743,6 +724,11 @@ class Indexer(SyncObj):
 
             count = self.__get_writer(index_name).delete_documents(doc_ids, doc_id_field=self.__index_configs.get(
                 index_name).get_doc_id_field())
+
+            # count = 0
+            # for doc_id in doc_ids:
+            #     count += self.__get_writer(index_name).delete_by_term(
+            #         self.__index_configs.get(index_name).get_doc_id_field(), doc_id)
 
             self.__logger.info('{0} documents has deleted from {1}'.format(count, index_name))
         except Exception as ex:

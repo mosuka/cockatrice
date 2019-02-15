@@ -190,6 +190,33 @@ class TestIndexer(unittest.TestCase):
         # results_page = self.index_core.get_document(index_name, test_doc_id)
         # self.assertEqual(0, results_page.total)
 
+    def test_optimize(self):
+        # read index config
+        with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:
+            index_config_dict = yaml.safe_load(file_obj.read())
+        index_config = IndexConfig(index_config_dict)
+
+        # create index
+        index_name = 'test_file_index'
+        self.indexer.create_index(index_name, index_config, sync=True)
+        self.assertTrue(self.indexer.is_index_exist(index_name))
+
+        test_doc_id = '1'
+        with open(self.example_dir + '/doc1.json', 'r', encoding='utf-8') as file_obj:
+            test_fields = json.loads(file_obj.read(), encoding='utf-8')
+
+        # put document
+        count = self.indexer.put_document(index_name, test_doc_id, test_fields, sync=True)
+        self.assertEqual(1, count)
+
+        # commit
+        success = self.indexer.commit_index(index_name, sync=True)
+        self.assertTrue(success)
+
+        # optimize
+        success = self.indexer.optimize_index(index_name, sync=True)
+        self.assertTrue(success)
+
     def test_get_document(self):
         # read index config
         with open(self.example_dir + '/index_config.yaml', 'r', encoding='utf-8') as file_obj:

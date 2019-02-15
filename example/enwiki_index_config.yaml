@@ -434,18 +434,18 @@ writer:
   # auto commit settings
   #
   auto_commit:
-    period: 30  # Set this to 0 or null to not use auto-commit
+    period: 10  # Set this to 0 or null to not use auto-commit
     limit: 100
 
   #
   #
   #
-  processors: null  # Set to 0 or null to use the number of CPUs in the system
+  processors: 4  # Set to 0 or null to use the number of CPUs in the system
 
   #
   #
   #
-  batch_size: 100
+  batch_size: 30
 
   #
   #

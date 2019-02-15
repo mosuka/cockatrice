@@ -39,7 +39,7 @@ class IndexWriter(WhooshIndexWriter):
 
         self.__counter = 0
 
-        self.__lock = threading.RLock()
+        self.__lock = threading.Lock()
 
         if self.__period:
             self.autocommit_timer = threading.Timer(self.__period, self.commit)
@@ -68,15 +68,22 @@ class IndexWriter(WhooshIndexWriter):
                 self.autocommit_timer.cancel()
                 self.__logger.debug('timer for {0} were stopped'.format(self.__index.indexname))
 
-            if not self.is_closed():
-                if self.__counter > 0:
-                    self.__writer.commit(mergetype=mergetype, optimize=optimize, merge=merge)
-                    self.__logger.debug('writer for {0} were committed the index'.format(self.__index.indexname))
-                    self.__counter = 0
-                else:
-                    self.__writer.cancel()
-                    self.__logger.debug('writer for {0} has no updates'.format(self.__index.indexname))
+            if self.__counter > 0:
+                self.__writer.commit(mergetype=mergetype, optimize=optimize, merge=merge)
+                self.__logger.debug('writer for {0} were committed the index'.format(self.__index.indexname))
+                self.__counter = 0
+            else:
+                self.__writer.cancel()
+                self.__logger.debug('writer for {0} has no updates'.format(self.__index.indexname))
 
+            # if not self.is_closed():
+            #     if self.__counter > 0:
+            #         self.__writer.commit(mergetype=mergetype, optimize=optimize, merge=merge)
+            #         self.__logger.debug('writer for {0} were committed the index'.format(self.__index.indexname))
+            #         self.__counter = 0
+            #     else:
+            #         self.__writer.cancel()
+            #         self.__logger.debug('writer for {0} has no updates'.format(self.__index.indexname))
             if restart:
                 self.__writer = self.__index.writer(proc=self.__procs, batchsize=self.__batchsize,
                                                     subargs=self.__subargs, multisegment=self.__multisegment,

@@ -22,8 +22,9 @@ from logging import getLogger
 
 import mimeparse
 import yaml
-from flask import after_this_request, Flask, request
+from flask import after_this_request, Flask, request, Response
 from prometheus_client.core import CollectorRegistry, Counter, Histogram
+from prometheus_client.exposition import CONTENT_TYPE_LATEST, generate_latest
 from yaml.constructor import ConstructorError
 
 from cockatrice import NAME
@@ -85,6 +86,11 @@ class ManagementHTTPServicer:
         self.app.add_url_rule('/data/<path:key>', endpoint='put', view_func=self.__put, methods=['PUT'])
         self.app.add_url_rule('/data/<path:key>', endpoint='get', view_func=self.__get, methods=['GET'])
         self.app.add_url_rule('/data/<path:key>', endpoint='delete', view_func=self.__delete, methods=['DELETE'])
+        self.app.add_url_rule('/metrics', endpoint='metrics', view_func=self.__metrics, methods=['GET'])
+        self.app.add_url_rule('/healthiness', endpoint='healthiness', view_func=self.__healthiness, methods=['GET'])
+        self.app.add_url_rule('/liveness', endpoint='liveness', view_func=self.__liveness, methods=['GET'])
+        self.app.add_url_rule('/readiness', endpoint='readiness', view_func=self.__readiness, methods=['GET'])
+        self.app.add_url_rule('/status', endpoint='status', view_func=self.__get_status, methods=['GET'])
 
         # disable Flask default logger
         self.app.logger.disabled = True
@@ -242,5 +248,176 @@ class ManagementHTTPServicer:
         # make response
         resp = make_response(data, output)
         resp.status_code = status_code
+
+        return resp
+
+    def __get_status(self):
+        start_time = time.time()
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            record_log(request, response, logger=self.__http_logger)
+            self.__record_metrics(start_time, request, resp)
+            return response
+
+        data = {}
+        status_code = None
+
+        try:
+            data['node_status'] = self.__manager.getStatus()
+            status_code = HTTPStatus.OK
+        except Exception as ex:
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            self.__logger.error(ex)
+        finally:
+            data['time'] = time.time() - start_time
+            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+                              'description': status_code.description}
+
+        output = request.args.get('output', default='json', type=str).lower()
+
+        # make response
+        resp = make_response(data, output)
+        resp.status_code = status_code
+
+        return resp
+
+    def __healthiness(self):
+        start_time = time.time()
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            record_log(request, response, logger=self.__http_logger)
+            self.__record_metrics(start_time, request, response)
+            return response
+
+        data = {}
+        status_code = None
+
+        try:
+            healthy = self.__manager.is_healthy()
+
+            data['healthy'] = healthy
+            if healthy:
+                status_code = HTTPStatus.OK
+            else:
+                status_code = HTTPStatus.SERVICE_UNAVAILABLE
+                data['error'] = 'node is not healthy'
+        except Exception as ex:
+            data['healthy'] = False
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            self.__logger.error(ex)
+        finally:
+            data['time'] = time.time() - start_time
+            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+                              'description': status_code.description}
+
+        output = request.args.get('output', default='json', type=str).lower()
+
+        # make response
+        resp = make_response(data, output)
+        resp.status_code = status_code
+
+        return resp
+
+    def __liveness(self):
+        start_time = time.time()
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            record_log(request, response, logger=self.__http_logger)
+            self.__record_metrics(start_time, request, response)
+            return response
+
+        data = {}
+        status_code = None
+
+        try:
+            alive = self.__manager.is_alive()
+
+            data['liveness'] = alive
+            if alive:
+                status_code = HTTPStatus.OK
+            else:
+                status_code = HTTPStatus.SERVICE_UNAVAILABLE
+                data['error'] = 'node is not alive'
+        except Exception as ex:
+            data['liveness'] = False
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            self.__logger.error(ex)
+        finally:
+            data['time'] = time.time() - start_time
+            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+                              'description': status_code.description}
+
+        output = request.args.get('output', default='json', type=str).lower()
+
+        # make response
+        resp = make_response(data, output)
+        resp.status_code = status_code
+
+        return resp
+
+    def __readiness(self):
+        start_time = time.time()
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            record_log(request, response, logger=self.__http_logger)
+            self.__record_metrics(start_time, request, response)
+            return response
+
+        data = {}
+        status_code = None
+
+        try:
+            ready = self.__manager.is_ready()
+
+            data['readiness'] = ready
+            if ready:
+                status_code = HTTPStatus.OK
+            else:
+                status_code = HTTPStatus.SERVICE_UNAVAILABLE
+                data['error'] = 'node is not ready'
+        except Exception as ex:
+            data['readiness'] = False
+            data['error'] = '{0}'.format(ex.args[0])
+            status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            self.__logger.error(ex)
+        finally:
+            data['time'] = time.time() - start_time
+            data['status'] = {'code': status_code.value, 'phrase': status_code.phrase,
+                              'description': status_code.description}
+
+        output = request.args.get('output', default='json', type=str).lower()
+
+        # make response
+        resp = make_response(data, output)
+        resp.status_code = status_code
+
+        return resp
+
+    def __metrics(self):
+        start_time = time.time()
+
+        @after_this_request
+        def to_do_after_this_request(response):
+            record_log(request, response, logger=self.__http_logger)
+            self.__record_metrics(start_time, request, response)
+            return response
+
+        resp = Response()
+        try:
+            resp.status_code = HTTPStatus.OK
+            resp.content_type = CONTENT_TYPE_LATEST
+            resp.data = generate_latest(self.__metrics_registry)
+        except Exception as ex:
+            resp.status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+            resp.content_type = 'text/plain; charset="UTF-8"'
+            resp.data = '{0}\n{1}'.format(resp.status_code.phrase, resp.status_code.description)
+            self.__logger.error(ex)
 
         return resp

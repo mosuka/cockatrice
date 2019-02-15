@@ -13,9 +13,9 @@ You can easily bring up 3-node cluster with dynamic membership by following comm
 
 .. code-block:: bash
 
-    $ cockatrice start indexer --port=7070 --snapshot-file=/tmp/cockatrice/node1/snapshot.zip --index-dir=/tmp/cockatrice/node1/index --http-port=8080
-    $ cockatrice start indexer --port=7071 --snapshot-file=/tmp/cockatrice/node2/snapshot.zip --index-dir=/tmp/cockatrice/node2/index --http-port=8081 --peer-addr=127.0.0.1:7070
-    $ cockatrice start indexer --port=7072 --snapshot-file=/tmp/cockatrice/node3/snapshot.zip --index-dir=/tmp/cockatrice/node3/index --http-port=8082 --peer-addr=127.0.0.1:7070
+    $ cockatrice start indexer --port=7070 --snapshot-file=/tmp/cockatrice/node1/index.zip --data-dir=/tmp/cockatrice/node1/index --grpc-port 5050 --http-port=8080
+    $ cockatrice start indexer --port=7071 --snapshot-file=/tmp/cockatrice/node2/index.zip --data-dir=/tmp/cockatrice/node2/index --grpc-port 5051 --http-port=8081 --peer-addr=127.0.0.1:7070
+    $ cockatrice start indexer --port=7072 --snapshot-file=/tmp/cockatrice/node3/index.zip --data-dir=/tmp/cockatrice/node3/index --grpc-port 5052 --http-port=8082 --peer-addr=127.0.0.1:7070
 
 Start by specifying the existing node in the cluster with the ``--peer-addr`` parameter.
 

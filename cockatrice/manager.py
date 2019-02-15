@@ -15,11 +15,9 @@
 # limitations under the License.
 
 import os
-import socket
 import time
 import zipfile
 from concurrent import futures
-from contextlib import closing
 from logging import getLogger
 from threading import RLock, Thread
 
@@ -27,18 +25,17 @@ import grpc
 import pysyncobj.pickle as pickle
 from locked_dict.locked_dict import LockedDict
 from prometheus_client.core import CollectorRegistry, Counter, Histogram
-from pysyncobj import replicated, SyncObj, SyncObjConf
+from pysyncobj import replicated, SyncObjConf
 
 from cockatrice import NAME
 from cockatrice.manager_grpc import ManagementGRPCServicer
 from cockatrice.manager_http import ManagementHTTPServicer
 from cockatrice.protobuf.management_pb2_grpc import add_ManagementServicer_to_server
 from cockatrice.util.http import HTTPServer
-from cockatrice.util.raft import add_node, get_peers, RAFT_DATA_FILE
-from cockatrice.util.resolver import parse_addr
+from cockatrice.util.raft import add_node, get_peers, get_snapshot, get_status, RAFT_DATA_FILE, RaftNode
 
 
-class Manager(SyncObj):
+class Manager(RaftNode):
     def __init__(self, host='localhost', port=7070, seed_addr=None, conf=SyncObjConf(),
                  data_dir='/tmp/cockatrice/management', grpc_port=5050, grpc_max_workers=10, http_port=8080,
                  logger=getLogger(), http_logger=getLogger(), metrics_registry=CollectorRegistry()):
@@ -91,6 +88,19 @@ class Manager(SyncObj):
         # create data dir
         os.makedirs(self.__data_dir, exist_ok=True)
 
+        # copy snapshot from the leader node
+        if self.__seed_addr is not None:
+            try:
+                leader = get_status(bind_addr=self.__seed_addr, timeout=0.5)['leader']
+                self.__logger.info('copying snapshot from {0}'.format(leader))
+                snapshot = get_snapshot(bind_addr=leader, timeout=0.5)
+                if snapshot is not None:
+                    with open(self.__conf.fullDumpFile, 'wb') as f:
+                        f.write(snapshot)
+                    self.__logger.info('snapshot copied from {0}'.format(leader))
+            except Exception as ex:
+                self.__logger.error('failed to copy snapshot from {0}: {1}'.format(leader, ex))
+
         # start node
         super(Manager, self).__init__(self.__self_addr, self.__other_addrs, conf=self.__conf)
         self.__logger.info('state machine has started')
@@ -115,7 +125,7 @@ class Manager(SyncObj):
         self.__http_server.start()
         self.__logger.info('HTTP server has started')
 
-        self.__logger.info('supervisor has started')
+        self.__logger.info('manager has started')
 
     def stop(self):
         # stop HTTP server
@@ -130,7 +140,7 @@ class Manager(SyncObj):
         self.destroy()
         self.__logger.info('state machine has stopped')
 
-        self.__logger.info('supervisor has stopped')
+        self.__logger.info('manager has stopped')
 
     def __record_metrics(self, start_time, func_name):
         self.__metrics_requests_total.labels(
@@ -187,12 +197,10 @@ class Manager(SyncObj):
         return raft_data
 
     def is_healthy(self):
-        return self.is_alive() and self.is_ready()
+        return self.isHealthy()
 
     def is_alive(self):
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
-            alive = sock.connect_ex(parse_addr(self.__self_addr)) == 0
-        return alive
+        return self.isAlive()
 
     def is_ready(self):
         return self.isReady()
