@@ -17,6 +17,7 @@
 import copy
 import os
 import re
+import threading
 import time
 import zipfile
 from concurrent import futures
@@ -29,10 +30,11 @@ import pysyncobj.pickle as pickle
 import requests
 from prometheus_client.core import CollectorRegistry, Counter, Gauge, Histogram
 from pysyncobj import replicated, SyncObjConf
-from whoosh.filedb.filestore import FileStorage, RamStorage
+from whoosh.filedb.filestore import FileStorage
 from whoosh.qparser import QueryParser
 
 from cockatrice import NAME
+from cockatrice.filestore.filestore import RamStorage
 from cockatrice.indexer_grpc import IndexGRPCServicer
 from cockatrice.indexer_http import IndexHTTPServicer
 from cockatrice.protobuf.index_pb2_grpc import add_IndexServicer_to_server
@@ -93,6 +95,8 @@ class Indexer(RaftNode):
         self.__indices = {}
         self.__index_configs = {}
         self.__writers = {}
+        self.__auto_commit_timers = {}
+
         self.__lock = RLock()
 
         # create data dir
@@ -121,13 +125,22 @@ class Indexer(RaftNode):
             'grpc_addr': '{0}:{1}'.format(self.__host, self.__grpc_port),
             'http_addr': '{0}:{1}'.format(self.__host, self.__http_port)
         }
+        self.__logger.info('starting raft state machine')
         super(Indexer, self).__init__(self.__self_addr, self.__peer_addrs, conf=self.__conf, metadata=metadata)
-        self.__logger.info('state machine has started')
+        self.__logger.info('raft state machine has started')
+
+        if os.path.exists(self.__conf.fullDumpFile):
+            self.__logger.debug('snapshot exists: {0}'.format(self.__conf.fullDumpFile))
+        else:
+            pass
+
         while not self.isReady():
             # recovering data
             self.__logger.debug('waiting for cluster ready')
+            self.__logger.debug(self.getStatus())
             time.sleep(1)
         self.__logger.info('cluster ready')
+        self.__logger.debug(self.getStatus())
 
         # open existing indices on startup
         for index_name in self.get_index_names():
@@ -189,11 +202,25 @@ class Indexer(RaftNode):
             func=func_name
         ).observe(time.time() - start_time)
 
+    # def __serialize_indices(self, filename):
+    #     with self.__lock:
+    #         try:
+    #             self.__logger.info('starting serialize indices')
+    #
+    #         except Exception as ex:
+    #             self.__logger.error('failed to create snapshot: {0}'.format(ex))
+    #         finally:
+    #             self.__logger.info('serialize indices has finished')
+
+    # def __serialize_raft_data(self, filename, raft_data):
+    #     with self.__lock:
+    #         pass
+
     # index serializer
     def __serialize(self, filename, raft_data):
         with self.__lock:
             try:
-                self.__logger.info('serializer has started')
+                self.__logger.debug('serializer has started')
 
                 # store the index files and raft logs to the snapshot file
                 with zipfile.ZipFile(filename, 'w', zipfile.ZIP_DEFLATED) as f:
@@ -219,18 +246,18 @@ class Indexer(RaftNode):
 
                     # store the raft data
                     f.writestr(RAFT_DATA_FILE, pickle.dumps(raft_data))
-                    self.__logger.info('{0} has restored'.format(RAFT_DATA_FILE))
-                self.__logger.info('snapshot has created')
+                    self.__logger.debug('{0} has restored'.format(RAFT_DATA_FILE))
+                self.__logger.debug('snapshot has created')
             except Exception as ex:
                 self.__logger.error('failed to create snapshot: {0}'.format(ex))
             finally:
-                self.__logger.info('serializer has stopped')
+                self.__logger.debug('serializer has stopped')
 
     # index deserializer
     def __deserialize(self, filename):
         with self.__lock:
             try:
-                self.__logger.info('deserializer has started')
+                self.__logger.debug('deserializer has started')
 
                 with zipfile.ZipFile(filename, 'r') as zf:
                     # get file names in snapshot file
@@ -239,8 +266,8 @@ class Indexer(RaftNode):
                     # get index names in snapshot file
                     index_names = []
                     pattern_toc = re.compile(r'^_(.+)_\d+\.toc$')
-                    for filename in filenames:
-                        match = pattern_toc.search(filename)
+                    for f in filenames:
+                        match = pattern_toc.search(f)
                         if match and match.group(1) not in index_names:
                             index_names.append(match.group(1))
 
@@ -273,16 +300,16 @@ class Indexer(RaftNode):
 
                             self.__logger.debug('{0} has restored from {1}'.format(index_file, filename))
 
-                        self.__logger.info('{0} has restored'.format(index_name))
+                        self.__logger.debug('{0} has restored'.format(index_name))
 
                     # extract the raft data
                     raft_data = pickle.loads(zf.read(RAFT_DATA_FILE))
-                    self.__logger.info('{0} has restored'.format(RAFT_DATA_FILE))
+                    self.__logger.debug('{0} has restored'.format(RAFT_DATA_FILE))
                     return raft_data
             except Exception as ex:
                 self.__logger.error('failed to restore indices: {0}'.format(ex))
             finally:
-                self.__logger.info('deserializer has stopped')
+                self.__logger.debug('deserializer has stopped')
 
     def is_healthy(self):
         return self.isHealthy()
@@ -358,7 +385,7 @@ class Indexer(RaftNode):
             # open the index
             index = self.__indices.get(index_name)
             if index is None:
-                self.__logger.info('opening {0}'.format(index_name))
+                self.__logger.debug('opening {0}'.format(index_name))
 
                 if index_config is None:
                     # set saved index config
@@ -404,7 +431,7 @@ class Indexer(RaftNode):
             # close the index
             index = self.__indices.pop(index_name)
             if index is not None:
-                self.__logger.info('closing {0}'.format(index_name))
+                self.__logger.debug('closing {0}'.format(index_name))
                 index.close()
                 self.__logger.info('{0} has closed'.format(index_name))
         except Exception as ex:
@@ -429,7 +456,7 @@ class Indexer(RaftNode):
 
         with self.__lock:
             try:
-                self.__logger.info('creating {0}'.format(index_name))
+                self.__logger.debug('creating {0}'.format(index_name))
 
                 # set index config
                 self.__index_configs[index_name] = index_config
@@ -472,12 +499,12 @@ class Indexer(RaftNode):
 
         with self.__lock:
             try:
-                self.__logger.info('deleting {0}'.format(index_name))
+                self.__logger.debug('deleting {0}'.format(index_name))
 
                 # delete index files
                 for filename in self.get_index_files(index_name):
                     self.__file_storage.delete_file(filename)
-                    self.__logger.info('{0} was deleted'.format(filename))
+                    self.__logger.debug('{0} was deleted'.format(filename))
 
                 self.__logger.info('{0} has deleted'.format(index_name))
 
@@ -506,16 +533,38 @@ class Indexer(RaftNode):
 
         return index
 
+    def __start_auto_commit_timer(self, index_name, period):
+        timer = self.__auto_commit_timers.get(index_name, None)
+        if timer is None:
+            self.__auto_commit_timers[index_name] = threading.Timer(period, self.__auto_commit_index,
+                                                                    kwargs={'index_name': index_name, 'period': period})
+            self.__auto_commit_timers[index_name].start()
+            self.__logger.debug('auto commit timer for {0} were started'.format(index_name))
+
+    def __stop_auto_commit_timer(self, index_name):
+        timer = self.__auto_commit_timers.pop(index_name, None)
+        if timer is not None:
+            timer.cancel()
+            self.__logger.debug('auto commit timer for {0} were stopped'.format(index_name))
+
+    def __auto_commit_index(self, index_name, period):
+        self.__stop_auto_commit_timer(index_name)
+        self.__commit_index(index_name)
+        self.__start_auto_commit_timer(index_name, period=period)
+
     def __open_writer(self, index_name):
         writer = None
 
         try:
             writer = self.__writers.get(index_name, None)
             if writer is None or writer.is_closed:
-                self.__logger.info('opening writer for {0}'.format(index_name))
+                self.__logger.debug('opening writer for {0}'.format(index_name))
                 writer = self.__indices.get(index_name).writer()
                 self.__writers[index_name] = writer
-                self.__logger.info('writer for {0} has opened'.format(index_name))
+                self.__logger.debug('writer for {0} has opened'.format(index_name))
+
+                self.__start_auto_commit_timer(index_name, period=self.__index_configs.get(
+                    index_name).get_writer_auto_commit_period())
         except Exception as ex:
             self.__logger.error('failed to open writer for {0}: {1}'.format(index_name, ex))
 
@@ -525,12 +574,14 @@ class Indexer(RaftNode):
         writer = None
 
         try:
+            self.__stop_auto_commit_timer(index_name)
+
             # close the index
             writer = self.__writers.pop(index_name, None)
             if writer is not None:
-                self.__logger.info('closing writer for {0}'.format(index_name))
+                self.__logger.debug('closing writer for {0}'.format(index_name))
                 writer.commit()
-                self.__logger.info('writer for {0} has closed'.format(index_name))
+                self.__logger.debug('writer for {0} has closed'.format(index_name))
         except Exception as ex:
             self.__logger.error('failed to close writer for {0}: {1}'.format(index_name, ex))
 
@@ -561,7 +612,7 @@ class Indexer(RaftNode):
 
         with self.__lock:
             try:
-                self.__logger.info('committing {0}'.format(index_name))
+                self.__logger.debug('committing {0}'.format(index_name))
 
                 self.__get_writer(index_name).commit()
                 self.__open_writer(index_name)  # reopen writer
@@ -587,7 +638,7 @@ class Indexer(RaftNode):
 
         with self.__lock:
             try:
-                self.__logger.info('rolling back {0}'.format(index_name))
+                self.__logger.debug('rolling back {0}'.format(index_name))
 
                 self.__get_writer(index_name).cancel()
                 self.__open_writer(index_name)  # reopen writer
@@ -613,7 +664,7 @@ class Indexer(RaftNode):
 
         with self.__lock:
             try:
-                self.__logger.info('optimizing {0}'.format(index_name))
+                self.__logger.debug('optimizing {0}'.format(index_name))
 
                 self.__get_writer(index_name).commit(optimize=True, merge=False)
                 self.__open_writer(index_name)  # reopen writer
@@ -663,7 +714,7 @@ class Indexer(RaftNode):
 
         with self.__lock:
             try:
-                self.__logger.info('putting documents to {0}'.format(index_name))
+                self.__logger.debug('putting documents to {0}'.format(index_name))
 
                 # count = self.__get_writer(index_name).update_documents(docs)
 
@@ -687,9 +738,9 @@ class Indexer(RaftNode):
                                                  self.__index_configs.get(index_name).get_doc_id_field(), 1,
                                                  page_len=1)
             if results_page.total > 0:
-                self.__logger.info('{0} was got from {1}'.format(doc_id, index_name))
+                self.__logger.debug('{0} was got from {1}'.format(doc_id, index_name))
             else:
-                self.__logger.info('{0} did not exist in {1}'.format(doc_id, index_name))
+                self.__logger.debug('{0} did not exist in {1}'.format(doc_id, index_name))
         except Exception as ex:
             raise ex
 
@@ -711,7 +762,7 @@ class Indexer(RaftNode):
 
         with self.__lock:
             try:
-                self.__logger.info('deleting documents from {0}'.format(index_name))
+                self.__logger.debug('deleting documents from {0}'.format(index_name))
 
                 # count = self.__get_writer(index_name).delete_documents(doc_ids, doc_id_field=self.__index_configs.get(
                 #     index_name).get_doc_id_field())

@@ -134,6 +134,7 @@ def start_indexer(host='localhost', port=7070, peer_addr=None, snapshot_file='/t
 
     # determine log destination
     if log_file is not None:
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
         log_handler = RotatingFileHandler(log_file, 'a+', maxBytes=log_file_max_bytes,
                                           backupCount=log_file_backup_count)
 
@@ -173,6 +174,7 @@ def start_indexer(host='localhost', port=7070, peer_addr=None, snapshot_file='/t
 
     # determine http log destination
     if http_log_file is not None:
+        os.makedirs(os.path.dirname(http_log_file), exist_ok=True)
         http_log_handler = RotatingFileHandler(http_log_file, 'a+', maxBytes=http_log_file_max_bytes,
                                                backupCount=http_log_file_backup_count)
 

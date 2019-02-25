@@ -424,7 +424,7 @@ filters:
 # define storage settings
 #
 storage:
-  type: "file"  # "ram" or "file"
+  type: "ram"  # "ram" or "file"
 
 #
 # define writer settings
@@ -440,7 +440,7 @@ writer:
   #
   #
   #
-  processors: 4  # Set to 0 or null to use the number of CPUs in the system
+  processors: 1  # Set to 0 or null to use the number of CPUs in the system
 
   #
   #
