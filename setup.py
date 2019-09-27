@@ -71,7 +71,7 @@ setup(
         'whoosh==2.7.4',
         'pyyaml==4.2b1',
         'janome==0.3.7',
-        'werkzeug==0.14.1',
+        'werkzeug==0.15.3',
         'grpcio==1.17.1',
         'grpcio-tools==1.17.1',
         'protobuf==3.6.1',
